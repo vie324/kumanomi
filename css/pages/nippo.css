@@ -1,1 +1,153 @@
-/* 日報 ページ固有スタイル(.page-nippo 配下に必ずスコープすること) */
+/* 日報 ページ固有スタイル(.page-nippo 配下にスコープ) */
+
+/* ---- レイアウト:フォーム + サイド ---- */
+.page-nippo .nippo-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 940px) {
+  .page-nippo .nippo-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- 提出フォーム ---- */
+.page-nippo .nippo-lead {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 13px;
+  border-radius: var(--r-md);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font-size: var(--fs-sm); font-weight: 600; line-height: 1.6;
+}
+.page-nippo .nippo-lead svg { margin-top: 2px; }
+
+.page-nippo .nippo-datefield { max-width: 220px; flex: 1; }
+
+.page-nippo .nippo-numgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.page-nippo .nippo-numgrid .input {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* ---- 契約率リアルタイム表示 ---- */
+.page-nippo .nippo-ratewrap { grid-column: 1 / -1; }
+.page-nippo .nippo-rate {
+  text-align: center;
+  padding: 14px 16px 16px;
+  border-radius: var(--r-lg);
+  border: 1px dashed var(--hairline-strong);
+  background: var(--surface-2);
+  transition: background var(--dur), border-color var(--dur);
+}
+.page-nippo .nippo-rate-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); font-weight: 800; color: var(--ink-3);
+  letter-spacing: 0.04em;
+}
+.page-nippo .nippo-rate-val {
+  font-size: 46px; font-weight: 800; line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  transition: color var(--dur);
+}
+.page-nippo .nippo-rate-sub { font-size: var(--fs-xs); color: var(--ink-3); }
+.page-nippo .nippo-rate.good {
+  border-color: color-mix(in srgb, var(--good) 45%, transparent);
+  background: var(--good-soft);
+}
+.page-nippo .nippo-rate.good .nippo-rate-val,
+.page-nippo .nippo-rate.good .nippo-rate-label { color: var(--good-text); }
+.page-nippo .nippo-rate.mid {
+  border-color: color-mix(in srgb, var(--brand) 45%, transparent);
+  background: var(--brand-soft);
+}
+.page-nippo .nippo-rate.mid .nippo-rate-val,
+.page-nippo .nippo-rate.mid .nippo-rate-label { color: var(--brand-ink); }
+.page-nippo .nippo-rate.warn {
+  border-color: color-mix(in srgb, var(--warn) 50%, transparent);
+  background: var(--warn-soft);
+}
+.page-nippo .nippo-rate.warn .nippo-rate-val,
+.page-nippo .nippo-rate.warn .nippo-rate-label { color: var(--warn-text); }
+.page-nippo .nippo-rate.over {
+  border-color: color-mix(in srgb, var(--critical) 50%, transparent);
+  background: var(--critical-soft);
+}
+.page-nippo .nippo-rate.over .nippo-rate-val,
+.page-nippo .nippo-rate.over .nippo-rate-label { color: var(--critical-text); }
+
+/* ---- 評価連携バッジ / コツ ---- */
+.page-nippo .nippo-evalnote {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--good-soft);
+  color: var(--good-text);
+  font-size: var(--fs-sm); line-height: 1.6;
+}
+.page-nippo .nippo-evalnote svg { margin-top: 2px; flex: none; }
+
+.page-nippo .nippo-tips {
+  margin: 0; padding-left: 1.2em;
+  font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.9;
+}
+.page-nippo .nippo-tips li { list-style: disc; }
+
+/* ---- 提出状況(小さく) ---- */
+.page-nippo .nippo-substatus {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+  font-size: var(--fs-xs); color: var(--ink-3);
+  min-width: 0;
+}
+.page-nippo .nippo-subcount {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-weight: 700; color: var(--ink-2);
+}
+.page-nippo .nippo-sublabel { font-weight: 700; }
+.page-nippo .nippo-subchip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 23px; padding: 0 9px 0 3px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  color: var(--ink-2); font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---- みんなの日報:日付ナビ ---- */
+.page-nippo .nippo-controls {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 10px;
+}
+.page-nippo .nippo-datenav { display: flex; align-items: center; gap: 6px; }
+.page-nippo .nippo-datenav .nav-chev {
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+}
+.page-nippo .nippo-datenav .nav-chev:hover { background: var(--surface-2); }
+.page-nippo .nippo-datenav .nav-chev:disabled { opacity: 0.4; pointer-events: none; }
+.page-nippo .nippo-dateval {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-width: 128px; justify-content: center;
+  font-size: var(--fs-md); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 契約率セル ---- */
+.page-nippo .nippo-ratecell { font-weight: 700; font-variant-numeric: tabular-nums; }
+.page-nippo .nippo-ratecell.hi { color: var(--good-text); font-weight: 800; }
+.page-nippo .nippo-ratecell.lo { color: var(--warn-text); }
+
+/* ---- モバイル(390px で横スクロールなし) ---- */
+@media (max-width: 480px) {
+  .page-nippo .nippo-numgrid { gap: 10px; }
+  .page-nippo .nippo-rate-val { font-size: 38px; }
+  .page-nippo .nippo-datefield { max-width: none; }
+  .page-nippo .nippo-controls { flex-direction: column; align-items: stretch; }
+  .page-nippo .nippo-datenav { justify-content: center; }
+  .page-nippo .segmented { justify-content: center; }
+}

@@ -1,1 +1,136 @@
-/* シフト管理 ページ固有スタイル(.page-shift 配下に必ずスコープすること) */
+/* シフト管理 ページ固有スタイル(.page-shift 配下にスコープ)
+   ※ AIプレビューはモーダル内に .page-shift ラッパー付きで描画されるため
+     ここのスタイルはモーダル内グリッドにも効く */
+
+/* ---- ツールバー(週ナビ+店舗フィルタ) ---- */
+.page-shift .shift-toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.page-shift .shift-weeknav { display: inline-flex; align-items: center; gap: 4px; }
+.page-shift .shift-range {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: var(--fs-sm); font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ---- 週グリッド ---- */
+.page-shift .shift-scroll { overflow-x: auto; margin-inline: -4px; padding: 4px; }
+.page-shift .shift-grid { min-width: 760px; }
+.page-shift .shift-grid.compact { min-width: 640px; }
+
+.page-shift .sg-row {
+  display: grid;
+  grid-template-columns: 168px repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid var(--hairline);
+}
+.page-shift .shift-grid.compact .sg-row { grid-template-columns: 140px repeat(7, minmax(0, 1fr)); }
+.page-shift .sg-row:last-child { border-bottom: none; }
+
+.page-shift .sg-cell {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 4px;
+  min-height: 46px;
+  border-left: 1px solid var(--hairline);
+  background: none;
+}
+.page-shift .sg-cell:first-child { border-left: none; }
+.page-shift .sg-cell.is-today { background: color-mix(in srgb, var(--brand) 6%, transparent); }
+
+.page-shift .sg-head { border-bottom: 1px solid var(--hairline-strong); }
+.page-shift .sg-h { flex-direction: column; gap: 1px; padding: 6px 4px; min-height: 0; }
+.page-shift .sg-date { font-size: var(--fs-xs); font-weight: 800; }
+.page-shift .sg-date.pill {
+  background: var(--brand); color: var(--on-brand);
+  padding: 1px 9px; border-radius: var(--r-full);
+}
+.page-shift .sg-dow { font-size: 10px; font-weight: 700; color: var(--ink-3); }
+.page-shift .sg-dow.sun { color: var(--critical-text); }
+.page-shift .sg-dow.sat { color: var(--series-1); }
+
+.page-shift .sg-name {
+  justify-content: flex-start;
+  gap: 9px;
+  padding-left: 8px;
+  text-align: left;
+}
+.page-shift .sg-sname { min-width: 0; line-height: 1.25; }
+.page-shift .sg-n {
+  display: block;
+  font-size: var(--fs-xs); font-weight: 800;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.page-shift .sg-r {
+  display: block;
+  font-size: 10px; color: var(--ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* クリックで循環変更するセル */
+.page-shift .sg-btn { cursor: pointer; transition: background var(--dur); border-radius: 0; }
+.page-shift .sg-btn:hover { background: color-mix(in srgb, var(--brand) 10%, transparent); }
+.page-shift .sg-btn:active .sh-chip { transform: scale(0.92); }
+
+/* ---- シフト種別チップ ---- */
+.page-shift .sh-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; height: 25px; padding: 0 8px;
+  border-radius: var(--r-full);
+  font-size: 11px; font-weight: 800;
+  transition: transform 120ms var(--ease);
+  white-space: nowrap;
+}
+.page-shift .shift-grid.compact .sh-chip { min-width: 38px; height: 22px; font-size: 10px; }
+.page-shift .sh-chip.t-early { background: var(--brand-soft); color: var(--brand-ink); }
+.page-shift .sh-chip.t-late { background: color-mix(in srgb, var(--series-7) 15%, var(--surface)); color: var(--series-7); }
+:root[data-theme="dark"] .page-shift .sh-chip.t-late { background: color-mix(in srgb, var(--series-7) 22%, var(--surface)); }
+.page-shift .sh-chip.t-full { background: var(--accent-soft); color: var(--accent-ink); }
+.page-shift .sh-chip.t-training { background: var(--good-soft); color: var(--good-text); }
+.page-shift .sh-chip.t-off { background: var(--surface-3); color: var(--ink-3); }
+.page-shift .sh-chip.t-none { background: none; color: var(--ink-3); opacity: 0.5; }
+
+/* ---- 充足判定行 ---- */
+.page-shift .sg-cov { background: var(--surface-2); border-top: 1px solid var(--hairline-strong); }
+.page-shift .sg-covlabel { font-size: var(--fs-xs); font-weight: 800; color: var(--ink-3); }
+.page-shift .sg-covcell { flex-direction: column; gap: 2px; padding: 7px 3px; }
+.page-shift .sg-covnum { font-size: 9.5px; color: var(--ink-3); white-space: nowrap; }
+
+/* ---- 凡例 ---- */
+.page-shift .shift-legend {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-top: 12px;
+}
+.page-shift .shift-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- 締切・説明 ---- */
+.page-shift .shift-deadline {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--fs-xs); color: var(--ink-3);
+}
+.page-shift .shift-link {
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.page-shift .shift-link-ic {
+  flex: none;
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border-radius: 12px;
+  background: var(--brand-soft); color: var(--brand-ink);
+}
+.page-shift .shift-link-txt { font-size: var(--fs-sm); line-height: 1.7; color: var(--ink-2); }
+
+/* ---- 希望提出モーダル ---- */
+.page-shift .shift-wish-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px; align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.page-shift .shift-wish-row:last-of-type { border-bottom: none; }
+.page-shift .shift-wish-day { font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .page-shift .shift-toolbar { gap: 8px; }
+  .page-shift .shift-wish-row { grid-template-columns: 92px 1fr; }
+}

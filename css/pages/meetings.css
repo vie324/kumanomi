@@ -1,1 +1,140 @@
-/* 会議・議事録 ページ固有スタイル(.page-meetings 配下に必ずスコープすること) */
+/* 会議・議事録 ページ固有スタイル(.page-meetings 配下にスコープ) */
+
+/* ---- 次回会議カード ---- */
+.page-meetings .pm-next {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--brand) 7%, var(--surface)) 0%, var(--surface) 62%);
+  border-color: color-mix(in srgb, var(--brand) 28%, var(--hairline));
+}
+.page-meetings .pm-next-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); font-weight: 800; color: var(--brand-ink);
+  margin-bottom: 10px;
+}
+.page-meetings .pm-next-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 760px) { .page-meetings .pm-next-grid { grid-template-columns: 1fr; } }
+.page-meetings .pm-next-title { font-size: var(--fs-lg); font-weight: 800; }
+.page-meetings .pm-next-when {
+  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+  margin: 8px 0 10px;
+  font-size: var(--fs-sm); color: var(--ink-2);
+}
+.page-meetings .pm-next-when strong { font-size: var(--fs-lg); color: var(--ink); }
+.page-meetings .pm-next-side {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
+}
+@media (max-width: 760px) { .page-meetings .pm-next-side { flex-direction: row; align-items: center; flex-wrap: wrap; } }
+
+/* ---- アジェンダ(番号付き) ---- */
+.page-meetings .pm-agenda { display: flex; flex-direction: column; gap: 7px; }
+.page-meetings .pm-agenda li { display: flex; align-items: baseline; gap: 9px; font-size: var(--fs-sm); line-height: 1.6; }
+.page-meetings .pm-agenda.sm li { font-size: var(--fs-xs); }
+.page-meetings .pm-agenda-no {
+  flex: none;
+  width: 21px; height: 21px;
+  display: inline-grid; place-items: center;
+  border-radius: 7px;
+  background: var(--brand-soft); color: var(--brand-ink);
+  font-size: 11px; font-weight: 800;
+  transform: translateY(2px);
+}
+
+/* ---- 一覧タイムライン ---- */
+.page-meetings .pm-tl-card {
+  display: block; width: 100%; text-align: left;
+  padding: 4px 6px 6px;
+  border-radius: var(--r-md);
+  transition: background var(--dur);
+  cursor: pointer;
+}
+.page-meetings .pm-tl-card:hover { background: var(--surface-2); }
+.page-meetings .pm-tl-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.page-meetings .pm-tl-title { font-size: var(--fs-sm); font-weight: 800; margin: 5px 0 6px; }
+.page-meetings .pm-tl-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: var(--fs-xs); color: var(--ink-3);
+}
+.page-meetings .pm-tl-chev { color: var(--ink-3); }
+
+/* ---- 詳細ヘッダ ---- */
+.page-meetings .pm-back-row { margin-bottom: 12px; }
+.page-meetings .pm-head {
+  display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.page-meetings .pm-head-main { flex: 1; min-width: 240px; }
+.page-meetings .pm-head-title { font-size: var(--fs-2xl); font-weight: 800; margin-top: 6px; }
+.page-meetings .pm-head-meta {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: var(--fs-sm); color: var(--ink-2);
+}
+.page-meetings .pm-meta-item { display: inline-flex; align-items: center; gap: 6px; }
+.page-meetings .pm-head-actions { display: flex; gap: 8px; }
+
+/* ---- タスクチェック/アクションアイテム ---- */
+.page-meetings .pm-prev-line {
+  font-size: var(--fs-xs); color: var(--ink-3);
+  margin-bottom: 8px;
+}
+.page-meetings .pm-ai-list { display: flex; flex-direction: column; }
+.page-meetings .pm-ai-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--hairline);
+}
+.page-meetings .pm-ai-row:last-child { border-bottom: none; }
+.page-meetings .pm-ai-main { flex: 1; min-width: 0; }
+.page-meetings .pm-ai-title { font-size: var(--fs-sm); font-weight: 700; line-height: 1.55; }
+.page-meetings .pm-ai-title.done { text-decoration: line-through; color: var(--ink-3); }
+.page-meetings .pm-ai-meta {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 5px;
+}
+.page-meetings .pm-due {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-xs); color: var(--ink-3);
+}
+
+/* 状態切替ボタン */
+.page-meetings .pm-st {
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-width: 62px; height: 26px; padding: 0 10px;
+  border-radius: var(--r-full);
+  font-size: 11px; font-weight: 800;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  transition: all var(--dur) var(--ease);
+  margin-top: 1px;
+}
+.page-meetings .pm-st:hover { transform: translateY(-1px); }
+.page-meetings .pm-st.doing { background: var(--brand-soft); border-color: transparent; color: var(--brand-ink); }
+.page-meetings .pm-st.done { background: var(--good-soft); border-color: transparent; color: var(--good-text); }
+
+/* ---- 議事録・AI ---- */
+.page-meetings .pm-minutes { min-height: 150px; font-size: var(--fs-sm); line-height: 1.8; }
+.page-meetings .pm-ta-actions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px;
+}
+.page-meetings .pm-adopt-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+.page-meetings .pm-aisum { margin-top: 12px; }
+.page-meetings .pm-aisum-head { font-size: var(--fs-xs); font-weight: 800; color: var(--ink-3); margin-bottom: 4px; }
+.page-meetings .pm-aisum-body { font-size: var(--fs-sm); line-height: 1.75; white-space: pre-wrap; }
+
+/* ---- 決定事項 ---- */
+.page-meetings .pm-decisions { display: flex; flex-direction: column; gap: 8px; }
+.page-meetings .pm-decisions li { display: flex; gap: 9px; align-items: baseline; font-size: var(--fs-sm); line-height: 1.6; }
+.page-meetings .pm-dec-ic { flex: none; color: var(--good-text); transform: translateY(2px); }
+
+.page-meetings .pm-note { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.7; }
+.page-meetings .pm-ok { color: var(--good-text); font-weight: 700; }
+.page-meetings .pm-warn { color: var(--warn-text); font-weight: 700; }
+.page-meetings .pm-cell-action { display: inline-flex; gap: 6px; }
+.page-meetings .pm-more { background: var(--ink-3); }
