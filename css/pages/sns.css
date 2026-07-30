@@ -8,7 +8,7 @@
   align-items: start;
 }
 @media (max-width: 1080px) {
-  .page-sns .sns-layout { grid-template-columns: 1fr; }
+  .page-sns .sns-layout { grid-template-columns: minmax(0, 1fr); }
   .page-sns .sns-side { order: 2; }
 }
 .page-sns .sns-side { display: flex; flex-direction: column; gap: 16px; position: sticky; top: calc(var(--topbar-h) + 16px); }

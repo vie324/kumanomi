@@ -322,7 +322,10 @@
 .row-main { flex: 1; min-width: 0; }
 .row-title { font-size: var(--fs-sm); font-weight: 700; }
 .row-sub { font-size: var(--fs-xs); color: var(--ink-3); }
-.row-title, .row-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-title, .row-sub {
+  display: block;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ---- Modal / drawer ---- */
 .modal-scrim {
