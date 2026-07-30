@@ -1,0 +1,64 @@
+/* ============================================================
+   KUMANOMI Router — ハッシュベースの SPA ルーター
+   ルート形式: #/pageId または #/pageId/param1/param2
+   ============================================================ */
+
+const pages = new Map();
+let outlet = null;
+let onNavigate = null;
+
+export const router = {
+  /** ページモジュール({id,title,icon,group,render})を登録 */
+  register(page) { pages.set(page.id, page); },
+
+  pages() { return [...pages.values()]; },
+  get(id) { return pages.get(id); },
+
+  init(outletEl, navigateHook) {
+    outlet = outletEl;
+    onNavigate = navigateHook;
+    window.addEventListener("hashchange", () => router.render());
+    router.render();
+  },
+
+  /** 現在のルートを解析 → {id, params} */
+  current() {
+    const hash = location.hash.replace(/^#\/?/, "");
+    const parts = hash.split("/").filter(Boolean);
+    const id = parts[0] || "dashboard";
+    return { id: pages.has(id) ? id : "dashboard", params: parts.slice(1).map(decodeURIComponent) };
+  },
+
+  navigate(path) {
+    const target = `#/${path.replace(/^#?\/?/, "")}`;
+    if (location.hash === target) router.render();
+    else location.hash = target;
+  },
+
+  render() {
+    if (!outlet) return;
+    const { id, params } = router.current();
+    const page = pages.get(id);
+    if (!page) return;
+    outlet.innerHTML = "";
+    outlet.classList.remove("main");
+    // reflow でページ遷移アニメーションを毎回発火させる
+    void outlet.offsetWidth;
+    outlet.classList.add("main");
+    const root = document.createElement("div");
+    root.className = `page page-${id}`;
+    outlet.appendChild(root);
+    try {
+      page.render(root, params);
+    } catch (err) {
+      console.error(`[router] ${id} の描画でエラー:`, err);
+      root.innerHTML = `<div class="card" style="border-color:var(--critical)">
+        <div class="card-title">ページの表示中にエラーが発生しました</div>
+        <p class="muted" style="font-size:var(--fs-sm)">${String(err?.message || err)}</p>
+      </div>`;
+    }
+    onNavigate?.(page, params);
+    outlet.scrollTop = 0;
+    window.scrollTo({ top: 0 });
+  },
+};

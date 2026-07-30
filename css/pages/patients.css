@@ -1,0 +1,577 @@
+/* 顧客・カルテ ページ固有スタイル(.page-patients 配下にスコープ) */
+
+/* ---- 共通:リード文 ---- */
+.page-patients .pt-lead {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 13px;
+  border-radius: var(--r-md);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font-size: var(--fs-sm); font-weight: 600; line-height: 1.65;
+}
+.page-patients .pt-lead svg { margin-top: 3px; }
+
+/* ============================================================
+   一覧ビュー
+   ============================================================ */
+
+/* ---- 離反リスクカード ---- */
+.page-patients .pt-risk {
+  border-color: color-mix(in srgb, var(--critical) 32%, var(--hairline));
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--critical) 5%, var(--surface)) 0%,
+    var(--surface) 55%);
+  margin-bottom: 16px;
+}
+.page-patients .pt-risk-head {
+  display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+}
+.page-patients .pt-risk-ic {
+  flex: none;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: 11px;
+  background: var(--critical-soft);
+  color: var(--critical-text);
+}
+.page-patients .pt-risk-txt { flex: 1; min-width: 220px; }
+.page-patients .pt-risk-title {
+  display: block;
+  font-size: var(--fs-md); font-weight: 800;
+  color: var(--critical-text);
+}
+.page-patients .pt-risk-desc {
+  display: block; margin-top: 2px;
+  font-size: var(--fs-xs); color: var(--ink-2); line-height: 1.6;
+}
+.page-patients .pt-risk-list {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  margin-top: 14px;
+}
+.page-patients .pt-risk-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  text-align: left;
+  transition: border-color var(--dur), box-shadow var(--dur), transform 120ms var(--ease);
+  min-width: 0;
+}
+.page-patients .pt-risk-row:hover {
+  border-color: var(--critical);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+.page-patients .pt-risk-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.page-patients .pt-risk-name { font-size: var(--fs-sm); font-weight: 800; }
+.page-patients .pt-risk-sub {
+  font-size: var(--fs-xs); color: var(--ink-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.page-patients .pt-risk-chev { color: var(--ink-3); flex: none; display: inline-flex; }
+.page-patients .pt-risk .ai-panel { margin-top: 14px; }
+
+/* ---- リマインド文面ブロック ---- */
+.page-patients .pt-remind {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: 12px;
+}
+.page-patients .pt-remind-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+.page-patients .pt-remind-name {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: var(--fs-sm); font-weight: 800;
+}
+
+/* ---- 検索・フィルタ ---- */
+.page-patients .pt-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.page-patients .pt-search {
+  display: flex; align-items: center; gap: 8px;
+  flex: 1; min-width: 220px; max-width: 360px;
+  padding: 0 12px;
+  height: 38px;
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 10px;
+  color: var(--ink-3);
+  transition: border-color var(--dur), box-shadow var(--dur);
+}
+.page-patients .pt-search:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+.page-patients .pt-search-input {
+  flex: 1; min-width: 0;
+  border: none; outline: none; background: none;
+  font-size: var(--fs-md); color: var(--ink);
+  height: 100%;
+}
+.page-patients .pt-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+
+/* ---- 一覧テーブル(行カード) ---- */
+.page-patients .pt-rowhead,
+.page-patients .pt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) 96px 92px 76px 108px 18px;
+  gap: 12px; align-items: center;
+}
+.page-patients .pt-rowhead {
+  padding: 10px 10px 8px;
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3);
+  border-bottom: 1px solid var(--hairline);
+}
+.page-patients .pt-row {
+  width: 100%;
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  text-align: left;
+  transition: background var(--dur);
+}
+.page-patients .pt-row:last-child { border-bottom: none; }
+.page-patients .pt-row:hover { background: var(--surface-2); border-radius: var(--r-md); }
+
+.page-patients .pt-cell-person {
+  display: flex; align-items: center; gap: 11px; min-width: 0;
+}
+.page-patients .pt-person-txt { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.page-patients .pt-person-name { font-size: var(--fs-md); font-weight: 800; line-height: 1.3; }
+.page-patients .pt-person-kana {
+  font-size: var(--fs-xs); color: var(--ink-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.page-patients .pt-person-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.page-patients .pt-person-tags i {
+  font-style: normal;
+  font-size: 10px; font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--surface-3); color: var(--ink-2);
+  white-space: nowrap;
+}
+.page-patients .pt-cell {
+  font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.page-patients .pt-cell-ticket { font-weight: 800; color: var(--brand-ink); }
+.page-patients .pt-cell-ticket.low { color: var(--warn-text); }
+.page-patients .pt-cell-ticket.none { color: var(--ink-3); font-weight: 600; }
+.page-patients .pt-chev { color: var(--ink-3); display: inline-flex; }
+
+@media (max-width: 820px) {
+  .page-patients .pt-rowhead { display: none; }
+  .page-patients .pt-row {
+    display: flex; flex-wrap: wrap; gap: 7px 8px;
+    padding: 13px 8px;
+  }
+  .page-patients .pt-row:hover { border-radius: 0; }
+  .page-patients .pt-cell-person { width: 100%; }
+  .page-patients .pt-chev { display: none; }
+  .page-patients .pt-cell {
+    font-size: var(--fs-xs);
+    background: var(--surface-2);
+    padding: 3px 9px;
+    border-radius: var(--r-full);
+  }
+  .page-patients .pt-cell-visit::before { content: "最終来院 "; color: var(--ink-3); font-weight: 600; }
+  .page-patients .pt-cell-ticket::before { content: "回数券 "; color: var(--ink-3); font-weight: 600; }
+  .page-patients .pt-cell-risk { background: none; padding: 0; }
+}
+
+/* ============================================================
+   詳細ビュー
+   ============================================================ */
+
+.page-patients .pt-back {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-bottom: 14px;
+  font-size: var(--fs-sm); font-weight: 700;
+  color: var(--ink-2);
+  border-radius: 8px;
+  padding: 5px 10px 5px 6px;
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  transition: color var(--dur), background var(--dur);
+}
+.page-patients .pt-back:hover { color: var(--brand-ink); background: var(--brand-soft); }
+
+.page-patients .pt-detail-top {
+  display: grid; gap: 16px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  margin-bottom: 16px;
+  align-items: start;
+}
+.page-patients .pt-detail-grid {
+  display: grid; gap: 16px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .page-patients .pt-detail-top,
+  .page-patients .pt-detail-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- プロフィール ---- */
+.page-patients .pt-prof-head { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.page-patients .pt-prof-names { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.page-patients .pt-prof-kana { font-size: var(--fs-xs); color: var(--ink-3); font-weight: 600; }
+.page-patients .pt-prof-name { font-size: var(--fs-xl); font-weight: 800; line-height: 1.25; }
+.page-patients .pt-prof-suffix {
+  font-style: normal; font-size: var(--fs-sm); font-weight: 700;
+  color: var(--ink-3); margin-left: 4px;
+}
+.page-patients .pt-prof-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.page-patients .pt-tag {
+  font-size: var(--fs-xs); font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  background: var(--brand-soft); color: var(--brand-ink);
+  white-space: nowrap;
+}
+.page-patients .pt-chief {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px dashed var(--hairline-strong);
+  font-size: var(--fs-sm); line-height: 1.65; color: var(--ink-2);
+}
+.page-patients .pt-chief-label {
+  flex: none;
+  font-size: 10px; font-weight: 800;
+  padding: 2px 8px; margin-top: 1px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft); color: var(--accent-ink);
+}
+.page-patients .pt-kv-inline {
+  display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ---- 回数券カード ---- */
+.page-patients .pt-ticket-hero {
+  display: flex; align-items: baseline; justify-content: center; gap: 8px;
+  padding: 18px 14px 14px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--brand) 11%, var(--surface)) 0%,
+    color-mix(in srgb, var(--accent) 7%, var(--surface)) 100%);
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, var(--hairline));
+}
+.page-patients .pt-ticket-hero.low {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--warn) 13%, var(--surface)) 0%,
+    color-mix(in srgb, var(--accent) 8%, var(--surface)) 100%);
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--hairline));
+}
+.page-patients .pt-ticket-left { font-size: var(--fs-sm); font-weight: 700; color: var(--ink-2); }
+.page-patients .pt-ticket-num {
+  font-size: 52px; font-weight: 800; line-height: 1;
+  color: var(--brand-ink);
+  font-variant-numeric: tabular-nums;
+}
+.page-patients .pt-ticket-hero.low .pt-ticket-num { color: var(--warn-text); }
+.page-patients .pt-ticket-unit { font-size: var(--fs-sm); font-weight: 700; color: var(--ink-3); }
+.page-patients .pt-ticket-copy {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--fs-xs); font-weight: 600; line-height: 1.65;
+}
+.page-patients .pt-ticket-copy svg { margin-top: 2px; flex: none; }
+.page-patients .pt-ticket-none {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px;
+  border-radius: var(--r-md);
+  border: 1px dashed var(--hairline-strong);
+  background: var(--surface-2);
+}
+.page-patients .pt-ticket-none-ic {
+  flex: none;
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border-radius: 11px;
+  background: var(--surface-3); color: var(--ink-3);
+}
+.page-patients .pt-ticket-none-title { display: block; font-size: var(--fs-sm); font-weight: 800; }
+.page-patients .pt-ticket-none-sub { display: block; font-size: var(--fs-xs); color: var(--ink-3); margin-top: 1px; }
+
+/* ---- 新規カルテ:ボイス入力 ---- */
+.page-patients .pt-rec[hidden],
+.page-patients .pt-transcript[hidden] { display: none; }
+.page-patients .pt-staffbox {
+  display: flex; align-items: center;
+  min-height: 40px;
+  padding: 4px 12px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.page-patients .pt-rec {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in srgb, var(--critical) 35%, var(--hairline));
+  background: color-mix(in srgb, var(--critical) 6%, var(--surface));
+}
+.page-patients .pt-rec-mic {
+  flex: none;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--critical); color: #fff;
+  animation: pt-pulse 1.4s ease-in-out infinite;
+}
+@keyframes pt-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--critical) 40%, transparent); }
+  50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--critical) 0%, transparent); }
+}
+.page-patients .pt-rec-bars { display: inline-flex; align-items: center; gap: 3px; height: 26px; }
+.page-patients .pt-rec-bars i {
+  width: 4px; height: 100%;
+  border-radius: 2px;
+  background: var(--critical);
+  animation: pt-eq 0.9s ease-in-out infinite;
+  transform-origin: center;
+}
+.page-patients .pt-rec-bars i:nth-child(1) { animation-delay: 0s; }
+.page-patients .pt-rec-bars i:nth-child(2) { animation-delay: 0.12s; }
+.page-patients .pt-rec-bars i:nth-child(3) { animation-delay: 0.24s; }
+.page-patients .pt-rec-bars i:nth-child(4) { animation-delay: 0.36s; }
+.page-patients .pt-rec-bars i:nth-child(5) { animation-delay: 0.48s; }
+.page-patients .pt-rec-bars i:nth-child(6) { animation-delay: 0.6s; }
+.page-patients .pt-rec-bars i:nth-child(7) { animation-delay: 0.72s; }
+@keyframes pt-eq {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+.page-patients .pt-rec-label {
+  font-size: var(--fs-sm); font-weight: 700;
+  color: var(--critical-text);
+}
+.page-patients .pt-transcript {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  border: 1px dashed var(--hairline-strong);
+  background: var(--surface-2);
+}
+.page-patients .pt-transcript-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-xs); font-weight: 800; color: var(--ink-3);
+}
+.page-patients .pt-transcript-text {
+  font-size: var(--fs-sm); line-height: 1.75; color: var(--ink-2);
+}
+
+/* ---- SOAP ---- */
+.page-patients .pt-soap-field { display: flex; gap: 10px; align-items: flex-start; }
+.page-patients .pt-soap-field .pt-soap-tag { margin-top: 24px; }
+.page-patients .pt-soap-tag {
+  flex: none;
+  width: 24px; height: 24px;
+  display: inline-grid; place-items: center;
+  border-radius: 8px;
+  font-size: var(--fs-xs); font-weight: 800;
+}
+.page-patients .pt-soap-tag.subjective { background: var(--brand-soft); color: var(--brand-ink); }
+.page-patients .pt-soap-tag.objective { background: var(--accent-soft); color: var(--accent-ink); }
+.page-patients .pt-soap-tag.assessment {
+  background: color-mix(in srgb, var(--series-7) 14%, var(--surface));
+  color: var(--series-7);
+}
+.page-patients .pt-soap-tag.plan { background: var(--good-soft); color: var(--good-text); }
+.page-patients .pt-soap-ta { min-height: 58px; }
+.page-patients .pt-flash { animation: pt-flash 1.4s var(--ease); }
+@keyframes pt-flash {
+  0% { background: var(--brand-soft); border-color: var(--brand); }
+  100% { background: var(--surface); }
+}
+
+/* ---- タイムライン ---- */
+.page-patients .pt-tl-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.page-patients .pt-tl-menu {
+  font-size: var(--fs-xs); font-weight: 700;
+  padding: 2px 9px;
+  border-radius: var(--r-full);
+  background: var(--surface-3); color: var(--ink-2);
+}
+.page-patients .pt-karte {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  padding: 12px 13px;
+}
+.page-patients .pt-karte-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.page-patients .pt-photos { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.page-patients .pt-photo {
+  font-size: var(--fs-xs); font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 8px;
+  border: 1px dashed var(--hairline-strong);
+  background: var(--surface); color: var(--ink-2);
+  white-space: nowrap;
+}
+.page-patients .pt-soap { display: flex; flex-direction: column; gap: 7px; }
+.page-patients .pt-soap-row { display: flex; gap: 9px; align-items: flex-start; min-width: 0; }
+.page-patients .pt-soap-row .pt-soap-tag { width: 21px; height: 21px; font-size: 10px; margin-top: 1px; }
+.page-patients .pt-soap-text {
+  font-size: var(--fs-sm); line-height: 1.65; color: var(--ink-2);
+  min-width: 0; overflow-wrap: anywhere;
+}
+
+/* ---- 姿勢分析 ---- */
+.page-patients .pt-pose-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: 30px 16px;
+  border-radius: var(--r-md);
+  border: 1px dashed var(--hairline-strong);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: var(--fs-sm); font-weight: 600;
+}
+.page-patients .pt-pose-empty-ic { font-size: 30px; opacity: 0.8; }
+.page-patients .pt-pose-wrap { display: flex; gap: 16px; flex-wrap: wrap; }
+.page-patients .pt-pose-box {
+  position: relative;
+  flex: none;
+  width: min(240px, 100%);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+}
+.page-patients .pt-pose-svg { display: block; width: 100%; height: auto; }
+.page-patients .pt-pose-grid { stroke: var(--chart-grid); stroke-width: 1; }
+.page-patients .pt-pose-bone {
+  stroke: color-mix(in srgb, var(--brand) 55%, transparent);
+  stroke-width: 2; stroke-linecap: round;
+}
+.page-patients .pt-pose-dot {
+  fill: var(--brand);
+  stroke: var(--chart-surface); stroke-width: 1;
+}
+.page-patients .pt-pose-key {
+  fill: var(--accent);
+  stroke: var(--chart-surface); stroke-width: 1.6;
+}
+.page-patients .pt-pose-label {
+  fill: var(--ink-2);
+  font-size: 10px; font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--chart-surface); stroke-width: 3; stroke-linejoin: round;
+}
+.page-patients .pt-pose-count {
+  position: absolute; bottom: 8px; left: 8px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 800;
+  padding: 3px 8px;
+  border-radius: var(--r-full);
+  background: var(--surface); color: var(--brand-ink);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-1);
+}
+.page-patients .pt-pose-side { flex: 1; min-width: 190px; display: flex; flex-direction: column; gap: 12px; }
+.page-patients .pt-pose-score {
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+}
+.page-patients .pt-pose-score-label { font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3); }
+.page-patients .pt-pose-score-num {
+  font-size: 40px; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.page-patients .pt-pose-score-unit { font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3); }
+.page-patients .pt-pose-score.good { background: var(--good-soft); border-color: color-mix(in srgb, var(--good) 30%, var(--hairline)); }
+.page-patients .pt-pose-score.good .pt-pose-score-num { color: var(--good-text); }
+.page-patients .pt-pose-score.brand { background: var(--brand-soft); border-color: color-mix(in srgb, var(--brand) 30%, var(--hairline)); }
+.page-patients .pt-pose-score.brand .pt-pose-score-num { color: var(--brand-ink); }
+.page-patients .pt-pose-score.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 35%, var(--hairline)); }
+.page-patients .pt-pose-score.warn .pt-pose-score-num { color: var(--warn-text); }
+.page-patients .pt-metrics { display: flex; flex-direction: column; }
+.page-patients .pt-metric {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--hairline);
+}
+.page-patients .pt-metric:last-child { border-bottom: none; }
+.page-patients .pt-metric-label { font-size: var(--fs-xs); font-weight: 600; color: var(--ink-3); }
+.page-patients .pt-metric-val {
+  font-size: var(--fs-sm); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.page-patients .pt-pose-comments {
+  margin: 0; padding-left: 1.2em;
+  font-size: var(--fs-xs); color: var(--ink-2); line-height: 1.8;
+}
+.page-patients .pt-pose-comments li { list-style: disc; }
+
+/* ---- LINEプレビュー ---- */
+.page-patients .pt-line {
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+}
+.page-patients .pt-line-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--good) 13%, var(--surface));
+  color: var(--good-text);
+  font-size: var(--fs-xs); font-weight: 800;
+}
+.page-patients .pt-line-body {
+  padding: 12px;
+  background: color-mix(in srgb, var(--brand) 5%, var(--surface-2));
+}
+.page-patients .pt-line-bubble {
+  margin-left: auto;
+  max-width: 94%;
+  white-space: pre-wrap;
+  padding: 11px 13px;
+  border-radius: 15px 15px 4px 15px;
+  background: color-mix(in srgb, var(--good) 15%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--good) 22%, var(--hairline));
+  font-size: var(--fs-sm); line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.page-patients .pt-line-meta {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 10px; color: var(--ink-3);
+}
+
+/* ---- モバイル(390px で横スクロールなし) ---- */
+@media (max-width: 480px) {
+  .page-patients .pt-risk-head { flex-direction: column; align-items: stretch; }
+  .page-patients .pt-risk-head .btn { width: 100%; }
+  .page-patients .pt-search { max-width: none; }
+  .page-patients .pt-ticket-num { font-size: 44px; }
+  .page-patients .pt-remind-head { flex-direction: column; align-items: stretch; }
+  .page-patients .pt-remind-head .btn { width: 100%; }
+  .page-patients .pt-soap-field { gap: 8px; }
+  .page-patients .pt-pose-box { margin-inline: auto; }
+}

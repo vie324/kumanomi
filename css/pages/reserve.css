@@ -1,0 +1,200 @@
+/* 予約管理 ページ固有スタイル(.page-reserve 配下に必ずスコープすること) */
+
+/* ---- ツールバー ---- */
+.page-reserve .rv-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px 14px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.page-reserve .rv-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.page-reserve .rv-datenav { display: flex; align-items: center; gap: 4px; }
+.page-reserve .rv-datelabel {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin-left: 6px;
+  font-size: var(--fs-md); font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ---- 横スクロールコンテナ(タイムグリッド共通)---- */
+.page-reserve .rv-scroll {
+  overflow-x: auto;
+  margin-inline: -4px;
+  padding-inline: 4px;
+  padding-bottom: 4px;
+}
+
+/* ---- 日ビュー:タイムグリッド ---- */
+.page-reserve .rv-grid { display: grid; min-width: 100%; }
+.page-reserve .rv-cell { min-width: 0; }
+
+.page-reserve .rv-time {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--surface);
+  padding: 8px 8px 0 2px;
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: 2px 0 0 var(--surface);
+}
+.page-reserve .rv-corner { border-bottom: 1px solid var(--hairline-strong); }
+
+.page-reserve .rv-h {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--hairline-strong);
+}
+.page-reserve .rv-hname { line-height: 1.25; min-width: 0; }
+.page-reserve .rv-hn {
+  display: block;
+  font-size: var(--fs-sm); font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.page-reserve .rv-hr { display: block; font-size: var(--fs-xs); color: var(--ink-3); }
+
+.page-reserve .rv-slot {
+  display: flex; flex-direction: column; gap: 4px;
+  min-height: 60px;
+  padding: 4px;
+  border-bottom: 1px solid var(--hairline);
+  border-inline-start: 1px solid var(--hairline);
+}
+
+/* 空き枠(クリックで新規予約) */
+.page-reserve .rv-add {
+  flex: 1;
+  min-height: 48px;
+  display: grid; place-items: center;
+  border-radius: var(--r-sm);
+  border: 1px dashed transparent;
+  color: var(--ink-3);
+  opacity: 0.35;
+  transition: opacity var(--dur), background var(--dur), color var(--dur), border-color var(--dur);
+}
+.page-reserve .rv-add:hover, .page-reserve .rv-add:focus-visible {
+  opacity: 1;
+  background: var(--brand-soft);
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+  color: var(--brand-ink);
+}
+
+/* 予約カード */
+.page-reserve .rv-card {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%;
+  padding: 6px 8px 7px;
+  text-align: left;
+  border-radius: var(--r-sm);
+  border-inline-start: 3px solid var(--brand);
+  background: var(--brand-soft);
+  transition: box-shadow var(--dur), transform 120ms var(--ease);
+}
+.page-reserve .rv-card:hover { box-shadow: var(--shadow-2); transform: translateY(-1px); }
+.page-reserve .rv-card .rv-menu {
+  font-size: var(--fs-xs); color: var(--ink-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.page-reserve .rv-card .rv-name {
+  font-size: var(--fs-sm); font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.page-reserve .rv-card .rv-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.page-reserve .rv-card .badge { height: 18px; padding: 0 7px; font-size: 10px; }
+
+.page-reserve .rv-card.st-done { border-inline-start-color: var(--good); background: var(--good-soft); }
+.page-reserve .rv-card.st-cancelled {
+  border-inline-start-color: var(--hairline-strong);
+  background: var(--surface-2);
+  opacity: 0.62;
+}
+.page-reserve .rv-card.st-cancelled .rv-name { text-decoration: line-through; }
+.page-reserve .rv-card.st-noshow { border-inline-start-color: var(--critical); background: var(--critical-soft); }
+
+/* ---- 週ビュー:サマリーグリッド ---- */
+.page-reserve .rv-wname {
+  position: sticky; left: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px 8px 2px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3);
+  box-shadow: 2px 0 0 var(--surface);
+}
+.page-reserve .rv-wh {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--hairline-strong);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  transition: background var(--dur);
+}
+.page-reserve .rv-wh:hover { background: var(--surface-2); }
+.page-reserve .rv-wd {
+  font-size: var(--fs-sm); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.page-reserve .rv-wd.pill {
+  background: var(--brand); color: var(--on-brand);
+  padding: 0 8px; border-radius: var(--r-full);
+}
+.page-reserve .rv-wdow { font-size: 10px; font-weight: 700; color: var(--ink-3); }
+.page-reserve .rv-wdow.sun { color: var(--critical-text); }
+.page-reserve .rv-wdow.sat { color: var(--brand-ink); }
+.page-reserve .rv-wh.is-today { background: var(--brand-soft); }
+
+.page-reserve .rv-wcell {
+  display: grid; place-items: center;
+  padding: 3px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* 濃淡セル:予約数が多いほど濃い(--seq トークン利用・両テーマ対応) */
+.page-reserve .rv-heat {
+  width: 100%; height: 44px;
+  display: grid; place-items: center;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-md); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: transform 120ms var(--ease), box-shadow var(--dur);
+}
+.page-reserve button.rv-wcell:hover .rv-heat { transform: scale(1.04); box-shadow: var(--shadow-1); }
+.page-reserve .rv-heat.lv0 { background: var(--surface-2); color: var(--ink-3); }
+.page-reserve .rv-heat.lv1 { background: var(--seq-100); color: var(--seq-700); }
+.page-reserve .rv-heat.lv2 { background: var(--seq-250); color: var(--seq-700); }
+.page-reserve .rv-heat.lv3 { background: var(--seq-400); color: var(--page); }
+.page-reserve .rv-heat.lv4 { background: var(--seq-550); color: var(--page); }
+.page-reserve .rv-heat.closed { background: transparent; color: var(--ink-3); }
+.page-reserve .rv-heat.mini { width: 16px; height: 16px; border-radius: 4px; }
+.page-reserve .rv-heatlegend {
+  display: flex; align-items: center; gap: 5px;
+  padding-top: 10px;
+}
+
+/* ---- モーダル内 ---- */
+.page-reserve .rv-lead {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  background: var(--brand-soft); color: var(--brand-ink);
+  font-size: var(--fs-sm); font-weight: 600;
+}
+.page-reserve .rv-detail-top {
+  display: flex; align-items: center; gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 8px;
+}
+.page-reserve .rv-detail-who { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.page-reserve .rv-detail-name { font-size: var(--fs-lg); font-weight: 800; }
+.page-reserve .rv-plink {
+  display: inline-flex; align-items: center; gap: 2px;
+  color: var(--brand); font-weight: 800;
+}
+.page-reserve .rv-guestname { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ---- モバイル(390px で横スクロールなし。グリッドのみ内部スクロール)---- */
+@media (max-width: 640px) {
+  .page-reserve .rv-toolbar { align-items: stretch; flex-direction: column; }
+  .page-reserve .rv-nav { justify-content: space-between; width: 100%; }
+  .page-reserve .rv-datelabel { font-size: var(--fs-sm); }
+  .page-reserve .rv-heat { height: 40px; }
+}

@@ -1,0 +1,124 @@
+/* 在庫・経費 ページ固有スタイル(.page-backoffice 配下に必ずスコープすること) */
+
+/* ---- 共通レイアウト ---- */
+.page-backoffice .bo-body { gap: 16px; }
+.page-backoffice .bo-tiles { margin-bottom: 0; }
+.page-backoffice .bo-chips { margin-bottom: 12px; }
+.page-backoffice .bo-name { font-weight: 700; font-size: var(--fs-sm); white-space: nowrap; }
+.page-backoffice .bo-memo {
+  display: inline-block;
+  max-width: 260px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: bottom;
+}
+.page-backoffice .bo-ops { display: inline-flex; gap: 6px; white-space: nowrap; }
+.page-backoffice .bo-today { color: var(--brand-ink); font-weight: 700; }
+
+/* ---- 在庫:発注点割れアラート ---- */
+.page-backoffice .bo-alert {
+  border: 1px solid color-mix(in srgb, var(--critical) 35%, var(--hairline));
+  background: var(--critical-soft);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+}
+.page-backoffice .bo-alert-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--fs-sm); font-weight: 800;
+  color: var(--critical-text);
+  margin-bottom: 10px;
+}
+.page-backoffice .bo-alert-items { display: flex; flex-direction: column; gap: 8px; }
+.page-backoffice .bo-alert-item {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+}
+.page-backoffice .bo-alert-name { font-weight: 700; }
+.page-backoffice .bo-alert-short { font-weight: 800; color: var(--critical-text); white-space: nowrap; }
+.page-backoffice .bo-alert-detail { font-weight: 500; color: var(--ink-3); font-size: var(--fs-xs); margin-left: 4px; }
+
+/* ---- 在庫:在庫数セル ---- */
+.page-backoffice .bo-stock {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.page-backoffice .bo-stock b { font-weight: 800; }
+.page-backoffice .bo-stock .bo-stock-min { color: var(--ink-3); font-size: var(--fs-xs); }
+.page-backoffice .bo-stock.low { color: var(--critical-text); }
+.page-backoffice .bo-stock.low .bo-stock-min { color: color-mix(in srgb, var(--critical-text) 65%, var(--ink-3)); }
+
+/* ---- 小口現金 ---- */
+.page-backoffice .bo-cashgrid { align-items: stretch; }
+.page-backoffice .bo-balance { display: flex; flex-direction: column; gap: 2px; }
+.page-backoffice .bo-balance .hero-number { font-variant-numeric: tabular-nums; }
+.page-backoffice .bo-bal-sub { font-size: var(--fs-xs); color: var(--ink-3); }
+.page-backoffice .bo-bal-month {
+  display: flex; gap: 18px; flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px dashed var(--hairline-strong);
+}
+.page-backoffice .bo-bal-kv { display: flex; flex-direction: column; gap: 2px; }
+.page-backoffice .bo-bal-in { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--good-text); }
+.page-backoffice .bo-bal-out { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--critical-text); }
+.page-backoffice .bo-amount { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.page-backoffice .bo-amount.in { color: var(--good-text); }
+.page-backoffice .bo-amount.out { color: var(--critical-text); }
+
+/* ---- 経費申請 ---- */
+.page-backoffice .bo-reject-reason {
+  display: inline-block;
+  max-width: 180px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* ---- レジ連携 ---- */
+.page-backoffice .bo-sync {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--hairline));
+  background: var(--brand-soft);
+  border-radius: var(--r-lg);
+}
+.page-backoffice .bo-sync-ic {
+  width: 44px; height: 44px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--brand-ink);
+  box-shadow: var(--shadow-1);
+}
+.page-backoffice .bo-sync-main { flex: 1; min-width: 220px; }
+.page-backoffice .bo-sync-title {
+  font-size: var(--fs-sm); font-weight: 800;
+  color: var(--brand-ink);
+  line-height: 1.5;
+}
+.page-backoffice .bo-sync-desc {
+  font-size: var(--fs-xs); color: var(--ink-2);
+  line-height: 1.6; margin-top: 3px;
+}
+.page-backoffice .bo-spin { animation: bo-rotate 0.9s linear infinite; }
+@keyframes bo-rotate { to { transform: rotate(360deg); } }
+
+.page-backoffice .bo-datenav { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.page-backoffice .bo-datenav-date {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-width: 86px; justify-content: center;
+  font-size: var(--fs-md); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.page-backoffice .bo-reggrid { align-items: stretch; }
+
+@media (max-width: 640px) {
+  .page-backoffice .bo-alert-item .spacer { display: none; }
+  .page-backoffice .bo-alert-item { justify-content: space-between; }
+  .page-backoffice .bo-sync { align-items: flex-start; }
+  .page-backoffice .bo-sync > .btn { width: 100%; }
+  .page-backoffice .bo-memo { max-width: 180px; }
+}
