@@ -1,0 +1,155 @@
+/* ============================================================
+   KUMANOMI Design Tokens
+   ライト/ダーク両テーマ。チャート系列色は CVD 検証済みパレット。
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- Surfaces & ink ---- */
+  --page: #f4f6f5;
+  --surface: #ffffff;
+  --surface-2: #f7f9f8;
+  --surface-3: #eef2f1;
+  --ink: #17211f;
+  --ink-2: #4d5a57;
+  --ink-3: #8a938f;
+  --hairline: #e3e7e5;
+  --hairline-strong: #cfd6d3;
+  --shadow-1: 0 1px 2px rgba(23, 33, 31, 0.05);
+  --shadow-2: 0 4px 16px rgba(23, 33, 31, 0.08);
+  --shadow-3: 0 12px 40px rgba(23, 33, 31, 0.16);
+  --scrim: rgba(17, 24, 22, 0.44);
+
+  /* ---- Brand (深海ティール × クマノミオレンジ) ---- */
+  --brand: #0c7489;
+  --brand-strong: #085e70;
+  --brand-deep: #073d49;
+  --brand-soft: #e2f1f4;
+  --brand-ink: #0a5b6c;
+  --on-brand: #ffffff;
+  --accent: #e86f2d;
+  --accent-strong: #cf5a1b;
+  --accent-soft: #fdeee3;
+  --accent-ink: #b04c14;
+
+  /* ---- Status (固定・チャート系列と混用しない) ---- */
+  --good: #0ca30c;
+  --good-soft: #e6f6e6;
+  --good-text: #067006;
+  --warn: #c98500;
+  --warn-soft: #fdf3dc;
+  --warn-text: #8a5c00;
+  --serious: #d95926;
+  --serious-soft: #fcebe2;
+  --critical: #d03b3b;
+  --critical-soft: #fbe7e7;
+  --critical-text: #a82c2c;
+
+  /* ---- Chart palette (validated, adjacent-pair CVD safe) ---- */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  --chart-grid: #e6e9e7;
+  --chart-axis: #c4cbc8;
+  --chart-muted: #8a938f;
+  --chart-deemph: #d4dad7;
+  --chart-surface: #ffffff;
+  --seq-100: #cde2fb;
+  --seq-250: #86b6ef;
+  --seq-400: #3987e5;
+  --seq-550: #1c5cab;
+  --seq-700: #0d366b;
+
+  /* ---- Geometry ---- */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-full: 999px;
+  --sidebar-w: 248px;
+  --sidebar-w-slim: 72px;
+  --topbar-h: 60px;
+
+  /* ---- Type ---- */
+  --font: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
+          "Yu Gothic UI", "Meiryo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 19px;
+  --fs-2xl: 24px;
+  --fs-hero: 34px;
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 220ms;
+  --dur-slow: 420ms;
+}
+
+/* ============ Dark theme ============ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page: #0e1413;
+  --surface: #182120;
+  --surface-2: #1e2928;
+  --surface-3: #253130;
+  --ink: #f2f5f4;
+  --ink-2: #b4c0bc;
+  --ink-3: #78847f;
+  --hairline: #2b3735;
+  --hairline-strong: #3a4744;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --scrim: rgba(0, 0, 0, 0.6);
+
+  --brand: #2fa3ba;
+  --brand-strong: #4db8cd;
+  --brand-deep: #0b2a31;
+  --brand-soft: #10333c;
+  --brand-ink: #7fd0e0;
+  --on-brand: #06272e;
+  --accent: #f08447;
+  --accent-strong: #f79a64;
+  --accent-soft: #3a2415;
+  --accent-ink: #f5a878;
+
+  --good: #0ca30c;
+  --good-soft: #12300f;
+  --good-text: #5fd45f;
+  --warn: #fab219;
+  --warn-soft: #35290c;
+  --warn-text: #f5c65b;
+  --serious: #ec835a;
+  --serious-soft: #38200f;
+  --critical: #e66767;
+  --critical-soft: #3a1616;
+  --critical-text: #f09090;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --chart-grid: #263230;
+  --chart-axis: #3a4744;
+  --chart-muted: #78847f;
+  --chart-deemph: #37423f;
+  --chart-surface: #182120;
+  --seq-100: #0d366b;
+  --seq-250: #1c5cab;
+  --seq-400: #2a78d6;
+  --seq-550: #6da7ec;
+  --seq-700: #cde2fb;
+}
