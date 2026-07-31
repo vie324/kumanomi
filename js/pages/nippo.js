@@ -12,7 +12,7 @@ import {
   avatar, staffChip, emptyState, fmtYen, fmtNum, fmtDate, esc,
 } from "../ui.js";
 import { store, todayStr, addDays, monthOf, dow, SHIFT_TYPES } from "../store.js";
-import { lineChart, sparkline, donut } from "../charts.js";
+import { lineChart, sparkline } from "../charts.js";
 import { summarizeReports, delay } from "../ai.js";
 import {
   can, visibleStaff, canSeeStaff, visibilityReason, scopeLabel,
@@ -162,12 +162,18 @@ function submissionStats(date, storeId = "all") {
  */
 function defaultDate() {
   const t = todayStr();
+  const meId = store.me().id;
+  let fallback = null;
   for (let off = 0; off >= -10; off--) {
     const d = addDays(t, off);
     if (dow(d) === 3) continue;
-    if (submissionStats(d, "all").submitted.length > 0) return d;
+    const st = submissionStats(d, "all");
+    if (!st.submitted.length) continue;
+    if (fallback == null) fallback = d;
+    // 自分の日報も並ぶ日を優先(比較しやすいため)
+    if (st.submitted.some((s) => s.id === meId)) return d;
   }
-  return t;
+  return fallback || t;
 }
 
 /** 催促チップ(クリックで催促) */
@@ -197,6 +203,62 @@ function remindChip(s, date, goSubmit) {
   return btn;
 }
 
+/**
+ * 提出率リング(依存ゼロの SVG)。
+ * charts.js の donut は 100%(単一セグメント)で円弧が縮退するため専用に描く。
+ */
+function submissionRing(st) {
+  const NS = "http://www.w3.org/2000/svg";
+  const size = 132, sw = 13;
+  const r = (size - sw) / 2;
+  const C = 2 * Math.PI * r;
+  const n = st.members.length || 1;
+
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+  svg.setAttribute("width", size);
+  svg.setAttribute("height", size);
+  svg.setAttribute("aria-hidden", "true");
+
+  const arc = (color, frac, offsetFrac) => {
+    const c = document.createElementNS(NS, "circle");
+    c.setAttribute("cx", size / 2);
+    c.setAttribute("cy", size / 2);
+    c.setAttribute("r", r);
+    c.setAttribute("transform", `rotate(-90 ${size / 2} ${size / 2})`);
+    Object.assign(c.style, {
+      fill: "none",
+      stroke: color,
+      strokeWidth: `${sw}px`,
+      strokeLinecap: frac > 0 && frac < 1 ? "round" : "butt",
+      strokeDasharray: `${C * Math.min(frac, 1)} ${C}`,
+      strokeDashoffset: `${-C * offsetFrac}`,
+    });
+    return c;
+  };
+
+  const sF = st.submitted.length / n;
+  const dF = st.drafts.length / n;
+  svg.appendChild(arc("var(--hairline-strong)", 1, 0));
+  if (dF > 0) svg.appendChild(arc("var(--warn)", dF, sF));
+  if (sF > 0) svg.appendChild(arc("var(--good)", sF, 0));
+
+  const lg = (color, label, value) => el("span", { class: "nippo-ring-lgitem" },
+    el("span", { class: "nippo-ring-sw", style: { background: color } }),
+    el("span", { class: "nippo-ring-lglabel" }, label),
+    el("strong", {}, `${value}名`));
+
+  return el("div", { class: "nippo-ringwrap" },
+    el("div", { class: "nippo-ring" }, svg,
+      el("div", { class: "nippo-ring-center" },
+        el("span", { class: "nippo-ring-val" }, `${st.rate}%`),
+        el("span", { class: "nippo-ring-lbl" }, "提出率"))),
+    el("div", { class: "nippo-ring-legend" },
+      lg("var(--good)", "提出済", st.submitted.length),
+      st.drafts.length ? lg("var(--warn)", "下書き", st.drafts.length) : null,
+      st.missing.length ? lg("var(--hairline-strong)", "未提出", st.missing.length) : null));
+}
+
 /** 提出状況カード(みんなの日報タブの主役) */
 function submissionCard(date, storeId, goSubmit) {
   const st = submissionStats(date, storeId);
@@ -215,20 +277,7 @@ function submissionCard(date, storeId, goSubmit) {
         el("span", {}, "この条件で表示できる提出対象者はいません。")));
   }
 
-  const items = [
-    { label: "提出済", value: st.submitted.length, color: "var(--good)" },
-    { label: "下書き", value: st.drafts.length, color: "var(--warn)" },
-    { label: "未提出", value: st.missing.length, color: "var(--hairline-strong)" },
-  ].filter((i) => i.value > 0);
-
-  const ring = donut({
-    items,
-    size: 128,
-    centerLabel: "提出率",
-    centerValue: `${st.rate}%`,
-    fmt: (v) => `${v}名`,
-  });
-  ring.classList.add("nippo-subdonut");
+  const ring = submissionRing(st);
 
   const chips = el("div", { class: "nippo-missing" });
   if (st.missing.length) {
@@ -389,8 +438,7 @@ function openReport(list, index, onChanged) {
         el("span", { class: "nippo-ddate" }, fmtDate(r.date, { withYear: true })),
         el("span", { class: "nippo-dtags" },
           statusBadge(r.status),
-          reasonBadge(r.staffId),
-          badge(store.storeName(r.storeId), "")))));
+          reasonBadge(r.staffId)))));
 
     /* --- 数字 --- */
     body.appendChild(el("div", { class: "nippo-dtop" },
@@ -405,7 +453,7 @@ function openReport(list, index, onChanged) {
         numTile("施術数", `${fmtNum(r.treatments)}件`),
         numTile("新規", `${fmtNum(r.newPatients)}名`),
         numTile("回数券提案", `${fmtNum(r.proposals)}件`),
-        numTile("成約", `${fmtNum(r.contracts)}件`))));
+        numTile("成約", `${fmtNum(r.contracts)}件`, "grow"))));
 
     /* --- コメント全文 --- */
     body.appendChild(el("section", { class: "nippo-dsec" },
@@ -712,21 +760,24 @@ function allTab(renderAll) {
   const stores = visibleStores();
 
   /* --- 日付ナビ + 店舗フィルタ --- */
+  const goDate = (d) => { state.date = d; state.dateTouched = true; renderAll(); };
+  const goSubmit = () => { state.tab = "submit"; renderAll(); };
+
   const nav = el("div", { class: "nippo-datenav" },
     el("button", {
       class: "icon-btn nav-chev", "aria-label": "前日",
-      onclick: () => { state.date = addDays(state.date, -1); renderAll(); },
+      onclick: () => goDate(addDays(state.date, -1)),
     }, icon("chevL", 18)),
     el("span", { class: "nippo-dateval" },
       fmtDate(state.date, { withYear: true }),
-      isToday ? badge("今日", "accent") : null),
+      isToday ? badge("今日", "accent") : (!state.dateTouched ? badge("最新の提出日", "") : null)),
     el("button", {
       class: "icon-btn nav-chev", "aria-label": "翌日", disabled: isToday,
-      onclick: () => { state.date = addDays(state.date, 1); renderAll(); },
+      onclick: () => goDate(addDays(state.date, 1)),
     }, icon("chevR", 18)),
     !isToday ? el("button", {
       class: "btn ghost sm",
-      onclick: () => { state.date = todayStr(); renderAll(); },
+      onclick: () => goDate(todayStr()),
     }, "今日へ") : null);
 
   const seg = stores.length > 1 ? segmented(
@@ -735,7 +786,7 @@ function allTab(renderAll) {
     (id) => { state.storeFilter = id; renderAll(); }) : null;
 
   wrap.appendChild(el("div", { class: "nippo-controls" }, nav, seg));
-  wrap.appendChild(submissionCard(state.date, state.storeFilter));
+  wrap.appendChild(submissionCard(state.date, state.storeFilter, goSubmit));
 
   /* --- テーブル(+合計行) --- */
   const reports = reportsOn(state.date, state.storeFilter)
@@ -859,6 +910,7 @@ function menteeTab(renderAll) {
     wrap.appendChild(card({
       title: s.name,
       sub: `${store.storeName(s.storeId)}・${s.role}`,
+      class: "nippo-menteecard",
       actions: el("span", { class: "flex", style: { gap: "6px" } },
         unread ? badge(`未確認 ${unread}件`, "warn", true) : badge("すべて確認済み", "good"),
         badge(`今月の提出率 ${mine.rate}%`, mine.rate >= 90 ? "good" : mine.rate >= 70 ? "accent" : "warn")),
@@ -919,7 +971,7 @@ function meTab(renderAll) {
         tone: sub.rate >= 90 ? "good" : sub.rate >= 70 ? "brand" : "warn",
         sub: `${sub.submitted}日提出 / 営業日 ${sub.days}日`,
       }),
-      statTile({ label: `売上(${monthLabel})`, value: fmtYen(sum("revenue")), icon: "cash", tone: "brand", sub: "日報から自動集計", spark }),
+      statTile({ label: `売上(${monthLabel})`, value: fmtYen(sum("revenue")), icon: "cash", tone: "brand", sub: "自動集計", spark }),
       statTile({ label: `施術数(${monthLabel})`, value: `${fmtNum(sum("treatments"))}件`, icon: "body", tone: "accent", sub: `新規 ${fmtNum(sum("newPatients"))}名` }),
       statTile({ label: `成約数(${monthLabel})`, value: `${fmtNum(totC)}件`, icon: "ticket", tone: "good", sub: `提案 ${fmtNum(totP)}件` }),
       statTile({ label: `契約率(${monthLabel})`, value: mRate == null ? "—" : `${mRate}%`, icon: "target", tone: "violet", sub: "成約数 ÷ 提案数で自動計算" })),
@@ -950,11 +1002,10 @@ function meTab(renderAll) {
 function scopeBar() {
   const me = store.me();
   const bar = el("div", { class: "nippo-scopebar" },
-    el("span", { class: "nippo-scope" },
+    el("span", { class: "nippo-scope", title: `権限:${rankLabel(me)}` },
       icon("eye", 14),
-      el("span", { class: "nippo-scope-l" }, "閲覧できる範囲"),
-      el("strong", {}, scopeLabel()),
-      badge(rankLabel(me), "accent")));
+      el("span", { class: "nippo-scope-l" }, "閲覧範囲"),
+      el("strong", {}, scopeLabel())));
 
   if (isPractitioner(me)) {
     const s = monthSubmissionRate();
@@ -986,6 +1037,9 @@ export default {
       // 店舗フィルタが閲覧範囲外なら「全店」に戻す
       const okStores = new Set(visibleStores().map((s) => s.id));
       if (state.storeFilter !== "all" && !okStores.has(state.storeFilter)) state.storeFilter = "all";
+
+      // 初期表示日:提出のある直近の営業日(ユーザーが日付を動かすまで)
+      if (showAll && !state.dateTouched) state.date = defaultDate();
 
       const items = [{ id: "submit", label: "提出する" }];
       if (showAll) items.push({ id: "all", label: "みんなの日報" });

@@ -207,6 +207,28 @@
   align-items: center;
 }
 .page-nippo .nippo-subring { display: flex; justify-content: center; }
+
+/* 提出率リング */
+.page-nippo .nippo-ringwrap { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+.page-nippo .nippo-ring { position: relative; width: 132px; height: 132px; flex: none; }
+.page-nippo .nippo-ring-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px; pointer-events: none;
+}
+.page-nippo .nippo-ring-val {
+  font-size: 30px; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.page-nippo .nippo-ring-lbl { font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3); }
+.page-nippo .nippo-ring-legend { display: flex; flex-direction: column; gap: 3px; }
+.page-nippo .nippo-ring-lgitem {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); color: var(--ink-2);
+}
+.page-nippo .nippo-ring-sw { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.page-nippo .nippo-ring-lglabel { min-width: 42px; }
+.page-nippo .nippo-ring-lgitem strong { font-variant-numeric: tabular-nums; }
 .page-nippo .nippo-subinfo { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 
 .page-nippo .nippo-subtitle {
@@ -231,7 +253,7 @@
 
 .page-nippo .nippo-subbar {
   display: flex; gap: 2px;
-  height: 9px; width: 100%;
+  height: 9px; width: 100%; max-width: 460px;
   border-radius: var(--r-full);
   background: var(--surface-3);
   overflow: hidden;
@@ -276,6 +298,11 @@
   border-color: transparent; background: var(--good-soft); color: var(--good-text);
   cursor: default;
 }
+.page-nippo .nippo-remind.self {
+  border-color: color-mix(in srgb, var(--brand) 45%, transparent);
+  background: var(--brand-soft); color: var(--brand-ink);
+}
+.page-nippo .nippo-remind.self .nippo-remind-act { border-left-color: color-mix(in srgb, var(--brand) 35%, transparent); }
 .page-nippo .nippo-remind.done .nippo-remind-act { color: var(--good-text); border-left-color: color-mix(in srgb, var(--good) 35%, transparent); }
 
 .page-nippo .nippo-subhint {
@@ -340,8 +367,11 @@
   transition: background var(--dur), border-color var(--dur);
 }
 .page-nippo .nippo-mentee-row:hover { background: var(--surface-2); border-color: var(--hairline); }
-.page-nippo .nippo-mentee-row.unread { background: var(--warn-soft); }
-.page-nippo .nippo-mentee-row.unread:hover { background: color-mix(in srgb, var(--warn) 16%, var(--surface)); }
+.page-nippo .nippo-mentee-row.unread {
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+.page-nippo .nippo-mentee-row.unread:hover { background: var(--warn-soft); }
 .page-nippo .nippo-mentee-date {
   font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink-2);
   font-size: var(--fs-xs);
@@ -416,13 +446,13 @@
 
 .nippo-modal .nippo-dtop {
   display: grid;
-  grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 190px) minmax(0, 1fr);
+  gap: 12px;
   align-items: stretch;
 }
 .nippo-modal .nippo-drate {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 2px; padding: 14px 12px;
+  gap: 2px; padding: 18px 14px; min-height: 152px;
   border-radius: var(--r-lg);
   border: 1px solid var(--hairline);
   background: var(--surface-2);
@@ -449,10 +479,11 @@
 
 .nippo-modal .nippo-dnums {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-content: start;
 }
+.nippo-modal .nippo-dnum.grow { grid-column: span 2; }
 .nippo-modal .nippo-dnum {
   display: flex; flex-direction: column; gap: 2px;
   padding: 9px 12px;
@@ -510,6 +541,8 @@
 /* ---- モバイル(390px で横スクロールなし) ---- */
 @media (max-width: 640px) {
   .nippo-modal .nippo-dtop { grid-template-columns: 1fr; }
+  .nippo-modal .nippo-dnums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nippo-modal .nippo-dnum.grow { grid-column: 1 / -1; }
   .nippo-modal .nippo-dhead { justify-content: flex-start; }
   .nippo-modal .nippo-dhead-meta { align-items: flex-start; }
   .nippo-modal .nippo-dtags { justify-content: flex-start; }
@@ -534,6 +567,9 @@
   .page-nippo .nippo-subbig strong { font-size: 34px; }
   .page-nippo .nippo-remind { max-width: 100%; }
   .page-nippo .nippo-remind-name { overflow: hidden; text-overflow: ellipsis; }
+
+  /* メンティーカードの補足(店舗・役職)が語中で折れないように */
+  .page-nippo .nippo-menteecard .card-sub { display: inline-block; white-space: nowrap; }
 
   .page-nippo .nippo-mentee-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
   .page-nippo .nippo-mentee-comment { grid-column: 1 / -1; white-space: normal; }
