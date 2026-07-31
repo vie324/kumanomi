@@ -498,12 +498,6 @@ function makePosts() {
   P({ type: "chourei", channelId: "ch-all", authorId: "s01", date: iso(TODAY, "09:32"),
     title: `朝礼メモ(成増店)`,
     body: "本日の予約18件。14時に新規の方(紹介)がご来院予定です。今週の理念テーマは「仲間への感謝を言葉にする」。退勤前にサンクスカードを1枚以上送りましょう。", likes: ["s02", "s03", "s04"] });
-  P({ type: "thanks", authorId: "s02", toId: "s04", points: 30, date: iso(addDays(TODAY, -1), "19:42"),
-    body: "予約が重なってバタバタしていた時、受付とお会計を完璧に回してくれてありがとうございました!安心して施術に集中できました🙏", likes: ["s01", "s03", "s09"] });
-  P({ type: "thanks", authorId: "s04", toId: "s02", points: 20, date: iso(addDays(TODAY, -1), "20:05"),
-    body: "患者様への説明がとても丁寧で、待合で「あの先生に会うと元気になる」と仰っていました。私も見習います!", likes: ["s01", "s05"] });
-  P({ type: "thanks", authorId: "s05", toId: "s06", points: 30, date: iso(addDays(TODAY, -2), "18:30"),
-    body: "急な欠員の穴を埋めてくれて本当に助かりました。おかげでキャンセルゼロで回せました。", likes: ["s10", "s09"] });
   P({ type: "philosophy", channelId: "ch-philosophy", authorId: "s09", date: iso(addDays(TODAY, -2), "08:50"),
     title: "今週の理念テーマ",
     body: "「数字は誠実さのものさし」。数字を追うのは売上のためではなく、患者様への提案が届いたかを確かめるためです。今週のマネージャー会議で各店の好事例を共有します。", likes: ["s01", "s05", "s07", "s12"] });
@@ -523,8 +517,6 @@ function makePosts() {
   P({ type: "notice", channelId: "ch-env", authorId: "s04", date: iso(addDays(TODAY, -6), "16:00"),
     title: "フェイスタオルの在庫について",
     body: "成増店のフェイスタオル在庫が発注点を下回りました。在庫管理画面から発注済みです。到着まで大宮店から20枚借用します。", likes: ["s09"] });
-  P({ type: "thanks", authorId: "s08", toId: "s07", points: 20, date: iso(addDays(TODAY, -6), "19:55"),
-    body: "難しい症例の相談に乗っていただき、施術方針がクリアになりました。患者様の経過も良好です!", likes: ["s11"] });
   P({ type: "committee", channelId: "ch-traffic", authorId: "s05", date: iso(addDays(TODAY, -8), "20:15"),
     title: "交通事故対応フロー更新",
     body: "保険会社への施術情報提供書のテンプレートを更新しました。カルテ画面のAI要約をそのまま添付できるようになっています。", likes: ["s01", "s07", "s12"] });

@@ -35,6 +35,10 @@ const TAB_DEFS = [
 
 const MAX_MEDIA = 4;
 const MAX_MSG = 300;
+const FEED_PAGE = 12;
+
+/** リアクションピッカーを閉じる document リスナー(ページ再描画で張り替える) */
+let closePickers = null;
 
 function nameOf(id) { return store.byId("staff", id)?.name || "—"; }
 function firstNameOf(id) { return (store.byId("staff", id)?.name || "").split(" ")[0]; }
@@ -49,22 +53,9 @@ function monthLabel(m) {
   return `${y}年${mo}月`;
 }
 
-/* ------------------------------------------------------------
-   media.js の photoDataUri は seed によっては絵文字が undefined になる
-   (符号付きシフトで負のインデックスになるケースがある)。
-   共有ファイルは変更できないため、ページ側で生成後に差し替える。
-   ------------------------------------------------------------ */
-const SCENE_FALLBACK = ["🤝", "🎉", "💪", "🌸", "📣", "🧑‍⚕️", "🏥", "✨", "🍰", "📸", "🌅", "🏆", "🧹", "📚", "💬", "🫶"];
-function fnv(str) {
-  let h = 2166136261;
-  for (let i = 0; i < String(str).length; i++) { h ^= String(str).charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
-}
+/** メディアの表示URL(キャプションは別途オーバーレイで出すため画像には焼き込まない) */
 function mediaUrl(m, opts = {}) {
-  const url = mediaSrc(m, { label: "", ...opts });
-  if (!url.includes("%3Eundefined%3C")) return url;
-  const fb = SCENE_FALLBACK[(fnv(m?.seed ?? m?.id ?? "x") >>> 3) % SCENE_FALLBACK.length];
-  return url.replace("%3Eundefined%3C", `%3E${encodeURIComponent(fb)}%3C`);
+  return mediaSrc(m, { label: "", ...opts });
 }
 
 /** CSS カスタムプロパティは style オブジェクト代入では効かないため文字列で渡す */
@@ -205,6 +196,7 @@ export default {
     /* ---------------- 状態 ---------------- */
     let activeTab = TAB_DEFS.some((t) => t.id === params[0]) ? params[0] : "feed";
     let feedFilter = "all";
+    let feedLimit = FEED_PAGE;
     let rankMonth = monthOf(todayStr());
     const expanded = new Set();     // コメント展開中のカード
     const draft = {
@@ -589,7 +581,7 @@ export default {
           }).length;
           bar.appendChild(el("button", {
             class: `chip ${feedFilter === f.id ? "on" : ""}`,
-            onclick: () => { feedFilter = f.id; drawFilters(); drawList(); },
+            onclick: () => { feedFilter = f.id; feedLimit = FEED_PAGE; drawFilters(); drawList(); },
           }, f.label, el("span", { class: "chip-n" }, String(n))));
         }
       }
@@ -604,7 +596,15 @@ export default {
           })));
           return;
         }
-        list.forEach((c) => listWrap.appendChild(cardNode(c)));
+        list.slice(0, feedLimit).forEach((c) => listWrap.appendChild(cardNode(c)));
+        const rest = list.length - feedLimit;
+        if (rest > 0) {
+          listWrap.appendChild(el("div", { class: "tk-more" },
+            el("button", {
+              class: "btn ghost",
+              onclick: () => { feedLimit += FEED_PAGE; drawList(); },
+            }, icon("chevD", 15), `もっと見る(あと ${rest}枚)`)));
+        }
       }
 
       drawFilters();
@@ -1222,9 +1222,10 @@ export default {
       else renderRank(body);
     }
 
-    // ピッカーの外側クリックで閉じる
-    const onDocClick = () => document.querySelectorAll(".tc-react-host.open").forEach((n) => n.classList.remove("open"));
-    document.addEventListener("click", onDocClick);
+    // ピッカーの外側クリックで閉じる(ページ再描画のたびに張り替える)
+    if (closePickers) document.removeEventListener("click", closePickers);
+    closePickers = () => document.querySelectorAll(".tc-react-host.open").forEach((n) => n.classList.remove("open"));
+    document.addEventListener("click", closePickers);
 
     drawTabs();
     drawBody();

@@ -149,6 +149,8 @@
 }
 .page-thanks .tk-filters .chip.on .chip-n { background: color-mix(in srgb, #000 18%, transparent); color: var(--on-brand); }
 .page-thanks .tk-feed { display: flex; flex-direction: column; gap: 18px; }
+.page-thanks .tk-more { display: flex; justify-content: center; padding: 4px 0 8px; }
+.page-thanks .tk-more .btn { min-width: 220px; }
 
 /* ============================================================
    サンクスカード(主役)
@@ -178,7 +180,7 @@
   color: var(--tcink);
   overflow: hidden;
   isolation: isolate;
-  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--tcink) 22%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--tcink) 28%, transparent);
 }
 .page-thanks .tc-head::after {
   content: ""; position: absolute; inset: 0; z-index: -1;
@@ -289,8 +291,8 @@
   aspect-ratio: 4 / 3;
   transition: transform var(--dur) var(--ease);
 }
-.page-thanks .tc-media.n1 > .tm { aspect-ratio: 16 / 9; max-height: 360px; }
-.page-thanks .tc-media.n3 > .tm:first-child { aspect-ratio: 16 / 9; max-height: 300px; }
+.page-thanks .tc-media.n1 > .tm { aspect-ratio: auto; height: 330px; }
+.page-thanks .tc-media.n3 > .tm:first-child { aspect-ratio: auto; height: 250px; }
 .page-thanks .tm:hover { transform: scale(1.012); }
 .page-thanks .tm-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .page-thanks .tm-shade {
@@ -1061,6 +1063,8 @@
   .page-thanks .tc-pname { max-width: 9ch; }
   .page-thanks .tc-person.from .tc-pname { font-size: var(--fs-sm); }
   .page-thanks .tc-motif { font-size: 76px; }
+  .page-thanks .tc-media.n1 > .tm { height: 220px; }
+  .page-thanks .tc-media.n3 > .tm:first-child { height: 170px; }
   .page-thanks .tc-foot { padding: 9px 11px; }
   .page-thanks .tc-comments { padding: 11px 12px 12px; }
   .page-thanks .tc-picker { left: auto; right: 0; }

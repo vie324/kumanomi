@@ -38,13 +38,13 @@ const SCENES = ["🤝", "🎉", "💪", "🌸", "📣", "🧑‍⚕️", "🏥",
 export function photoDataUri(seed, { w = 800, h = 600, label = "" } = {}) {
   const n = hash(seed);
   const [c1, c2] = PALETTES[n % PALETTES.length];
-  const scene = SCENES[(n >> 3) % SCENES.length];
-  const angle = (n >> 5) % 90;
+  const scene = SCENES[(n >>> 3) % SCENES.length];
+  const angle = (n >>> 5) % 90;
   // 背景の丸(ボケ)を3つ散らす
   const blobs = [0, 1, 2].map((i) => {
-    const bx = ((n >> (i * 4 + 2)) % 100);
-    const by = ((n >> (i * 4 + 6)) % 100);
-    const br = 12 + ((n >> (i * 3 + 4)) % 22);
+    const bx = ((n >>> (i * 4 + 2)) % 100);
+    const by = ((n >>> (i * 4 + 6)) % 100);
+    const br = 12 + ((n >>> (i * 3 + 4)) % 22);
     return `<circle cx="${bx}%" cy="${by}%" r="${br}%" fill="#ffffff" opacity="0.12"/>`;
   }).join("");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">
