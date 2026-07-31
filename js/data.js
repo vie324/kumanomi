@@ -44,39 +44,66 @@ const iso = (dateStr, hm) => `${dateStr}T${hm}:00`;
 // マスターデータ
 // ============================================================
 
+/** category: 整骨院/整体院/鍼灸院 は責任者=院長、美容・エステ は責任者=店長 */
 const stores = [
-  { id: "st-narimasu", name: "成増店", short: "成増", isPilot: true, phone: "03-5967-xxxx", address: "東京都板橋区成増2-XX-X", lat: 35.7772, lng: 139.632, openHour: "10:00", closeHour: "20:00", color: "#2a78d6" },
-  { id: "st-omiya", name: "大宮店", short: "大宮", isPilot: false, phone: "048-641-xxxx", address: "埼玉県さいたま市大宮区桜木町1-XX", lat: 35.9063, lng: 139.6242, openHour: "10:00", closeHour: "20:00", color: "#eb6834" },
-  { id: "st-kawagoe", name: "川越店", short: "川越", isPilot: false, phone: "049-224-xxxx", address: "埼玉県川越市脇田町X-X", lat: 35.9086, lng: 139.4823, openHour: "10:00", closeHour: "20:00", color: "#1baf7a" },
-  { id: "st-urawa", name: "浦和店", short: "浦和", isPilot: false, phone: "048-813-xxxx", address: "埼玉県さいたま市浦和区高砂1-XX", lat: 35.8598, lng: 139.6574, openHour: "10:00", closeHour: "20:00", color: "#eda100" },
+  { id: "st-narimasu", name: "成増店", short: "成増", category: "整骨院", isPilot: true, phone: "03-5967-xxxx", address: "東京都板橋区成増2-XX-X", lat: 35.7772, lng: 139.632, openHour: "10:00", closeHour: "20:00", color: "#2a78d6" },
+  { id: "st-omiya", name: "大宮店", short: "大宮", category: "整体院", isPilot: false, phone: "048-641-xxxx", address: "埼玉県さいたま市大宮区桜木町1-XX", lat: 35.9063, lng: 139.6242, openHour: "10:00", closeHour: "20:00", color: "#eb6834" },
+  { id: "st-kawagoe", name: "川越店", short: "川越", category: "鍼灸院", isPilot: false, phone: "049-224-xxxx", address: "埼玉県川越市脇田町X-X", lat: 35.9086, lng: 139.4823, openHour: "10:00", closeHour: "20:00", color: "#1baf7a" },
+  { id: "st-urawa", name: "浦和店", short: "浦和", category: "整体院", isPilot: false, phone: "048-813-xxxx", address: "埼玉県さいたま市浦和区高砂1-XX", lat: 35.8598, lng: 139.6574, openHour: "10:00", closeHour: "20:00", color: "#eda100" },
+  { id: "st-biyou", name: "ビューティー大宮店", short: "美容大宮", category: "美容・エステ", isPilot: false, phone: "048-641-yyyy", address: "埼玉県さいたま市大宮区宮町X-X", lat: 35.908, lng: 139.626, openHour: "10:00", closeHour: "20:00", color: "#e87ba4" },
 ];
 
+/** 店舗カテゴリから責任者の呼称(院長/店長)を返す */
+export function directorTitle(store) {
+  return store?.category === "美容・エステ" ? "店長" : "院長";
+}
+
+/*
+ * 組織ツリー:reportsTo(直属の上司)で「傘」を表現する。
+ *   社長 熊野(s14)
+ *   └ 統括マネージャー 小林(s09)
+ *     ├ マネージャー 加藤(s10) … 治療エリアA
+ *     │   └ 統括院長 大森(s15)
+ *     │       ├ 院長 佐藤(成増) ├ 院長 伊藤(大宮)
+ *     ├ マネージャー 高木(s16) … エリアB+美容
+ *     │   ├ 院長 山本(川越) ├ 院長 山口(浦和) ├ 店長 白鳥(美容大宮)
+ *   └ 本部人事 森(s13)は社長直下
+ * 管轄は毎月変わる想定 → 組織図ページのドラッグで reportsTo を付け替える。
+ */
 const staff = [
-  { id: "s01", name: "佐藤 健太", kana: "さとう けんた", role: "院長", storeId: "st-narimasu", color: "#0c7489", points: 320, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.6, 接客: 4.2, 数値: 4.0, 理念: 4.8, 協調: 4.4 }, rank: "manager" },
-  { id: "s02", name: "鈴木 美咲", kana: "すずき みさき", role: "柔道整復師", storeId: "st-narimasu", color: "#c2547e", points: 415, joined: "2022-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.8, 接客: 4.7, 数値: 3.5, 理念: 4.2, 協調: 4.6 }, rank: "mentor", mentorId: "s01", menteeIds: ["s11", "s06"] },
-  { id: "s03", name: "田中 大輔", kana: "たなか だいすけ", role: "鍼灸師", storeId: "st-narimasu", color: "#4a3aa7", points: 268, joined: "2021-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.3, 接客: 3.6, 数値: 3.9, 理念: 3.8, 協調: 4.0 }, rank: "staff", mentorId: "s01" },
-  { id: "s04", name: "高橋 由美", kana: "たかはし ゆみ", role: "受付", storeId: "st-narimasu", color: "#b0771a", points: 388, joined: "2020-07-01", licenses: [], skills: { 技術: 3.0, 接客: 4.9, 数値: 3.4, 理念: 4.5, 協調: 4.8 }, rank: "staff", mentorId: "s01" },
-  { id: "s05", name: "伊藤 翔太", kana: "いとう しょうた", role: "院長", storeId: "st-omiya", color: "#1f7a4d", points: 295, joined: "2018-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.7, 接客: 4.0, 数値: 4.4, 理念: 4.3, 協調: 4.1 }, rank: "manager" },
-  { id: "s06", name: "渡辺 花子", kana: "わたなべ はなこ", role: "柔道整復師", storeId: "st-omiya", color: "#d95926", points: 342, joined: "2023-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.4, 接客: 4.4, 数値: 3.2, 理念: 4.0, 協調: 4.5 }, rank: "staff", mentorId: "s02" },
-  { id: "s07", name: "山本 拓海", kana: "やまもと たくみ", role: "院長", storeId: "st-kawagoe", color: "#2a78d6", points: 251, joined: "2019-10-01", licenses: ["柔道整復師", "はり師"], skills: { 技術: 4.5, 接客: 3.9, 数値: 4.2, 理念: 4.1, 協調: 3.9 }, rank: "manager" },
-  { id: "s08", name: "中村 さくら", kana: "なかむら さくら", role: "鍼灸師", storeId: "st-kawagoe", color: "#a83a52", points: 377, joined: "2022-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.0, 接客: 4.6, 数値: 3.6, 理念: 4.4, 協調: 4.7 }, rank: "mentor", mentorId: "s07", menteeIds: ["s03"] },
-  { id: "s09", name: "小林 誠", kana: "こばやし まこと", role: "統括マネージャー", storeId: "st-narimasu", color: "#3d4f6b", points: 198, joined: "2017-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.2, 接客: 4.1, 数値: 4.8, 理念: 4.6, 協調: 4.3 }, rank: "exec" },
-  { id: "s10", name: "加藤 恵", kana: "かとう めぐみ", role: "マネージャー", storeId: "st-omiya", color: "#7b5cc4", points: 289, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.1, 接客: 4.5, 数値: 4.5, 理念: 4.2, 協調: 4.6 }, rank: "area", areaStoreIds: ["st-omiya", "st-urawa"] },
-  { id: "s11", name: "吉田 陽菜", kana: "よしだ ひな", role: "柔道整復師", storeId: "st-urawa", color: "#0f8f7a", points: 305, joined: "2024-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.2, 接客: 4.3, 数値: 3.0, 理念: 3.9, 協調: 4.4 }, rank: "staff", mentorId: "s02" },
-  { id: "s12", name: "山口 蓮", kana: "やまぐち れん", role: "院長", storeId: "st-urawa", color: "#c46a1f", points: 233, joined: "2020-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.4, 接客: 3.8, 数値: 4.1, 理念: 4.0, 協調: 3.8 }, rank: "manager" },
-  { id: "s13", name: "森 あかり", kana: "もり あかり", role: "本部人事", storeId: "st-narimasu", color: "#5b6f8a", points: 120, joined: "2021-04-01", licenses: [], skills: { 技術: 2.0, 接客: 4.4, 数値: 4.7, 理念: 4.5, 協調: 4.6 }, rank: "hr" },
+  { id: "s01", name: "佐藤 健太", kana: "さとう けんた", role: "院長", storeId: "st-narimasu", color: "#0c7489", points: 320, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.6, 接客: 4.2, 数値: 4.0, 理念: 4.8, 協調: 4.4 }, rank: "manager", reportsTo: "s15" },
+  { id: "s02", name: "鈴木 美咲", kana: "すずき みさき", role: "柔道整復師", storeId: "st-narimasu", color: "#c2547e", points: 415, joined: "2022-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.8, 接客: 4.7, 数値: 3.5, 理念: 4.2, 協調: 4.6 }, rank: "mentor", reportsTo: "s01", mentorId: "s01", menteeIds: ["s11", "s06"] },
+  { id: "s03", name: "田中 大輔", kana: "たなか だいすけ", role: "鍼灸師", storeId: "st-narimasu", color: "#4a3aa7", points: 268, joined: "2021-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.3, 接客: 3.6, 数値: 3.9, 理念: 3.8, 協調: 4.0 }, rank: "staff", reportsTo: "s01", mentorId: "s01" },
+  { id: "s04", name: "高橋 由美", kana: "たかはし ゆみ", role: "受付", storeId: "st-narimasu", color: "#b0771a", points: 388, joined: "2020-07-01", licenses: [], skills: { 技術: 3.0, 接客: 4.9, 数値: 3.4, 理念: 4.5, 協調: 4.8 }, rank: "staff", reportsTo: "s01", mentorId: "s01" },
+  { id: "s05", name: "伊藤 翔太", kana: "いとう しょうた", role: "院長", storeId: "st-omiya", color: "#1f7a4d", points: 295, joined: "2018-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.7, 接客: 4.0, 数値: 4.4, 理念: 4.3, 協調: 4.1 }, rank: "manager", reportsTo: "s15" },
+  { id: "s06", name: "渡辺 花子", kana: "わたなべ はなこ", role: "柔道整復師", storeId: "st-omiya", color: "#d95926", points: 342, joined: "2023-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.4, 接客: 4.4, 数値: 3.2, 理念: 4.0, 協調: 4.5 }, rank: "staff", reportsTo: "s05", mentorId: "s02" },
+  { id: "s07", name: "山本 拓海", kana: "やまもと たくみ", role: "院長", storeId: "st-kawagoe", color: "#2a78d6", points: 251, joined: "2019-10-01", licenses: ["柔道整復師", "はり師"], skills: { 技術: 4.5, 接客: 3.9, 数値: 4.2, 理念: 4.1, 協調: 3.9 }, rank: "manager", reportsTo: "s16" },
+  { id: "s08", name: "中村 さくら", kana: "なかむら さくら", role: "鍼灸師", storeId: "st-kawagoe", color: "#a83a52", points: 377, joined: "2022-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.0, 接客: 4.6, 数値: 3.6, 理念: 4.4, 協調: 4.7 }, rank: "mentor", reportsTo: "s07", mentorId: "s07", menteeIds: ["s03"] },
+  { id: "s09", name: "小林 誠", kana: "こばやし まこと", role: "統括マネージャー", storeId: "st-narimasu", color: "#3d4f6b", points: 198, joined: "2017-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.2, 接客: 4.1, 数値: 4.8, 理念: 4.6, 協調: 4.3 }, rank: "exec", reportsTo: "s14" },
+  { id: "s10", name: "加藤 恵", kana: "かとう めぐみ", role: "マネージャー", storeId: "st-omiya", color: "#7b5cc4", points: 289, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.1, 接客: 4.5, 数値: 4.5, 理念: 4.2, 協調: 4.6 }, rank: "area", reportsTo: "s09" },
+  { id: "s11", name: "吉田 陽菜", kana: "よしだ ひな", role: "柔道整復師", storeId: "st-urawa", color: "#0f8f7a", points: 305, joined: "2024-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.2, 接客: 4.3, 数値: 3.0, 理念: 3.9, 協調: 4.4 }, rank: "staff", reportsTo: "s12", mentorId: "s02" },
+  { id: "s12", name: "山口 蓮", kana: "やまぐち れん", role: "院長", storeId: "st-urawa", color: "#c46a1f", points: 233, joined: "2020-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.4, 接客: 3.8, 数値: 4.1, 理念: 4.0, 協調: 3.8 }, rank: "manager", reportsTo: "s16" },
+  { id: "s13", name: "森 あかり", kana: "もり あかり", role: "本部人事", storeId: "st-narimasu", color: "#5b6f8a", points: 120, joined: "2021-04-01", licenses: [], skills: { 技術: 2.0, 接客: 4.4, 数値: 4.7, 理念: 4.5, 協調: 4.6 }, rank: "hr", reportsTo: "s14" },
+  { id: "s14", name: "熊野 太志", kana: "くまの たいし", role: "社長", storeId: "st-narimasu", color: "#8a4b12", points: 88, joined: "2015-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.5, 接客: 4.3, 数値: 4.9, 理念: 5.0, 協調: 4.5 }, rank: "ceo", reportsTo: null },
+  { id: "s15", name: "大森 隆", kana: "おおもり たかし", role: "統括院長", storeId: "st-narimasu", color: "#146b5c", points: 176, joined: "2017-10-01", licenses: ["柔道整復師", "はり師"], skills: { 技術: 4.8, 接客: 4.2, 数値: 4.3, 理念: 4.6, 協調: 4.2 }, rank: "chief", reportsTo: "s10" },
+  { id: "s16", name: "高木 純", kana: "たかぎ じゅん", role: "マネージャー", storeId: "st-kawagoe", color: "#4d5fb3", points: 205, joined: "2018-10-01", licenses: ["柔道整復師"], skills: { 技術: 4.0, 接客: 4.4, 数値: 4.6, 理念: 4.1, 協調: 4.4 }, rank: "area", reportsTo: "s09" },
+  { id: "s17", name: "白鳥 結衣", kana: "しらとり ゆい", role: "店長", storeId: "st-biyou", color: "#c25a86", points: 264, joined: "2020-10-01", licenses: ["エステティシャン"], skills: { 技術: 4.3, 接客: 4.8, 数値: 4.0, 理念: 4.2, 協調: 4.5 }, rank: "manager", reportsTo: "s16", menteeIds: ["s18"] },
+  { id: "s18", name: "井村 心春", kana: "いむら こはる", role: "エステティシャン", storeId: "st-biyou", color: "#7a9e3f", points: 142, joined: "2024-10-01", licenses: ["エステティシャン"], skills: { 技術: 3.1, 接客: 4.5, 数値: 2.9, 理念: 3.8, 協調: 4.3 }, rank: "staff", reportsTo: "s17", mentorId: "s17" },
 ];
 
-/** 施術者(受付・本部職を除く) */
-const practitioners = staff.filter((s) => ["院長", "柔道整復師", "鍼灸師"].includes(s.role));
+/** 現場の担当者(受付・本部職を除く=日報/予約/評価の対象) */
+const practitioners = staff.filter((s) => ["院長", "店長", "柔道整復師", "鍼灸師", "エステティシャン"].includes(s.role));
 
 const menus = [
-  { id: "m1", name: "整体スタンダード(60分)", minutes: 60, price: 6600 },
-  { id: "m2", name: "骨盤矯正(45分)", minutes: 45, price: 5500 },
-  { id: "m3", name: "鍼灸施術(60分)", minutes: 60, price: 7700 },
-  { id: "m4", name: "全身整体プレミアム(90分)", minutes: 90, price: 9350 },
-  { id: "m5", name: "初回検査・カウンセリング(75分)", minutes: 75, price: 3300 },
-  { id: "m6", name: "産後骨盤ケア(60分)", minutes: 60, price: 6600 },
+  { id: "m1", name: "整体スタンダード(60分)", minutes: 60, price: 6600, kind: "treatment" },
+  { id: "m2", name: "骨盤矯正(45分)", minutes: 45, price: 5500, kind: "treatment" },
+  { id: "m3", name: "鍼灸施術(60分)", minutes: 60, price: 7700, kind: "treatment" },
+  { id: "m4", name: "全身整体プレミアム(90分)", minutes: 90, price: 9350, kind: "treatment" },
+  { id: "m5", name: "初回検査・カウンセリング(75分)", minutes: 75, price: 3300, kind: "treatment" },
+  { id: "m6", name: "産後骨盤ケア(60分)", minutes: 60, price: 6600, kind: "treatment" },
+  { id: "m7", name: "フェイシャルエステ(60分)", minutes: 60, price: 8800, kind: "beauty" },
+  { id: "m8", name: "痩身トリートメント(80分)", minutes: 80, price: 12100, kind: "beauty" },
+  { id: "m9", name: "美容カウンセリング(45分)", minutes: 45, price: 2200, kind: "beauty" },
 ];
 
 const philosophy = {
@@ -207,7 +234,7 @@ function makeKarte(patients) {
         patientId: p.id,
         staffId,
         date,
-        menuId: pick(menus.slice(0, 4)).id,
+        menuId: pick(menus.filter((m) => m.kind === "treatment").slice(0, 4)).id,
         chief: chiefComplaints[p.id],
         subjective: pick(subjectiveBank),
         objective: pick(objectiveBank),
@@ -250,7 +277,7 @@ function makeReservations(patients) {
         const key = `${sf.id}-${start}`;
         if (used.has(key)) continue;
         used.add(key);
-        const menu = pick(menus);
+        const menu = pick(menus.filter((m) => (st.category === "美容・エステ" ? m.kind === "beauty" : m.kind === "treatment")));
         const pt = rnd() > 0.16 ? pick(patients.filter((p) => p.storeId === st.id)) : null;
         const endH = Number(start.slice(0, 2)) + Math.ceil(menu.minutes / 60);
         let status = "confirmed";
@@ -816,6 +843,7 @@ const chatRooms = [
   { id: "cr-omiya", kind: "store", name: "大宮店", icon: "🏠", desc: "大宮店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-omiya").map((s) => s.id), pinnedMessageId: null },
   { id: "cr-kawagoe", kind: "store", name: "川越店", icon: "🏠", desc: "川越店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-kawagoe").map((s) => s.id), pinnedMessageId: null },
   { id: "cr-urawa", kind: "store", name: "浦和店", icon: "🏠", desc: "浦和店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-urawa").map((s) => s.id), pinnedMessageId: null },
+  { id: "cr-biyou", kind: "store", name: "ビューティー大宮店", icon: "💆", desc: "美容・エステ店舗のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-biyou").map((s) => s.id), pinnedMessageId: null },
   { id: "cr-managers", kind: "group", name: "院長・マネージャー", icon: "🧭", desc: "責任者間の連携", memberIds: ["s01", "s05", "s07", "s12", "s09", "s10"], pinnedMessageId: null },
   { id: "cr-tech", kind: "group", name: "技術委員会", icon: "✋", desc: "手技・症例の相談", memberIds: ["s01", "s03", "s05", "s07", "s08", "s02"], pinnedMessageId: null },
   { id: "cr-mentor-s02", kind: "group", name: "メンター:鈴木班", icon: "🌱", desc: "鈴木メンターとメンティー", memberIds: ["s02", "s11", "s06"], pinnedMessageId: null },
@@ -980,7 +1008,13 @@ function makeRoleplaySessions() {
 // エクスポート
 // ============================================================
 
-export const SCHEMA_VERSION = 4;
+/** 組織変更の履歴(組織図ページで追記される) */
+const orgChangeLog = [
+  { id: "og01", date: addDays(TODAY, -32), staffId: "s17", fromId: "s10", toId: "s16", by: "s09", note: "美容部門をエリアBへ移管" },
+  { id: "og02", date: addDays(TODAY, -32), staffId: "s12", fromId: "s15", toId: "s16", by: "s09", note: "浦和店をエリアBへ移管" },
+];
+
+export const SCHEMA_VERSION = 5;
 
 export function createSeed() {
   const patients = makePatients();
@@ -1015,6 +1049,7 @@ export function createSeed() {
     chatMessages: makeChatMessages(),
     talkScripts,
     roleplaySessions: makeRoleplaySessions(),
+    orgChangeLog,
   };
 }
 

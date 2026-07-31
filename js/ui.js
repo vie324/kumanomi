@@ -126,6 +126,7 @@ const ICON_PATHS = {
   eye: '<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>',
   ticket: '<path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2.5a2 2 0 0 0 0 3V16a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2.5a2 2 0 0 0 0-3z"/><path d="M14 6v12" stroke-dasharray="2.5 2.5"/>',
   body: '<circle cx="12" cy="4.5" r="2.3"/><path d="M12 7v7M12 14l-3.5 6M12 14l3.5 6M6.5 9.5 12 8.5l5.5 1"/>',
+  org: '<rect x="8.5" y="2.5" width="7" height="5.5" rx="1.5"/><rect x="2.5" y="16" width="7" height="5.5" rx="1.5"/><rect x="14.5" y="16" width="7" height="5.5" rx="1.5"/><path d="M12 8v3.5M6 16v-2h12v2M12 11.5v2.5"/>',
 };
 
 /** icon("home", 20) → SVG element */
