@@ -342,7 +342,8 @@ function practicePane(host, sc) {
         S.recording = true; S.elapsed = 0; S.result = null; S.savedId = null;
         practiceView(host);
       },
-    }, icon("mic", 18), S.transcript ? "もう一度録音する" : "🎤 録音を開始"));
+    }, S.transcript ? icon("refresh", 17) : el("span", { class: "rp-recbtn-emo" }, "🎤"),
+      S.transcript ? "もう一度録音する" : "録音を開始"));
 
     recBody.append(liveNote());
   };
@@ -410,7 +411,7 @@ function resultPane(host, sc) {
     el("div", { class: "rp-hero-body" },
       el("div", { class: "rp-hero-toprow" },
         el("span", { class: `rp-hero-word ${tone}` }, scoreWord(r.score)),
-        el("span", { class: "rp-hero-sub" }, `${sc.title} の採点結果`)),
+        el("span", { class: "rp-hero-sub" }, `${sc.category}・${sc.level} / カバレッジ ${r.metrics.coverage}%`)),
       el("div", { class: "rp-hero-title" }, verdict(r.score)),
       el("div", { class: "rp-hero-meta" },
         el("span", {}, icon("clock", 13), `録音 ${fmtSec(S.durationSec)}(目安 ${fmtSec(sc.durationSec)})`),
@@ -527,13 +528,16 @@ function mineView(host) {
   if (trends.length) {
     const charts = el("div", { class: "rp-trend-grid" });
     for (const [sid, list] of trends) {
+      // 同日に複数回練習した場合は日付が並ぶので「n回目」表記に切り替える
+      const uniqueDates = new Set(list.map((x) => x.date)).size === list.length;
+      const labels = list.map((x, i) => (uniqueDates ? fmtDate(x.date, { withDow: false }) : `${i + 1}回目`));
       charts.appendChild(el("div", { class: "rp-trend" },
         el("div", { class: "rp-trend-title" },
           scriptTitle(sid),
           el("span", { class: "muted small" }, ` ${list.length}回 / 最高 ${Math.max(...list.map((x) => x.score))}点`)),
         lineChart({
           series: [{ name: "スコア", values: list.map((x) => x.score) }],
-          labels: list.map((x) => fmtDate(x.date, { withDow: false })),
+          labels,
           height: 190, showDots: true, fillFirst: true,
           yFmt: (v) => String(Math.round(v)),
         })));
@@ -642,11 +646,10 @@ function sessionModal(s, { review = false } = {}) {
   const wrapper = el("div", { class: "page-roleplay" }, body);
 
   body.appendChild(el("div", { class: `rp-hero compact ${scoreTone(s.score)}` },
-    el("div", { class: "rp-hero-score" },
-      el("span", { class: "rp-hero-num mono-num" }, String(s.score)),
-      el("span", { class: "rp-hero-unit" }, "点"),
-      el("span", { class: `rp-hero-word ${scoreTone(s.score)}` }, scoreWord(s.score))),
+    scoreRing(s.score),
     el("div", { class: "rp-hero-body" },
+      el("div", { class: "rp-hero-toprow" },
+        el("span", { class: `rp-hero-word ${scoreTone(s.score)}` }, scoreWord(s.score))),
       el("div", { class: "rp-hero-title" }, scriptTitle(s.scriptId)),
       el("div", { class: "rp-hero-meta" },
         el("span", {}, icon("user", 13), store.staffName(s.staffId)),
