@@ -81,44 +81,49 @@ function findDeviations(month, staffIds) {
     const a = attMap.get(key) || null;
     const t = SHIFT_TYPES[sh.type] || {};
     const types = [];
-    const details = [];
+    const notes = [];      // 構造的な問題(打刻そのものが無い等)のみ。一覧の補足行に出す
+    const reasons = [];    // モーダル用の全文
     let mins = 0;
 
     if (sh.type === "off") {
       if (a && (a.clockIn || a.clockOut)) {
         types.push("unplanned");
-        details.push("休み予定の日に打刻があります");
+        notes.push("休み予定の日に打刻があります");
       }
     } else if (!a || (!a.clockIn && !a.clockOut)) {
       types.push("absent");
-      details.push("出勤記録がありません");
+      notes.push("シフトはありましたが出勤記録がありません");
     } else {
       if (!a.clockIn || !a.clockOut || a.status === "missing") {
         types.push("missing");
-        details.push(!a.clockIn ? "出勤打刻なし" : "退勤打刻なし");
+        notes.push(!a.clockIn ? "出勤打刻がありません" : "退勤打刻がありません");
       }
       // 遅刻は勤怠記録の判定(打刻時刻とシフト開始の比較結果)を正とする
       if (a.status === "late" && a.clockIn) {
         const m = t.start ? Math.max(0, toMin(a.clockIn) - toMin(t.start)) : 0;
         types.push("late"); mins += m;
-        details.push(m ? `シフト開始から${m}分の遅刻` : "シフト開始後の打刻");
+        reasons.push(m ? `シフト開始から${m}分の遅刻` : "シフト開始後の打刻");
       }
       if (a.clockOut && t.end && toMin(a.clockOut) < toMin(t.end)) {
         const m = toMin(t.end) - toMin(a.clockOut);
-        types.push("early"); mins += m; details.push(`${m}分の早退`);
+        types.push("early"); mins += m; reasons.push(`${m}分の早退`);
       }
     }
-    if (types.length) rows.push({ date: sh.date, staffId: sh.staffId, shift: sh, att: a, types, mins, details });
+    if (types.length) {
+      rows.push({
+        date: sh.date, staffId: sh.staffId, shift: sh, att: a, types, mins,
+        note: notes.join("・"),
+        reason: [...notes, ...reasons].join("・"),
+      });
+    }
   }
 
   // シフト未登録なのに打刻がある日も「予定外出勤」として拾う
   for (const [key, a] of attMap) {
     if (seen.has(key) || a.date >= today) continue;
     if (!a.clockIn && !a.clockOut) continue;
-    rows.push({
-      date: a.date, staffId: a.staffId, shift: null, att: a,
-      types: ["unplanned"], mins: 0, details: ["シフト未登録の日に打刻があります"],
-    });
+    const n = "シフト未登録の日に打刻があります";
+    rows.push({ date: a.date, staffId: a.staffId, shift: null, att: a, types: ["unplanned"], mins: 0, note: n, reason: n });
   }
 
   rows.sort((x, y) => (x.date < y.date ? 1 : x.date > y.date ? -1 : x.staffId.localeCompare(y.staffId)));
@@ -355,7 +360,7 @@ export default {
           render: (a) => a.approved
             ? badge("承認済", "good")
             : el("button", {
-                class: "btn primary sm",
+                class: "btn soft sm hr-approve",
                 onclick: (e) => {
                   e.stopPropagation();
                   store.update("attendance", a.id, { approved: true });
@@ -423,13 +428,12 @@ export default {
           el("span", { class: "dv-staff" }, staffChip(d.staffId, { size: 28 })),
           el("span", { class: "dv-times" },
             el("span", { class: "dv-plan" }, el("span", { class: "dv-lab" }, "予定"), plan),
-            icon("chevR", 13),
             el("span", { class: "dv-act" }, el("span", { class: "dv-lab" }, "実績"), actual)),
           el("span", { class: "dv-tail" },
             el("span", { class: "dv-badges" },
               d.types.map((t2) => badge(DEV_META[t2].label, DEV_META[t2].kind))),
             el("span", { class: `dv-min ${d.mins ? "" : "zero"}` }, d.mins ? `${d.mins}分` : "—")),
-          el("span", { class: "dv-detail" }, d.details.join("・"))));
+          d.note ? el("span", { class: "dv-detail" }, d.note) : null));
       }
 
       // 乖離の多い順ランキング
@@ -509,7 +513,7 @@ export default {
             el("div", { class: "otc-meta" },
               el("span", { class: "otc-name" }, r.staff.name),
               el("span", { class: "otc-sub" }, `${store.storeName(r.staff.storeId)}・${r.staff.role}`)),
-            badge(level === "critical" ? "上限超過" : level === "warn" ? "注意" : "要watch",
+            badge(level === "critical" ? "上限超過" : level === "warn" ? "注意" : "要確認",
               level === "critical" ? "critical" : level === "warn" ? "warn" : "accent")),
           el("div", { class: "otc-value" }, h1(r.ot), el("span", { class: "otc-unit" }, "/ 月")),
           el("div", { class: "otc-facts" },
@@ -558,30 +562,44 @@ export default {
           : emptyState({ icon: "🗂", title: "対象月の勤怠データがありません" }),
       });
 
-      // 週次の残業推移
-      const weeks = weeksOf(state.month);
-      const bucket = new Map(weeks.map((w) => [w, 0]));
+      // 週次の残業推移(データのない前後の週は詰める)
+      const allWeeks = weeksOf(state.month);
+      const bucket = new Map(allWeeks.map((w) => [w, 0]));
       for (const a of store.get("attendance")) {
         if (monthOf(a.date) !== state.month || !ids.has(a.staffId)) continue;
         const w = mondayOf(a.date);
         if (bucket.has(w)) bucket.set(w, bucket.get(w) + otH(a));
       }
+      let from = 0, to = allWeeks.length - 1;
+      while (from < to && bucket.get(allWeeks[from]) <= 0) from++;
+      while (to > from && bucket.get(allWeeks[to]) <= 0) to--;
+      const weeks = allWeeks.slice(from, to + 1);
       const values = weeks.map((w) => Math.round(bucket.get(w) * 10) / 10);
+      const totalOt = rowsAll.reduce((s, r) => s + r.ot, 0);
+      const withOt = rowsAll.filter((r) => r.ot > 0);
+      const peakIdx = values.indexOf(Math.max(...values, 0));
       const trendCard = card({
         title: "週次の残業推移",
         sub: `${monthLabelJa(state.month)}・${state.storeId === "all" ? "全店合計" : store.storeName(state.storeId)}`,
         body: values.some((v) => v > 0)
-          ? barChart({
-              series: [{ name: "残業時間", values, color: "var(--brand)" }],
-              labels: weeks.map(weekLabel), height: 220,
-              yFmt: (v) => `${Math.round(v)}h`,
-            })
+          ? el("div", {},
+              barChart({
+                series: [{ name: "残業時間", values, color: "var(--brand)" }],
+                labels: weeks.map(weekLabel), height: 220,
+                yFmt: (v) => `${Math.round(v)}h`,
+              }),
+              el("div", { class: "hr-otsum" },
+                kv("対象人数", `${rowsAll.length}名(うち残業あり ${withOt.length}名)`),
+                kv("残業合計", h1(totalOt)),
+                kv("1人あたり平均", h1(withOt.length ? totalOt / withOt.length : 0)),
+                kv("最も多い週", peakIdx >= 0 ? `${weekLabel(weeks[peakIdx])}(${h1(values[peakIdx])})` : "—"),
+                kv("残業が発生した日数", `${rowsAll.reduce((s, r) => s + r.otDays, 0)}日`)))
           : emptyState({ icon: "📉", title: "残業は発生していません" }),
       });
 
       return el("div", { class: "stack", style: { gap: "16px" } },
         alertCard,
-        el("div", { class: "grid cols-2" }, barsCard, trendCard));
+        el("div", { class: "hr-ot-grid" }, barsCard, trendCard));
     }
 
     /* ============================================================
@@ -671,7 +689,7 @@ export default {
               devs.map((d) => el("div", { class: "hmd-item" },
                 el("span", { class: "hmd-date" }, fmtDate(d.date)),
                 el("span", { class: "hmd-badges" }, d.types.map((t) => badge(DEV_META[t].label, DEV_META[t].kind))),
-                el("span", { class: "hmd-detail" }, d.details.join("・")))))
+                el("span", { class: "hmd-detail" }, d.reason))))
           : el("p", { class: "hr-modal-empty" }, "この月はシフト通りに勤務できています。"),
 
         el("p", { class: "hr-modal-note" }, icon("info", 13), "日報の内容は人事管理の対象外です。"),

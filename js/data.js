@@ -305,19 +305,40 @@ function makeShifts() {
   return shifts;
 }
 
+/** "HH:MM" → 0時からの分 / 分 → "HH:MM" */
+const toMin = (hm) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3));
+const toHM = (m) => `${pad(Math.floor(((m % 1440) + 1440) % 1440 / 60))}:${pad(((m % 60) + 60) % 60)}`;
+
 function makeAttendance(shifts) {
   const att = [];
   let n = 1;
   for (const sh of shifts) {
-    if (sh.date >= TODAY || sh.type === "off") continue;
+    if (sh.date >= TODAY) continue;
+
+    // 休みの日にまれに出勤している(予定外出勤)
+    if (sh.type === "off") {
+      if (rnd() < 0.02) {
+        const inMin = 10 * 60 + ri(0, 40);
+        att.push({
+          id: `at${String(n++).padStart(4, "0")}`,
+          staffId: sh.staffId, date: sh.date, shiftType: "off",
+          clockIn: toHM(inMin), clockOut: toHM(inMin + ri(180, 330)),
+          breakMin: 45, status: "normal", gpsOk: true,
+          approved: sh.date < addDays(TODAY, -7),
+          note: "休日出勤(応援)",
+        });
+      }
+      continue;
+    }
+
     const t = SHIFT_TYPES[sh.type];
     const late = rnd() < 0.05;
     const missing = rnd() < 0.04;
-    const inH = Number(t.start.slice(0, 2));
-    const inM = Number(t.start.slice(3)) + (late ? ri(3, 18) : -ri(2, 14));
-    const inTime = `${pad(inH + Math.floor(Math.max(inM, 0) / 60))}:${pad(((inM % 60) + 60) % 60)}`;
-    const outM = Number(t.end.slice(3)) + ri(0, 25);
-    const outTime = `${pad(Number(t.end.slice(0, 2)) + Math.floor(outM / 60))}:${pad(outM % 60)}`;
+    const early = !late && !missing && rnd() < 0.05; // 早退
+
+    const inTime = toHM(toMin(t.start) + (late ? ri(4, 22) : -ri(2, 14)));
+    const outTime = toHM(toMin(t.end) + (early ? -ri(25, 95) : ri(0, 25)));
+
     att.push({
       id: `at${String(n++).padStart(4, "0")}`,
       staffId: sh.staffId,
@@ -329,7 +350,7 @@ function makeAttendance(shifts) {
       status: missing ? "missing" : late ? "late" : "normal",
       gpsOk: !missing,
       approved: sh.date < addDays(TODAY, -7),
-      note: missing ? "打刻漏れ" : late ? "電車遅延" : "",
+      note: missing ? "打刻漏れ" : late ? "電車遅延" : early ? "体調不良のため早退" : "",
     });
   }
   return att;

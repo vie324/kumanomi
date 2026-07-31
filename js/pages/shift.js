@@ -576,9 +576,12 @@ export default {
         return el("div", { class: `shift-perm ${rw ? "rw" : "ro"}` },
           el("span", { class: "shift-perm-ic" }, icon(rw ? "edit" : "eye", 17)),
           el("span", { class: "shift-perm-txt" },
-            rw ? `編集できる店舗:${ed.map((s) => s.short).join("・")}` : "閲覧のみ(編集は院長以上)",
-            ro.length ? el("span", { class: "shift-perm-note" }, `閲覧のみ:${ro.map((s) => s.short).join("・")}`) : null),
-          rw ? badge("編集できます", "good") : badge("閲覧のみ", "warn"),
+            rw ? `編集できる店舗:${ed.map((s) => s.short).join("・")}` : "全店舗のシフトを閲覧できます",
+            el("span", { class: "shift-perm-note" },
+              rw
+                ? (ro.length ? `閲覧のみ:${ro.map((s) => s.short).join("・")}` : "すべての店舗を編集できます")
+                : "編集は院長以上の権限が必要です")),
+          rw ? badge("編集できます", "good") : badge("閲覧のみ(編集は院長以上)"),
           sub);
       }
 
@@ -593,9 +596,10 @@ export default {
       }
       return el("div", { class: "shift-perm ro" },
         el("span", { class: "shift-perm-ic" }, icon("eye", 17)),
-        el("span", { class: "shift-perm-txt" }, `${name}は閲覧のみです`,
-          el("span", { class: "shift-perm-note" }, "希望の提出はどなたでもできます")),
-        badge("閲覧のみ(編集は院長以上)", "warn"),
+        el("span", { class: "shift-perm-txt" }, `${name}のシフトを閲覧しています`,
+          el("span", { class: "shift-perm-note" },
+            isMyStore(state.storeId) ? "自店舗・希望の提出はどなたでもできます" : "希望の提出はどなたでもできます")),
+        badge("閲覧のみ(編集は院長以上)"),
         sub);
     }
 
@@ -700,6 +704,44 @@ export default {
       });
     }
 
+    /** 全店表示のときだけ出す、店舗別サマリー */
+    function buildAllSummaryCard() {
+      const dates = state.view === "week" ? weekDates(state.weekStart) : monthDates(state.month);
+      const periodLabel = state.view === "week" ? rangeLabel(state.weekStart) : monthLabel(state.month);
+
+      const rows = el("div", { class: "row-list" });
+      for (const st of allStores()) {
+        const list = staffOf(st.id);
+        let shortDays = 0, blankDays = 0, manDays = 0;
+        for (const d of dates) {
+          const s = dayStatus(st.id, d, list);
+          for (const p of list) {
+            const t = typeOfRec(p.id, d);
+            if (t && t !== "off") manDays++;
+          }
+          if (s.closed) continue;
+          if (s.planned === 0) blankDays++;
+          else if (!s.ok) shortDays++;
+        }
+        rows.appendChild(el("div", { class: "row-item shift-sumrow" },
+          el("span", { class: "shift-sumdot", style: { background: st.color } }),
+          el("span", { class: "row-main" },
+            el("span", { class: "row-title" }, st.name),
+            el("span", { class: "row-sub" }, `${list.length}名・延べ出勤 ${manDays}人日`)),
+          isMyStore(st.id) ? badge("自店舗", "brand") : null,
+          canEdit(st.id) ? badge("編集可", "good") : badge("閲覧のみ"),
+          badge(shortDays ? `不足 ${shortDays}日` : "不足なし", shortDays ? "critical" : "good"),
+          blankDays ? badge(`未作成 ${blankDays}日`, "warn") : null));
+      }
+
+      return card({
+        title: "全店サマリー",
+        sub: el("span", { class: "shift-cardsub" }, el("b", {}, periodLabel),
+          el("span", { class: "small muted" }, "店舗タブを選ぶと1店舗だけを大きく表示できます")),
+        body: rows,
+      });
+    }
+
     function buildLinkCard() {
       return el("div", { class: "card shift-link" },
         el("span", { class: "shift-link-ic" }, icon("gps", 20)),
@@ -772,6 +814,7 @@ export default {
 
       clear(root);
       root.append(buildHead(), buildPermBar(), buildToolbar());
+      if (state.storeId === ALL) root.append(buildAllSummaryCard());
       for (const s of shownStores()) root.append(buildStoreCard(s.id));
       root.append(
         buildLinkCard(),

@@ -42,12 +42,13 @@
   cursor: not-allowed;
 }
 .page-shift .shift-ailock-ic {
-  position: absolute; right: -5px; top: -5px;
-  width: 19px; height: 19px;
+  position: absolute; right: -6px; top: -6px;
+  width: 20px; height: 20px;
   display: grid; place-items: center;
   border-radius: var(--r-full);
-  background: var(--surface-3); color: var(--ink-2);
+  background: var(--surface); color: var(--ink-2);
   border: 1px solid var(--hairline-strong);
+  box-shadow: var(--shadow-1);
 }
 
 /* ---- ツールバー(表示切替+期間ナビ+店舗フィルタ) ---- */
@@ -223,7 +224,7 @@
   background: var(--good-soft); color: var(--good-text);
   font-size: 9.5px; font-weight: 800; white-space: nowrap;
 }
-.page-shift .sc-counts { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.page-shift .sc-counts { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; }
 .page-shift .sc-cnt {
   display: inline-flex; align-items: center; justify-content: center;
   height: 17px; padding: 0 6px;
@@ -372,6 +373,15 @@
 }
 .page-shift .shift-legend-item { display: inline-flex; align-items: center; gap: 6px; }
 
+/* ---- 全店サマリー ---- */
+.page-shift .shift-sumrow { gap: 10px; flex-wrap: wrap; }
+.page-shift .shift-sumdot {
+  flex: none;
+  width: 10px; height: 10px;
+  border-radius: var(--r-full);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
 /* ---- 締切・説明 ---- */
 .page-shift .shift-deadline {
   display: flex; align-items: center; gap: 7px;
@@ -414,8 +424,11 @@
   .page-shift .sc-cell { min-height: 70px; padding: 5px 3px; border-radius: 9px; gap: 3px; }
   .page-shift .sc-day { font-size: var(--fs-xs); }
   .page-shift .sc-day.pill { padding: 0 6px; }
-  .page-shift .sc-counts { gap: 2px; }
-  .page-shift .sc-cnt { height: 15px; padding: 0 3px; font-size: 9px; }
+  .page-shift .sc-counts { gap: 3px; }
+  .page-shift .sc-cnt {
+    height: 15px; padding: 0 2px; border-radius: 5px;
+    font-size: 8.5px; letter-spacing: -0.03em;
+  }
   .page-shift .sc-people { display: none; }
   .page-shift .sc-cov { height: 16px; padding: 0 5px; font-size: 8.5px; flex: 1; }
   .page-shift .sc-train { padding: 0 3px; font-size: 8.5px; }
