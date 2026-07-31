@@ -9,6 +9,8 @@ import { canSeePage, rankLabel, scopeLabel, RANKS, rankOf } from "./auth.js";
 
 import dashboard from "./pages/dashboard.js";
 import sns from "./pages/sns.js";
+import thanks from "./pages/thanks.js";
+import rewards from "./pages/rewards.js";
 import chat from "./pages/chat.js";
 import nippo from "./pages/nippo.js";
 import kintai from "./pages/kintai.js";
@@ -26,7 +28,7 @@ import assistant from "./pages/assistant.js";
 /* ---- ナビゲーション構成 ---- */
 const NAV_GROUPS = [
   { label: "ホーム", pages: [dashboard] },
-  { label: "コミュニケーション", pages: [chat, sns, meetings] },
+  { label: "コミュニケーション", pages: [chat, thanks, rewards, sns, meetings] },
   { label: "毎日の業務", pages: [nippo, kintai, shift] },
   { label: "患者様", pages: [reserve, patients] },
   { label: "組織運営", pages: [org, staffPage, roleplay, backoffice, hr] },
