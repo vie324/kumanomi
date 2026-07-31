@@ -126,6 +126,11 @@ const ICON_PATHS = {
   eye: '<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>',
   ticket: '<path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2.5a2 2 0 0 0 0 3V16a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2.5a2 2 0 0 0 0-3z"/><path d="M14 6v12" stroke-dasharray="2.5 2.5"/>',
   body: '<circle cx="12" cy="4.5" r="2.3"/><path d="M12 7v7M12 14l-3.5 6M12 14l3.5 6M6.5 9.5 12 8.5l5.5 1"/>',
+  play: '<path d="M8 5.5v13l11-6.5z"/>',
+  film: '<rect x="2.5" y="4.5" width="19" height="15" rx="2"/><path d="M7 4.5v15M17 4.5v15M2.5 12h19M2.5 8.2h4.5M2.5 15.8h4.5M17 8.2h4.5M17 15.8h4.5"/>',
+  image: '<rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.5" cy="10" r="1.8"/><path d="m3.5 17.5 5-4.5 4 3.5 3.5-3 4.5 4"/>',
+  medal: '<circle cx="12" cy="14.5" r="5.5"/><path d="m8 3 2.5 5M16 3l-2.5 5M12 12v5M9.8 14.2h4.4" /><path d="M6.5 3h11"/>',
+  star: '<path d="m12 3 2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16.9 6.4 20.1l1.4-6.3L3 9.5l6.4-.6z"/>',
   org: '<rect x="8.5" y="2.5" width="7" height="5.5" rx="1.5"/><rect x="2.5" y="16" width="7" height="5.5" rx="1.5"/><rect x="14.5" y="16" width="7" height="5.5" rx="1.5"/><path d="M12 8v3.5M6 16v-2h12v2M12 11.5v2.5"/>',
 };
 

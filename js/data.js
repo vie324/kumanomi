@@ -498,12 +498,6 @@ function makePosts() {
   P({ type: "chourei", channelId: "ch-all", authorId: "s01", date: iso(TODAY, "09:32"),
     title: `朝礼メモ(成増店)`,
     body: "本日の予約18件。14時に新規の方(紹介)がご来院予定です。今週の理念テーマは「仲間への感謝を言葉にする」。退勤前にサンクスカードを1枚以上送りましょう。", likes: ["s02", "s03", "s04"] });
-  P({ type: "thanks", authorId: "s02", toId: "s04", points: 30, date: iso(addDays(TODAY, -1), "19:42"),
-    body: "予約が重なってバタバタしていた時、受付とお会計を完璧に回してくれてありがとうございました!安心して施術に集中できました🙏", likes: ["s01", "s03", "s09"] });
-  P({ type: "thanks", authorId: "s04", toId: "s02", points: 20, date: iso(addDays(TODAY, -1), "20:05"),
-    body: "患者様への説明がとても丁寧で、待合で「あの先生に会うと元気になる」と仰っていました。私も見習います!", likes: ["s01", "s05"] });
-  P({ type: "thanks", authorId: "s05", toId: "s06", points: 30, date: iso(addDays(TODAY, -2), "18:30"),
-    body: "急な欠員の穴を埋めてくれて本当に助かりました。おかげでキャンセルゼロで回せました。", likes: ["s10", "s09"] });
   P({ type: "philosophy", channelId: "ch-philosophy", authorId: "s09", date: iso(addDays(TODAY, -2), "08:50"),
     title: "今週の理念テーマ",
     body: "「数字は誠実さのものさし」。数字を追うのは売上のためではなく、患者様への提案が届いたかを確かめるためです。今週のマネージャー会議で各店の好事例を共有します。", likes: ["s01", "s05", "s07", "s12"] });
@@ -523,8 +517,6 @@ function makePosts() {
   P({ type: "notice", channelId: "ch-env", authorId: "s04", date: iso(addDays(TODAY, -6), "16:00"),
     title: "フェイスタオルの在庫について",
     body: "成増店のフェイスタオル在庫が発注点を下回りました。在庫管理画面から発注済みです。到着まで大宮店から20枚借用します。", likes: ["s09"] });
-  P({ type: "thanks", authorId: "s08", toId: "s07", points: 20, date: iso(addDays(TODAY, -6), "19:55"),
-    body: "難しい症例の相談に乗っていただき、施術方針がクリアになりました。患者様の経過も良好です!", likes: ["s11"] });
   P({ type: "committee", channelId: "ch-traffic", authorId: "s05", date: iso(addDays(TODAY, -8), "20:15"),
     title: "交通事故対応フロー更新",
     body: "保険会社への施術情報提供書のテンプレートを更新しました。カルテ画面のAI要約をそのまま添付できるようになっています。", likes: ["s01", "s07", "s12"] });
@@ -1009,16 +1001,266 @@ function makeRoleplaySessions() {
 // ============================================================
 
 /** 組織変更の履歴(組織図ページで追記される) */
+// ============================================================
+// サンクスギフト(感謝の可視化・ポイント・ごほうび交換)
+// ============================================================
+
+/** 理念バリュー:カードは必ずどれか1つに紐づく(何を称えたのかが残る) */
+const thanksValues = [
+  { id: "v1", label: "患者様目線", emoji: "🫶", desc: "「痛みの先の人生」を見て動けた行動", color: "#e2621a" },
+  { id: "v2", label: "感謝を言葉に", emoji: "💬", desc: "仲間への感謝やねぎらいを伝えた行動", color: "#e87ba4" },
+  { id: "v3", label: "誠実な数字", emoji: "📊", desc: "ごまかさず数字と向き合った行動", color: "#2a78d6" },
+  { id: "v4", label: "学び続ける", emoji: "📚", desc: "技術・知識を磨き、共有した行動", color: "#1baf7a" },
+  { id: "v5", label: "地域に必要とされる", emoji: "🏥", desc: "院や地域のために動いた行動", color: "#4a3aa7" },
+];
+
+/** カードデザイン(送るときに選べる台紙) */
+const cardDesigns = [
+  { id: "d1", name: "サンセット", grad: ["#f8a423", "#e2621a"], ink: "#ffffff", motif: "🌅" },
+  { id: "d2", name: "オーシャン", grad: ["#0c7489", "#0a4a5c"], ink: "#ffffff", motif: "🐠" },
+  { id: "d3", name: "さくら", grad: ["#f7b7cd", "#e87ba4"], ink: "#5a2338", motif: "🌸" },
+  { id: "d4", name: "フォレスト", grad: ["#4fc79b", "#1baf7a"], ink: "#0b3a2a", motif: "🌿" },
+  { id: "d5", name: "ゴールド", grad: ["#ffd66b", "#eda100"], ink: "#4a3200", motif: "🏆" },
+  { id: "d6", name: "ミッドナイト", grad: ["#6b5ce0", "#3b2f8f"], ink: "#ffffff", motif: "✨" },
+  { id: "d7", name: "シンプル", grad: ["#ffffff", "#f0ebe4"], ink: "#221a15", motif: "🤍" },
+];
+
+/** ポイント交換のごほうび(ロイヤリティの出口) */
+const giftCatalog = [
+  { id: "g01", name: "コンビニコーヒー", cost: 150, category: "ちょっとした贅沢", emoji: "☕", stock: 999, desc: "休憩時間の一杯に。引換コードを発行します。", popular: true },
+  { id: "g02", name: "スイーツ引換券", cost: 300, category: "ちょっとした贅沢", emoji: "🍰", stock: 40, desc: "人気店のスイーツと交換できます。", popular: true },
+  { id: "g03", name: "ランチ補助券(1,000円)", cost: 600, category: "食事", emoji: "🍱", stock: 30, desc: "お昼ごはんに使える補助券。" },
+  { id: "g04", name: "書籍購入補助(3,000円)", cost: 1200, category: "学び", emoji: "📚", stock: 20, desc: "技術書・専門書の購入に。学びを応援します。", popular: true },
+  { id: "g05", name: "外部セミナー参加費補助", cost: 2500, category: "学び", emoji: "🎓", stock: 10, desc: "社外研修・セミナーの参加費に充当できます。" },
+  { id: "g06", name: "施術用スツール(自分専用)", cost: 3000, category: "仕事道具", emoji: "🪑", stock: 5, desc: "自分に合った高さのスツールを支給します。" },
+  { id: "g07", name: "マイタオルセット", cost: 400, category: "仕事道具", emoji: "🧻", stock: 60, desc: "名入りのタオルセット。" },
+  { id: "g08", name: "有給プラス半日", cost: 4000, category: "時間", emoji: "🌴", stock: 8, desc: "半日分の特別休暇。しっかり休んでください。", popular: true },
+  { id: "g09", name: "リラクゼーション施術(自社)", cost: 800, category: "時間", emoji: "💆", stock: 25, desc: "自社店舗で施術を受けられます。同僚に癒やされましょう。" },
+  { id: "g10", name: "推し備品リクエスト権", cost: 1500, category: "仕事道具", emoji: "🎯", stock: 12, desc: "院に置きたい備品を1つリクエストできます。" },
+  { id: "g11", name: "社長とランチ", cost: 2000, category: "体験", emoji: "🍽", stock: 6, desc: "社長と1対1のランチ。何でも話せます。" },
+  { id: "g12", name: "誕生日サプライズ企画権", cost: 1000, category: "体験", emoji: "🎂", stock: 15, desc: "仲間の誕生日を院ぐるみでお祝いする企画を実行できます。" },
+];
+
+/** 称号・バッジ(獲得条件は js 側で判定するため、定義だけ持つ) */
+const badges = [
+  { id: "b01", name: "はじめの一歩", emoji: "🌱", desc: "初めてサンクスカードを送った", tier: "bronze", metric: "sent", threshold: 1 },
+  { id: "b02", name: "感謝の常連", emoji: "💐", desc: "サンクスカードを25枚送った", tier: "silver", metric: "sent", threshold: 25 },
+  { id: "b03", name: "感謝の達人", emoji: "🏅", desc: "サンクスカードを100枚送った", tier: "gold", metric: "sent", threshold: 100 },
+  { id: "b04", name: "みんなの支え", emoji: "🤝", desc: "サンクスカードを25枚受け取った", tier: "silver", metric: "received", threshold: 25 },
+  { id: "b05", name: "院の太陽", emoji: "☀️", desc: "サンクスカードを100枚受け取った", tier: "gold", metric: "received", threshold: 100 },
+  { id: "b06", name: "写真で伝える人", emoji: "📸", desc: "写真・動画つきのカードを10枚送った", tier: "silver", metric: "withMedia", threshold: 10 },
+  { id: "b07", name: "理念の伝道師", emoji: "🧭", desc: "5つのバリューすべてでカードを送った", tier: "gold", metric: "valuesCovered", threshold: 5 },
+  { id: "b08", name: "店舗をつなぐ", emoji: "🌉", desc: "3店舗以上のメンバーにカードを送った", tier: "silver", metric: "storesReached", threshold: 3 },
+  { id: "b09", name: "続ける力", emoji: "🔥", desc: "4週連続でカードを送った", tier: "gold", metric: "weekStreak", threshold: 4 },
+  { id: "b10", name: "リアクション上手", emoji: "👏", desc: "仲間のカードに50回リアクションした", tier: "bronze", metric: "reactionsGiven", threshold: 50 },
+];
+
+const THANKS_REACTIONS = ["👏", "🙌", "❤️", "🎉", "🥹", "💪"];
+
+function makeThanksCards() {
+  const cards = [];
+  let n = 1;
+  const C = (fromId, toIds, points, valueId, designId, dayOff, hm, message, opts = {}) => {
+    cards.push({
+      id: `tc${String(n++).padStart(3, "0")}`,
+      fromId,
+      toIds: Array.isArray(toIds) ? toIds : [toIds],
+      points,
+      valueId,
+      designId,
+      date: iso(addDays(TODAY, dayOff), hm),
+      message,
+      media: opts.media || [],
+      reactions: opts.reactions || {},
+      comments: opts.comments || [],
+      boosts: opts.boosts || [],   // 上長からの「ブースト」= 追加ポイント贈与
+      pinned: !!opts.pinned,
+      visibility: opts.visibility || "all", // all | store
+    });
+  };
+
+  C("s02", "s04", 30, "v2", "d1", -1, "19:42",
+    "予約が重なってバタバタしていた時、受付とお会計を完璧に回してくれてありがとうございました!安心して施術に集中できました🙏",
+    { reactions: { "👏": ["s01", "s03", "s09"], "❤️": ["s05"] },
+      media: [{ id: "m01", kind: "photo", seed: "reception-rush", caption: "混み合った受付をさばく高橋さん" }],
+      comments: [{ id: "tcm1", authorId: "s01", body: "本当に助かりました。高橋さんの段取りはさすがです。", date: iso(addDays(TODAY, -1), "20:10") }] });
+
+  C("s04", "s02", 20, "v1", "d3", -1, "20:05",
+    "患者様への説明がとても丁寧で、待合で「あの先生に会うと元気になる」と仰っていました。私も見習います!",
+    { reactions: { "🥹": ["s01", "s05"], "👏": ["s03"] } });
+
+  C("s05", "s06", 30, "v2", "d4", -2, "18:30",
+    "急な欠員の穴を埋めてくれて本当に助かりました。おかげでキャンセルゼロで回せました。",
+    { reactions: { "🙌": ["s10", "s09", "s02"] },
+      boosts: [{ by: "s10", points: 20, comment: "現場を救ってくれました。マネージャーからも感謝!", date: iso(addDays(TODAY, -2), "19:10") }] });
+
+  C("s08", "s07", 20, "v4", "d2", -6, "19:55",
+    "難しい症例の相談に乗っていただき、施術方針がクリアになりました。患者様の経過も良好です!",
+    { reactions: { "👏": ["s11", "s03"] },
+      media: [{ id: "m02", kind: "video", seed: "technique-demo", caption: "教わった手技のデモ", durationSec: 42 }] });
+
+  C("s11", "s02", 30, "v4", "d6", -3, "20:20",
+    "テストの点数が上がらず落ち込んでいた時、勉強のやり方を一緒に考えてくれてありがとうございました。今週の小テスト、満点でした!",
+    { reactions: { "🎉": ["s01", "s02", "s12", "s09"], "🔥": [] , "💪": ["s06"] },
+      media: [{ id: "m03", kind: "photo", seed: "study-night", caption: "満点の答案" }],
+      comments: [{ id: "tcm2", authorId: "s02", body: "自分の力ですよ!よく頑張りました🌸", date: iso(addDays(TODAY, -3), "21:02") }],
+      pinned: true });
+
+  C("s01", ["s02", "s03", "s04"], 20, "v5", "d5", -4, "20:40",
+    "成増店の新ポータル移行、初週おつかれさまでした。全員が前向きに使ってくれたおかげで大きなトラブルなく走り切れました。チーム全員に感謝です!",
+    { reactions: { "🙌": ["s02", "s03", "s04", "s09"], "❤️": ["s09"] },
+      media: [{ id: "m04", kind: "photo", seed: "team-morning", caption: "移行初週の朝礼" }] });
+
+  C("s10", "s05", 30, "v3", "d5", -5, "18:05",
+    "大宮店の数字の振り返りが毎回とても丁寧で、エリア全体の判断がしやすくなっています。ありがとうございます。",
+    { reactions: { "📊": [], "👏": ["s09"] } });
+
+  C("s06", "s10", 10, "v2", "d7", -7, "12:15",
+    "面談で話を聞いてくださってありがとうございました。もやもやが晴れて、今週は前向きに働けています。",
+    { reactions: { "🥹": ["s05"] } });
+
+  C("s12", "s11", 20, "v1", "d3", -8, "19:30",
+    "初診の患者様への対応、緊張していたと思いますが最後まで笑顔で丁寧でした。患者様からもお褒めの言葉をいただきました。",
+    { reactions: { "👏": ["s02", "s06"], "🎉": ["s02"] } });
+
+  C("s03", "s08", 20, "v4", "d2", -9, "21:00",
+    "鍼の刺入角度について丁寧に教えていただき、翌日の施術で患者様の反応が明らかに変わりました。ありがとうございます!",
+    { reactions: { "💪": ["s07"] } });
+
+  C("s17", "s18", 30, "v1", "d3", -2, "19:15",
+    "初めてのフェイシャル担当、緊張していたと思いますがカウンセリングがとても丁寧でした。お客様が「また来たい」と仰っていましたよ✨",
+    { reactions: { "🎉": ["s16"], "❤️": ["s16"] },
+      media: [{ id: "m05", kind: "photo", seed: "beauty-room", caption: "整えられた施術ルーム" }] });
+
+  C("s18", "s17", 10, "v4", "d7", -1, "20:30",
+    "毎朝の技術チェック、丁寧に見てくださってありがとうございます。手順が体に入ってきました!",
+    { reactions: { "🙌": ["s17"] } });
+
+  C("s09", "s01", 30, "v5", "d6", -10, "17:20",
+    "成増店での先行導入、現場の声を吸い上げながら進めてくれて助かりました。他店展開の土台ができました。",
+    { reactions: { "👏": ["s05", "s07", "s12", "s10"], "🎉": ["s14"] },
+      boosts: [{ by: "s14", points: 50, comment: "会社の未来をつくる仕事です。ありがとう。", date: iso(addDays(TODAY, -10), "18:00") }] });
+
+  C("s07", "s03", 20, "v4", "d4", -12, "20:10",
+    "症例相談のスレッド、いつも具体的で他店の勉強にもなっています。ナレッジを惜しみなく出してくれてありがとう。",
+    { reactions: { "📚": [], "👏": ["s08"] } });
+
+  C("s04", "s01", 20, "v2", "d1", -14, "19:00",
+    "忙しい中でも必ず「ありがとう」と声をかけてくださるので、受付にいて安心できます。",
+    { reactions: { "🥹": ["s02", "s03"] } });
+
+  C("s02", "s01", 30, "v5", "d4", -5, "20:15",
+    "シフトの相談に柔軟に対応してくださって、家庭と両立しながら働けています。院長がいる院で本当によかったです。",
+    { reactions: { "🥹": ["s03", "s04"], "❤️": ["s09"] } });
+
+  C("s03", "s01", 20, "v4", "d6", -11, "19:25",
+    "新しい評価テストの作り方を教えていただきました。自分でも作れるようになり、後輩に渡せています。",
+    { reactions: { "👏": ["s02"] } });
+
+  // ---- 過去数ヶ月分(推移グラフと「文化の定着」を見せるため) ----
+  const history = [
+    ["s02", "s01", 20, "v2", "d1", -38, "19:20", "月末の締め作業、遅くまで一緒に見てくださってありがとうございました。"],
+    ["s01", "s03", 30, "v4", "d2", -41, "20:00", "鍼の症例共有、他店からも「参考になった」と声が届いています。"],
+    ["s04", "s02", 10, "v1", "d3", -44, "18:40", "患者様の名前と前回のお話を必ず覚えていらっしゃるのがすごいです。"],
+    ["s05", "s10", 20, "v3", "d5", -47, "17:30", "エリアの数字を丁寧に噛み砕いて説明してくださり、方針が腹落ちしました。"],
+    ["s06", "s05", 30, "v5", "d4", -52, "19:10", "急な予約変更の対応、院長が率先して動いてくださって心強かったです。"],
+    ["s08", "s12", 20, "v1", "d3", -58, "18:50", "浦和店に応援に行った際、初日から働きやすいよう配慮いただきました。"],
+    ["s11", "s12", 10, "v4", "d6", -63, "20:05", "苦手だった検査手技、何度も付き合ってくださってありがとうございました。"],
+    ["s07", "s08", 30, "v4", "d2", -67, "19:40", "研修の資料づくり、細部まで丁寧で当日の理解度が全然違いました。"],
+    ["s10", "s06", 20, "v2", "d7", -71, "18:20", "新人さんへの声かけをいつも気にかけてくれてありがとう。"],
+    ["s01", "s04", 30, "v5", "d1", -75, "19:55", "受付まわりの導線を見直してくれて、待ち時間の体感が変わりました。"],
+    ["s09", "s05", 30, "v3", "d5", -80, "17:00", "大宮店の数値改善、粘り強い取り組みが結果につながりました。"],
+    ["s12", "s11", 20, "v2", "d3", -86, "19:15", "入社してすぐの時期、明るく挨拶してくれて院の空気が良くなりました。"],
+  ];
+  for (const [from, to, pts, val, dsg, dayOff, hm, msg] of history) {
+    C(from, to, pts, val, dsg, dayOff, hm, msg, {});
+  }
+
+  // ---- よく感謝を受け取っているメンバーの蓄積(交換履歴と辻褄を合わせる) ----
+  const accumulated = [
+    ["s01", "s02", 30, "v4", "d4", -22, "19:30", "新人さんのフォロー、いつも本当にありがとうございます。教え方が丁寧で助かります。"],
+    ["s03", "s02", 30, "v2", "d3", -28, "18:45", "落ち込んでいた時に声をかけてくださって、気持ちを立て直せました。"],
+    ["s06", "s02", 30, "v4", "d6", -34, "20:00", "メンターとして毎週時間を取ってくださること、当たり前じゃないと思っています。"],
+    ["s11", "s02", 30, "v2", "d1", -49, "19:05", "遠い店舗なのに気にかけてくださって、心強いです。"],
+    ["s09", "s02", 50, "v5", "d5", -55, "17:40", "メンター制度の立ち上げを実質的に引っ張ってくれました。会社の財産です。"],
+    ["s12", "s02", 30, "v4", "d2", -62, "19:50", "浦和のメンバーにも勉強会を開いてくれてありがとうございます。"],
+    ["s01", "s04", 30, "v1", "d1", -30, "18:30", "患者様のちょっとした変化に気づいて共有してくれるので、施術の質が上がっています。"],
+    ["s02", "s04", 30, "v5", "d3", -46, "19:20", "受付の空き時間に院内の掲示を整えてくれていて、いつも助かっています。"],
+    ["s03", "s04", 30, "v2", "d7", -60, "18:15", "こちらが忙しい時に先回りして動いてくれてありがとうございます。"],
+    ["s09", "s04", 50, "v5", "d5", -78, "17:10", "受付フローの改善提案、全店に展開しました。ありがとうございます。"],
+    ["s07", "s08", 50, "v4", "d5", -25, "20:10", "鍼の勉強会、川越だけでなく全店から参加者が集まる会になりました。"],
+    ["s01", "s08", 50, "v4", "d2", -36, "19:35", "他店の私にまで丁寧に教えてくださり、成増でも取り入れています。"],
+    ["s03", "s08", 30, "v4", "d6", -54, "20:25", "刺鍼の角度、教わってから患者様の反応が明らかに変わりました。"],
+    ["s09", "s08", 50, "v5", "d5", -69, "17:50", "技術委員会の運営、根気強くありがとうございます。"],
+    ["s11", "s08", 30, "v2", "d3", -82, "19:00", "分からないことを何度聞いても嫌な顔ひとつせず教えてくださいます。"],
+    ["s12", "s08", 30, "v4", "d4", -90, "18:35", "浦和での臨時研修、快く引き受けてくださって助かりました。"],
+    ["s02", "s11", 30, "v4", "d6", -20, "20:15", "毎週の振り返り、自分の言葉で書けるようになってきましたね。成長が見えます。"],
+    ["s06", "s11", 30, "v2", "d3", -40, "19:10", "同期として支えてくれてありがとう。一緒に頑張れています。"],
+    ["s01", "s11", 30, "v1", "d1", -57, "18:55", "初診の患者様への向き合い方、こちらが学ばされました。"],
+    ["s09", "s11", 30, "v4", "d5", -73, "17:25", "入社1年目とは思えない伸び。継続する力が素晴らしいです。"],
+  ];
+  for (const [from, to, pts, val, dsg, dayOff, hm, msg] of accumulated) {
+    C(from, to, pts, val, dsg, dayOff, hm, msg, {});
+  }
+
+  return cards;
+}
+
+/**
+ * 交換履歴。獲得ポイントを超える交換が生まれないよう、
+ * 実際のカードから各人の獲得ptを計算し、その範囲で払える景品だけを積む。
+ */
+function makeGiftRedemptions(cards) {
+  const perRecipient = (c) => {
+    const n = (c.toIds || []).length || 1;
+    const boost = (c.boosts || []).reduce((a, b) => a + (b.points || 0), 0);
+    return (c.points || 0) + Math.round(boost / n);
+  };
+  const earned = {};
+  for (const c of cards) {
+    for (const to of c.toIds || []) earned[to] = (earned[to] || 0) + perRecipient(c);
+  }
+
+  const wish = [
+    { staffId: "s02", giftId: "g02", dayOff: -12, status: "delivered", code: "KM-8F3D-2K" },
+    { staffId: "s04", giftId: "g01", dayOff: -6, status: "delivered", code: "KM-1A9C-7P" },
+    { staffId: "s08", giftId: "g07", dayOff: -3, status: "processing", code: "KM-5E2B-4X" },
+    { staffId: "s11", giftId: "g01", dayOff: -1, status: "processing", code: "KM-9J7K-1M" },
+  ];
+
+  const out = [];
+  const used = {};
+  let n = 1;
+  for (const w of wish) {
+    const budget = (earned[w.staffId] || 0) - (used[w.staffId] || 0);
+    // 希望の景品が高すぎる場合は、その人が払える中で一番高いものに落とす
+    const affordable = giftCatalog
+      .filter((g) => g.cost <= budget)
+      .sort((a, b) => b.cost - a.cost);
+    const target = giftCatalog.find((g) => g.id === w.giftId);
+    const gift = target && target.cost <= budget ? target : affordable[0];
+    if (!gift) continue;
+    used[w.staffId] = (used[w.staffId] || 0) + gift.cost;
+    out.push({
+      id: `gr${String(n++).padStart(2, "0")}`,
+      staffId: w.staffId, giftId: gift.id, cost: gift.cost,
+      date: addDays(TODAY, w.dayOff), status: w.status, code: w.code,
+    });
+  }
+  return out;
+}
+
 const orgChangeLog = [
   { id: "og01", date: addDays(TODAY, -32), staffId: "s17", fromId: "s10", toId: "s16", by: "s09", note: "美容部門をエリアBへ移管" },
   { id: "og02", date: addDays(TODAY, -32), staffId: "s12", fromId: "s15", toId: "s16", by: "s09", note: "浦和店をエリアBへ移管" },
 ];
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export function createSeed() {
   const patients = makePatients();
   const shifts = makeShifts();
+  const thanksCards = makeThanksCards();
   return {
     schemaVersion: SCHEMA_VERSION,
     generatedAt: TODAY,
@@ -1050,7 +1292,10 @@ export function createSeed() {
     talkScripts,
     roleplaySessions: makeRoleplaySessions(),
     orgChangeLog,
+    thanksValues, cardDesigns, giftCatalog, badges,
+    thanksCards: thanksCards,
+    giftRedemptions: makeGiftRedemptions(thanksCards),
   };
 }
 
-export { SHIFT_TYPES };
+export { SHIFT_TYPES, THANKS_REACTIONS };

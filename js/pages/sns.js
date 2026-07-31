@@ -8,15 +8,12 @@ import {
 } from "../ui.js";
 import { store, todayStr, monthOf } from "../store.js";
 
-const MONTHLY_BUDGET = 200; // 月の持ちポイント(FAQ準拠)
-const PT_OPTIONS = [10, 20, 30];
 
 const TYPE_META = {
   notice: { label: "連絡", emoji: "📣", kind: "brand" },
   chourei: { label: "朝礼", emoji: "🌅", kind: "accent" },
   philosophy: { label: "理念", emoji: "🧭", kind: "brand" },
   committee: { label: "委員会", emoji: "🗂", kind: "" },
-  thanks: { label: "サンクス", emoji: "🎁", kind: "accent" },
 };
 
 function nowIso() {
@@ -27,14 +24,6 @@ function nowIso() {
 
 function byDateDesc(a, b) { return a.date < b.date ? 1 : -1; }
 
-/** 今月自分が送ったサンクスポイント合計 */
-function sentThisMonth() {
-  const meId = store.me().id;
-  const m = monthOf(todayStr());
-  return store.get("posts")
-    .filter((p) => p.type === "thanks" && p.authorId === meId && (p.date || "").startsWith(m))
-    .reduce((a, p) => a + (p.points || 0), 0);
-}
 
 function myRank() {
   const sorted = [...store.get("staff")].sort((a, b) => (b.points || 0) - (a.points || 0));
@@ -60,26 +49,23 @@ export default {
       clear(root);
       root.appendChild(sectionHeader(
         "社内SNS",
-        "感謝を送り合う文化と連絡事項を、ここ1箇所に。",
-        [el("button", { class: "btn accent", onclick: openThanksModal }, icon("gift", 17), "サンクスを送る")],
+        "連絡事項・朝礼メモ・理念の共有と、委員会ごとのやりとり。",
+        [el("button", { class: "btn ghost", onclick: () => { location.hash = "#/thanks"; } },
+          icon("gift", 17), "サンクスギフトへ")],
       ));
 
       const main = el("div", { class: "sns-main" });
-      const side = el("aside", { class: "sns-side" }, pointsCard(), philosophyCard());
+      const side = el("aside", { class: "sns-side" }, thanksLinkCard(), philosophyCard());
       root.appendChild(el("div", { class: "sns-layout" }, main, side));
 
       const posts = store.get("posts");
       main.appendChild(tabs([
         { id: "timeline", label: "タイムライン", badge: posts.length },
-        { id: "thanks", label: "サンクス", badge: posts.filter((p) => p.type === "thanks").length },
         { id: "channels", label: "チャンネル" },
-        { id: "ranking", label: "ランキング" },
-      ], tab, (id) => { tab = id; draw(); }));
+      ], tab === "timeline" || tab === "channels" ? tab : "timeline", (id) => { tab = id; draw(); }));
 
-      if (tab === "timeline") drawTimeline(main);
-      else if (tab === "thanks") drawThanks(main);
-      else if (tab === "channels") drawChannels(main);
-      else drawRanking(main);
+      if (tab === "channels") drawChannels(main);
+      else drawTimeline(main);
     }
 
     /* ================= タイムライン ================= */
@@ -142,7 +128,6 @@ export default {
 
     /* ---- 投稿カード(type別) ---- */
     function postCard(p) {
-      if (p.type === "thanks") return thanksCard(p);
       const author = store.byId("staff", p.authorId);
       const meta = TYPE_META[p.type] || TYPE_META.notice;
       const channel = p.channelId ? store.byId("channels", p.channelId) : null;
@@ -167,31 +152,6 @@ export default {
       );
     }
 
-    /* ---- サンクスカード(ギフトカード風) ---- */
-    function thanksCard(p) {
-      const from = store.byId("staff", p.authorId);
-      const to = store.byId("staff", p.toId);
-      return el("article", { class: "post-card thanks-card" },
-        el("div", { class: "thanks-top" },
-          el("span", { class: "thanks-label" }, "🎁 サンクスギフト"),
-          el("span", { class: "thanks-pts" }, `+${p.points ?? 0}pt`)),
-        el("div", { class: "thanks-people" },
-          el("span", { class: "tp" },
-            avatar(from, 32),
-            el("span", { class: "tp-meta" },
-              el("b", {}, from?.name || "—"),
-              el("span", { class: "tp-rel" }, "から"))),
-          el("span", { class: "thanks-arrow" }, icon("chevR", 17)),
-          el("span", { class: "tp" },
-            avatar(to, 32),
-            el("span", { class: "tp-meta" },
-              el("b", {}, to?.name || "—"),
-              el("span", { class: "tp-rel" }, "へ")))),
-        el("p", { class: "thanks-msg" }, p.body),
-        postFoot(p, { withTime: true }),
-        expanded.has(p.id) ? commentsBlock(p) : null,
-      );
-    }
 
     /* ---- いいね・コメントのフッター ---- */
     function postFoot(p, { withTime = false } = {}) {
@@ -258,26 +218,6 @@ export default {
       return wrap;
     }
 
-    /* ================= サンクスタブ ================= */
-    function drawThanks(main) {
-      const me = store.me();
-      const staffCount = store.get("staff").length;
-      const sent = sentThisMonth();
-      const thanksPosts = store.get("posts").filter((p) => p.type === "thanks").sort(byDateDesc);
-
-      main.appendChild(el("div", { class: "kpi-row sns-kpi" },
-        statTile({ label: "累計獲得ポイント", value: `${fmtNum(me.points)} pt`, icon: "gift", tone: "accent", sub: "サンクスで受け取った合計" }),
-        statTile({ label: "全社ランキング", value: `${myRank()}位`, icon: "award", tone: "brand", sub: `全${staffCount}名中` }),
-        statTile({ label: "今月の送信", value: `${fmtNum(sent)} pt`, icon: "heart", tone: "good", sub: `残り ${fmtNum(Math.max(0, MONTHLY_BUDGET - sent))}pt / 月${MONTHLY_BUDGET}pt` }),
-      ));
-
-      if (!thanksPosts.length) {
-        main.appendChild(el("div", { class: "card" },
-          emptyState({ icon: "🎁", title: "まだサンクスがありません", hint: "「サンクスを送る」から感謝を届けましょう" })));
-        return;
-      }
-      main.appendChild(el("div", { class: "thanks-grid" }, thanksPosts.map((p) => thanksCard(p))));
-    }
 
     /* ================= チャンネル(委員会) ================= */
     function drawChannels(main) {
@@ -321,59 +261,23 @@ export default {
       main.appendChild(grid);
     }
 
-    /* ================= ランキング ================= */
-    function drawRanking(main) {
-      const m = monthOf(todayStr());
-      const monthThanks = store.get("posts").filter((p) => p.type === "thanks" && (p.date || "").startsWith(m));
-      const participants = new Set(monthThanks.flatMap((p) => [p.authorId, p.toId].filter(Boolean)));
-      const totalPts = monthThanks.reduce((a, p) => a + (p.points || 0), 0);
 
-      main.appendChild(el("div", { class: "kpi-row sns-kpi" },
-        statTile({ label: "今月のサンクス", value: `${fmtNum(monthThanks.length)} 件`, icon: "gift", tone: "accent", sub: "全店舗合計" }),
-        statTile({ label: "動いたポイント", value: `${fmtNum(totalPts)} pt`, icon: "trend", tone: "brand", sub: "今月の送受信合計" }),
-        statTile({ label: "参加スタッフ", value: `${fmtNum(participants.size)} 名`, icon: "users", tone: "good", sub: "送った人+受け取った人" }),
-      ));
 
-      const sorted = [...store.get("staff")].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 8);
-      const max = sorted[0]?.points || 1;
-      const medals = ["🥇", "🥈", "🥉"];
-      const meId = store.me().id;
-
-      const rows = el("div", {}, sorted.map((s, i) =>
-        el("div", { class: `rank-row ${s.id === meId ? "is-me" : ""}` },
-          el("span", { class: "rank-no" }, i < 3 ? medals[i] : String(i + 1)),
-          avatar(s, 36),
-          el("div", { class: "rank-main" },
-            el("div", { class: "flex between" },
-              el("span", { class: "rank-name" }, s.name,
-                s.id === meId ? badge("自分", "accent") : null,
-                el("span", { class: "rank-sub" }, `${store.storeName(s.storeId)}・${s.role}`)),
-              el("span", { class: "rank-pts" }, `${fmtNum(s.points)} pt`)),
-            el("div", { class: "rank-bar-track" },
-              el("div", { class: "rank-bar", style: { width: `${Math.round(((s.points || 0) / max) * 100)}%` } }))))));
-
-      main.appendChild(card({
-        title: "サンクスポイント ランキング",
-        sub: "累計獲得ポイント TOP8",
-        body: rows,
-      }));
-    }
-
-    /* ================= サイドカード ================= */
-    function pointsCard() {
+    function thanksLinkCard() {
       const me = store.me();
-      const sent = sentThisMonth();
-      const remaining = Math.max(0, MONTHLY_BUDGET - sent);
+      const cards = store.get("thanksCards") || [];
+      const mine = cards.filter((c) => (c.toIds || []).includes(me.id)).length;
       return el("div", { class: "card points-card" },
-        el("div", { class: "pc-head" }, "🎁 今月のサンクスポイント"),
-        el("div", { class: "pc-num" },
-          el("span", { class: "pc-big" }, fmtNum(remaining)),
-          el("span", { class: "pc-unit" }, `/ ${MONTHLY_BUDGET}pt 残っています`)),
-        meter({ label: "今月の使用分", value: sent, max: MONTHLY_BUDGET, fmt: (v) => `${v}pt`, kind: "accent" }),
+        el("div", { class: "pc-head" }, "🎁 サンクスギフト"),
+        el("p", { class: "small muted", style: { lineHeight: "1.7" } },
+          "感謝のカードは専用ページに移りました。写真や動画をつけて贈れます。"),
         el("div", { class: "pc-kv" },
-          kv("累計獲得ポイント", `${fmtNum(me.points)} pt`),
-          kv("全社ランキング", `${myRank()}位 / ${store.get("staff").length}名`)),
-        el("button", { class: "btn accent block", onclick: openThanksModal }, icon("gift", 16), "サンクスを送る"));
+          kv("もらったカード", `${fmtNum(mine)} 枚`),
+          kv("累計獲得ポイント", `${fmtNum(me.points)} pt`)),
+        el("button", { class: "btn accent block", onclick: () => { location.hash = "#/thanks"; } },
+          icon("gift", 16), "サンクスを送る"),
+        el("button", { class: "btn ghost block mt-8", onclick: () => { location.hash = "#/rewards"; } },
+          icon("medal", 15), "ごほうび交換へ"));
     }
 
     function philosophyCard() {
@@ -388,83 +292,6 @@ export default {
         el("div", { class: "ph-note" }, "朝礼ではテーマを1つ選んで、自分の言葉で共有しましょう。"));
     }
 
-    /* ================= サンクス送信モーダル ================= */
-    function openThanksModal() {
-      const me = store.me();
-      const sent = sentThisMonth();
-      const remaining = Math.max(0, MONTHLY_BUDGET - sent);
-      let toId = null;
-      let pts = [...PT_OPTIONS].reverse().find((p) => p <= remaining) ?? 0;
-      let msg = "";
-
-      const others = store.get("staff").filter((s) => s.id !== me.id);
-
-      const staffWrap = el("div", { class: "tm-staff" });
-      const renderStaff = () => {
-        clear(staffWrap);
-        for (const s of others) {
-          staffWrap.appendChild(el("button", {
-            class: `tm-person ${toId === s.id ? "on" : ""}`,
-            onclick: () => { toId = s.id; renderStaff(); },
-          },
-            avatar(s, 30),
-            el("span", { class: "tm-pmeta" },
-              el("span", { class: "tm-pname" }, s.name),
-              el("span", { class: "tm-prole" }, `${store.storeName(s.storeId)}・${s.role}`))));
-        }
-      };
-      renderStaff();
-
-      const ptWrap = el("div", { class: "tm-pts" });
-      const renderPts = () => {
-        clear(ptWrap);
-        for (const p of PT_OPTIONS) {
-          ptWrap.appendChild(el("button", {
-            class: `tm-pt ${pts === p ? "on" : ""}`,
-            disabled: p > remaining,
-            onclick: () => { pts = p; renderPts(); },
-          },
-            el("span", { class: "tm-pt-emoji" }, p === 10 ? "🌱" : p === 20 ? "🌷" : "💐"),
-            el("span", { class: "tm-pt-val" }, `${p}pt`)));
-        }
-      };
-      renderPts();
-
-      const ta = el("textarea", {
-        class: "textarea", rows: 3,
-        placeholder: "ありがとうの気持ちを言葉にして届けましょう(例:昨日のフォロー、本当に助かりました!)",
-        oninput: (e) => { msg = e.target.value; },
-      });
-
-      const sendBtn = el("button", { class: "btn accent" }, icon("send", 15), "サンクスを送る");
-      const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
-      const m = modal({
-        title: "サンクスを送る",
-        body: el("div", { class: "page-sns" },
-          el("div", { class: "thanks-modal" },
-            el("div", { class: "field" }, el("label", {}, "宛先"), staffWrap),
-            el("div", { class: "field" }, el("label", {}, "ギフトポイント"), ptWrap),
-            el("div", { class: "field" }, el("label", {}, "メッセージ"), ta),
-            el("div", { class: "tm-remaining" },
-              icon("info", 14),
-              `今月の残りポイント:${fmtNum(remaining)}pt(毎月${MONTHLY_BUDGET}ptまで送れます)`))),
-        actions: [cancelBtn, sendBtn],
-      });
-      cancelBtn.addEventListener("click", m.close);
-      sendBtn.addEventListener("click", () => {
-        if (!toId) { toast("宛先のスタッフを選択してください", "error"); return; }
-        if (!msg.trim()) { toast("メッセージを入力してください", "error"); return; }
-        if (!pts || pts > remaining) { toast("今月の残りポイントが足りません", "error"); return; }
-        store.addFirst("posts", {
-          type: "thanks", authorId: me.id, toId, points: pts,
-          date: nowIso(), body: msg.trim(), likes: [], comments: [], pinned: false,
-        });
-        store.update("staff", toId, (s) => ({ points: (s.points || 0) + pts }));
-        m.close();
-        celebrate(`${store.staffName(toId)}さんに ${pts}pt のサンクスを送りました!`);
-        draw();
-      });
-    }
 
     draw();
   },
