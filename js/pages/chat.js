@@ -139,10 +139,11 @@ export default {
       oninput: (e) => { roomQuery = e.target.value; drawRoomList(); },
     });
     const roomScroll = el("div", { class: "cr-scroll" });
+    const totalBadge = el("span", { class: "cr-total" });
     roomsPane.append(
       el("div", { class: "cr-head" },
         el("div", { class: "cr-head-top" },
-          el("span", { class: "cr-head-title" }, "トーク"),
+          el("span", { class: "cr-head-title" }, "トーク", totalBadge),
           el("button", { class: "icon-btn cr-new", title: "新しいルームを作成", "aria-label": "新しいルームを作成", onclick: openNewRoom }, icon("plus", 18))),
         el("div", { class: "cr-search-wrap" }, el("span", { class: "cr-search-ic" }, icon("search", 15)), roomSearch)),
       roomScroll);
@@ -152,6 +153,13 @@ export default {
        ============================================================ */
     function drawRoomList() {
       clear(roomScroll);
+      const total = store.unreadChatCount();
+      const atMe = store.unreadMentionCount();
+      clear(totalBadge);
+      if (total > 0) {
+        totalBadge.appendChild(el("span", { class: "ct-n" }, `未読 ${total}`));
+        if (atMe > 0) totalBadge.appendChild(el("span", { class: "ct-at" }, `@${atMe}`));
+      }
       const q = roomQuery.trim();
       const sections = [
         { kind: "group", label: "グループ" },
@@ -777,9 +785,11 @@ export default {
       drawSearchBar();
       drawMessages();
       ta.value = drafts.get(room.id) || "";
-      ta.placeholder = room.kind === "dm"
-        ? `${roomTitle(room)} さんへメッセージ(Enterで送信)`
-        : `${roomTitle(room)} に投稿(@でメンション / Shift+Enterで改行)`;
+      ta.placeholder = isMobile()
+        ? "メッセージを入力(@でメンション)"
+        : room.kind === "dm"
+          ? `${roomTitle(room)} さんへメッセージ(Enterで送信 / Shift+Enterで改行)`
+          : `${roomTitle(room)} に投稿(@でメンション / Enterで送信)`;
       autoGrow();
       drawReplyBar(); drawAttachBar(); closeMentionPop(); closePop();
     }

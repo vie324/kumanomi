@@ -38,7 +38,18 @@
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; margin-bottom: 9px;
 }
-.page-chat .cr-head-title { font-size: var(--fs-md); font-weight: 800; letter-spacing: 0.02em; }
+.page-chat .cr-head-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--fs-md); font-weight: 800; letter-spacing: 0.02em;
+}
+.page-chat .cr-total { display: inline-flex; gap: 4px; }
+.page-chat .ct-n, .page-chat .cr-total .ct-at {
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-size: 10px; font-weight: 800; letter-spacing: 0;
+  background: var(--brand-soft); color: var(--brand-ink);
+}
+.page-chat .cr-total .ct-at { background: var(--accent-soft); color: var(--accent-ink); }
 .page-chat .cr-new { width: 32px; height: 32px; color: var(--brand-ink); background: var(--brand-soft); }
 .page-chat .cr-new:hover { background: color-mix(in srgb, var(--brand) 20%, var(--surface)); }
 
@@ -181,14 +192,19 @@
    ============================================================ */
 .page-chat .cv-body {
   flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
   overflow-y: auto; overflow-x: hidden;
   padding: 12px 14px 18px;
   background:
     radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand) 4%, transparent) 0%, transparent 42%),
     var(--surface-2);
 }
+/* メッセージが少ないときは入力欄側に寄せる(LINE的な見え方) */
+.page-chat .cv-stream { margin-top: auto; }
+.page-chat .cv-body > .empty-state { margin: auto; }
 
 .page-chat .day-sep { display: flex; justify-content: center; margin: 14px 0 12px; }
+.page-chat .cv-stream > .day-sep:first-child { margin-top: 4px; }
 .page-chat .day-sep span {
   padding: 3px 12px;
   border-radius: var(--r-full);
@@ -216,7 +232,7 @@
 .page-chat .msg-col {
   position: relative;
   display: flex; flex-direction: column; gap: 3px;
-  max-width: min(620px, 78%);
+  max-width: min(520px, 74%);
   min-width: 0;
 }
 .page-chat .msg.mine .msg-col { align-items: flex-end; }
@@ -564,6 +580,9 @@
   .page-chat .tool-btn { width: 24px; height: 24px; font-size: 12.5px; opacity: 0.85; }
 
   .page-chat .cv-send { padding: 0 12px; }
+  /* 候補リストは入力欄より広く出す(入力欄がボタンで狭いため) */
+  .page-chat .mention-pop { left: -102px; right: -46px; width: auto; }
+  .page-chat .mp-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .page-chat .emoji-pop { grid-template-columns: repeat(6, 32px); }
   .page-chat .chat-pop { left: 8px; right: 8px; }
   .page-chat .emoji-pop { justify-content: center; }
