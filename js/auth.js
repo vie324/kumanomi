@@ -1,20 +1,23 @@
 /* ============================================================
-   くまのみポータル — 権限(RBAC)エンジン
-   役職ランク + メンター関係 + 出勤状態 から「何が見えるか」を決める。
-   すべてのページはここの can() / scope() を通して判定すること。
+   くまのみポータル — 権限(RBAC)エンジン【組織ツリー版】
+   「自分の傘の下(組織図の配下)にある情報はすべて見える」を軸に、
+   メンター関係と出勤状態を重ねて判定する。
+   組織図(reportsTo)はドラッグで毎月付け替えられる前提のため、
+   すべての判定は保存済みツリーからその場で計算する。
    ============================================================ */
 
 import { store, todayStr } from "./store.js";
 
 /* ---------------- 役職ランク ----------------
-   数値が大きいほど広い権限。日本語の役職名(staff.role)とは別に
-   staff.rank で権限を管理する。 */
+   ランクは「できる操作の強さ」。見える範囲はツリー(reportsTo)が決める。 */
 export const RANKS = {
-  staff: { level: 1, label: "スタッフ", desc: "自分の情報と担当患者様を扱えます" },
+  ceo: { level: 7, label: "社長", desc: "全社のすべてにアクセスできます" },
+  exec: { level: 6, label: "統括マネージャー", desc: "配下の全エリア・全店舗を統括します" },
+  area: { level: 5, label: "マネージャー", desc: "管轄する店舗群を統括します" },
+  chief: { level: 4, label: "統括院長", desc: "管轄する院の院長たちを統括します" },
+  manager: { level: 3, label: "院長・店長", desc: "自店舗の責任者。シフト編集・勤怠承認ができます" },
   mentor: { level: 2, label: "メンター", desc: "担当メンティーの日報も確認できます" },
-  manager: { level: 3, label: "院長(店舗責任者)", desc: "自店舗のシフト編集・日報閲覧・勤怠承認ができます" },
-  area: { level: 4, label: "マネージャー", desc: "担当エリアの複数店舗を統括します" },
-  exec: { level: 5, label: "統括マネージャー", desc: "全店舗のすべての情報にアクセスできます" },
+  staff: { level: 1, label: "スタッフ", desc: "自分の情報と担当患者様を扱えます" },
   hr: { level: 3, label: "本部人事", desc: "全店舗の勤怠・シフトを管理します(日報は対象外)" },
 };
 
@@ -22,50 +25,121 @@ export function rankOf(staff) { return staff?.rank || "staff"; }
 export function rankLabel(staff) { return RANKS[rankOf(staff)]?.label || "スタッフ"; }
 export function rankLevel(staff) { return RANKS[rankOf(staff)]?.level ?? 1; }
 
-/* ---------------- 権限定義 ----------------
-   key: 権限名 / value: (me, ctx) => boolean
-   ctx は権限ごとに必要なものだけ渡す。 */
+/* ---------------- 組織ツリー ---------------- */
+
+/** 直属の部下 */
+export function directReports(staffId) {
+  return store.get("staff").filter((s) => s.reportsTo === staffId);
+}
+
+/** 配下全員のID(自分は含まない)。循環しても無限ループしない */
+export function subtreeIds(staffId) {
+  const out = [];
+  const seen = new Set([staffId]);
+  const queue = [staffId];
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const child of directReports(cur)) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      out.push(child.id);
+      queue.push(child.id);
+    }
+  }
+  return out;
+}
+
+/** target が base の配下(傘の下)か */
+export function isDescendant(targetId, baseId) {
+  if (!targetId || !baseId) return false;
+  let cur = store.byId("staff", targetId);
+  const seen = new Set();
+  while (cur?.reportsTo) {
+    if (cur.reportsTo === baseId) return true;
+    if (seen.has(cur.reportsTo)) return false; // 循環ガード
+    seen.add(cur.reportsTo);
+    cur = store.byId("staff", cur.reportsTo);
+  }
+  return false;
+}
+
+/** 自分から社長までの上司チェーン(近い順) */
+export function chainOf(staffId) {
+  const chain = [];
+  let cur = store.byId("staff", staffId);
+  const seen = new Set([staffId]);
+  while (cur?.reportsTo && !seen.has(cur.reportsTo)) {
+    seen.add(cur.reportsTo);
+    cur = store.byId("staff", cur.reportsTo);
+    if (cur) chain.push(cur);
+  }
+  return chain;
+}
+
+/** 自分の傘の下にある店舗(=配下+自分に「院長/店長」がいる店舗) */
+export function managedStores(me = null) {
+  const viewer = me || store.me();
+  if (!viewer) return [];
+  if (rankOf(viewer) === "hr") return store.get("stores").map((s) => s.id); // 勤怠管理のため全店
+  const ids = new Set([viewer.id, ...subtreeIds(viewer.id)]);
+  const out = new Set();
+  for (const s of store.get("staff")) {
+    if (ids.has(s.id) && ["院長", "店長"].includes(s.role)) out.add(s.storeId);
+  }
+  // 自分が院長/店長でなくても、配下スタッフの所属店舗は実質管轄
+  if (rankLevel(viewer) >= 3) {
+    for (const s of store.get("staff")) if (ids.has(s.id)) out.add(s.storeId);
+  }
+  return [...out];
+}
+
+/** 互換API:旧「担当エリア店舗」。ツリーから導出する */
+export function areaStores(me) {
+  const stores = managedStores(me);
+  return stores.length ? stores : [me?.storeId].filter(Boolean);
+}
+
+/* ---------------- 権限定義 ---------------- */
+
 const RULES = {
   /* --- 顧客・カルテ --- */
-  // 顧客情報の閲覧。原則「出勤打刻をしてから」— 責任者以上は打刻なしでも可。
   "patients.view": (me) => isClockedInToday(me.id) || rankLevel(me) >= 3,
-  // 打刻なしでも見られる例外権限を持っているか(ゲート画面の出し分け用)
   "patients.viewWithoutClockIn": (me) => rankLevel(me) >= 3,
   "patients.edit": (me) => rankOf(me) !== "hr" && (isClockedInToday(me.id) || rankLevel(me) >= 3),
 
   /* --- 日報 --- */
   "nippo.submit": (me) => rankOf(me) !== "hr",
-  // 人事は日報を見ない(ご要望どおり)
-  "nippo.view": (me) => rankOf(me) !== "hr",
-  "nippo.viewAll": (me) => rankOf(me) === "exec",
+  "nippo.view": (me) => rankOf(me) !== "hr", // 人事は日報を見ない
+  "nippo.viewAll": (me) => rankLevel(me) >= 6 && rankOf(me) !== "hr",
   "nippo.summarize": (me) => rankLevel(me) >= 2 && rankOf(me) !== "hr",
 
   /* --- シフト --- */
-  // 全社員が全店舗のシフトを閲覧できる
-  "shift.view": () => true,
-  // 編集は責任者(院長)以上
+  "shift.view": () => true, // 全社員が全店舗を閲覧できる
   "shift.edit": (me, ctx) => {
     if (rankOf(me) === "hr") return false;
-    if (rankLevel(me) >= 5) return true;                       // 統括:全店
-    if (rankOf(me) === "area") return inMyArea(me, ctx?.storeId); // エリア:担当店舗
-    if (rankOf(me) === "manager") return ctx?.storeId === me.storeId; // 院長:自店舗
-    return false;
+    if (rankLevel(me) < 3) return false;
+    if (rankOf(me) === "ceo") return true;
+    return !!ctx?.storeId && managedStores(me).includes(ctx.storeId);
   },
   "shift.generateAI": (me, ctx) => RULES["shift.edit"](me, ctx),
 
   /* --- 勤怠 --- */
   "kintai.punch": (me) => rankOf(me) !== "hr",
   "kintai.approve": (me, ctx) => {
-    if (rankLevel(me) >= 5 || rankOf(me) === "hr") return true;
-    if (rankOf(me) === "area") return inMyArea(me, ctx?.storeId);
-    if (rankOf(me) === "manager") return ctx?.storeId === me.storeId;
-    return false;
+    if (rankOf(me) === "hr" || rankOf(me) === "ceo") return true;
+    if (rankLevel(me) < 3) return false;
+    return !ctx?.storeId || managedStores(me).includes(ctx.storeId);
   },
 
   /* --- 人事管理ページ --- */
-  "hr.view": (me) => rankOf(me) === "hr" || rankLevel(me) >= 5,
+  "hr.view": (me) => rankOf(me) === "hr" || rankLevel(me) >= 6,
 
-  /* --- 売上・経営数値:全員閲覧可(ご要望どおり) --- */
+  /* --- 組織図 --- */
+  "org.view": () => true,
+  // 管轄の付け替え(ドラッグ)は 統括マネージャー以上+本部人事
+  "org.edit": (me) => rankLevel(me) >= 6 || rankOf(me) === "hr",
+
+  /* --- 売上・経営数値:全員閲覧可 --- */
   "sales.view": () => true,
 
   /* --- スタッフ育成 --- */
@@ -81,10 +155,6 @@ const RULES = {
   "meetings.edit": (me) => rankLevel(me) >= 3,
 };
 
-/**
- * 権限判定。 can("shift.edit", { storeId }) のように使う。
- * 第3引数で判定対象ユーザーを差し替え可能(既定はログイン中ユーザー)。
- */
 export function can(permission, ctx = {}, user = null) {
   const me = user || store.me();
   if (!me) return false;
@@ -98,78 +168,61 @@ export function can(permission, ctx = {}, user = null) {
 
 /* ---------------- 出勤判定 ---------------- */
 
-/** 今日すでに出勤打刻をしているか */
 export function isClockedInToday(staffId) {
   const t = todayStr();
   return store.get("attendance").some((a) => a.staffId === staffId && a.date === t && !!a.clockIn);
 }
 
-/* ---------------- 組織スコープ ---------------- */
-
-/** エリアマネージャーの担当店舗一覧 */
-export function areaStores(me) {
-  return me?.areaStoreIds?.length ? me.areaStoreIds : [me?.storeId].filter(Boolean);
-}
-
-function inMyArea(me, storeId) {
-  return !!storeId && areaStores(me).includes(storeId);
-}
+/* ---------------- 可視範囲(傘+メンター) ---------------- */
 
 /**
- * 「この人は自分の配下か」— 日報の閲覧範囲判定に使う。
- * 統括 > エリア(担当店舗) > 院長(自店舗) > メンター(担当メンティー) > 本人
+ * この人の情報(日報など)を見られるか。
+ * 自分 / 組織図の配下 / 担当メンティー。人事は勤怠管理のため全員
+ * (ただし日報そのものは nippo.view=false で遮断される)。
  */
 export function canSeeStaff(targetStaffId, me = null) {
   const viewer = me || store.me();
   if (!viewer) return false;
   if (viewer.id === targetStaffId) return true;
-  if (rankOf(viewer) === "hr") return true; // 勤怠管理のため全員を見るが、日報は nippo.view で別途遮断
-  const target = store.byId("staff", targetStaffId);
-  if (!target) return false;
-
-  switch (rankOf(viewer)) {
-    case "exec": return true;
-    case "area": return areaStores(viewer).includes(target.storeId);
-    case "manager": return target.storeId === viewer.storeId;
-    case "mentor": return (viewer.menteeIds || []).includes(targetStaffId);
-    default: return false;
-  }
+  if (rankOf(viewer) === "hr") return true;
+  if ((viewer.menteeIds || []).includes(targetStaffId)) return true;
+  return isDescendant(targetStaffId, viewer.id);
 }
 
-/**
- * 日報などで閲覧できるスタッフID一覧(自分を含む)。
- * 併せて「なぜ見えるか」のラベルも返す。
- */
+/** 閲覧できるスタッフ一覧(自分を含む) */
 export function visibleStaff(me = null) {
   const viewer = me || store.me();
-  const all = store.get("staff");
   if (!viewer) return [];
-  return all.filter((s) => canSeeStaff(s.id, viewer));
+  return store.get("staff").filter((s) => canSeeStaff(s.id, viewer));
 }
 
-/** 閲覧範囲の説明文(UIに出す用) */
+/** 閲覧範囲の説明文(UI表示用) */
 export function scopeLabel(me = null) {
   const viewer = me || store.me();
-  switch (rankOf(viewer)) {
-    case "exec": return "全店舗(統括権限)";
-    case "area": return `担当エリア ${areaStores(viewer).map((id) => store.storeName(id)).join("・")}`;
-    case "manager": return `${store.storeName(viewer.storeId)}(店舗責任者)`;
-    case "mentor": return `自分 + メンティー ${(viewer.menteeIds || []).length}名`;
-    case "hr": return "全店舗の勤怠・シフト(日報は対象外)";
-    default: return "自分の記録のみ";
-  }
+  if (!viewer) return "";
+  if (rankOf(viewer) === "hr") return "全店舗の勤怠・シフト(日報は対象外)";
+  const sub = subtreeIds(viewer.id).length;
+  const mentees = (viewer.menteeIds || []).length;
+  if (rankOf(viewer) === "ceo") return "全社(社長)";
+  if (sub === 0 && mentees === 0) return "自分の記録のみ";
+  const stores = managedStores(viewer).length;
+  const parts = [`配下 ${sub}名`];
+  if (stores) parts.push(`${stores}店舗`);
+  if (mentees) parts.push(`メンティー ${mentees}名`);
+  return `${parts.join("・")}(${rankLabel(viewer)})`;
 }
 
-/** その人がなぜ見えるのかの理由ラベル(日報一覧のバッジ用) */
+/** その人がなぜ見えるのかの理由ラベル */
 export function visibilityReason(targetStaffId, me = null) {
   const viewer = me || store.me();
+  if (!viewer) return "";
   if (viewer.id === targetStaffId) return "自分";
   if ((viewer.menteeIds || []).includes(targetStaffId)) return "メンティー";
   const target = store.byId("staff", targetStaffId);
   if (!target) return "";
-  if (rankOf(viewer) === "manager" && target.storeId === viewer.storeId) return "自店舗";
-  if (rankOf(viewer) === "area") return "担当エリア";
-  if (rankOf(viewer) === "exec") return "全社";
+  if (target.reportsTo === viewer.id) return "直属";
+  if (isDescendant(targetStaffId, viewer.id)) return rankOf(viewer) === "ceo" ? "全社" : "配下";
+  if (rankOf(viewer) === "hr") return "人事(勤怠)";
   return "";
 }
 
@@ -187,7 +240,6 @@ export function myMentees(me = null) {
 
 /* ---------------- ナビゲーション表示制御 ---------------- */
 
-/** ページIDごとの表示条件(未定義なら全員表示) */
 const PAGE_GUARDS = {
   hr: "hr.view",
   nippo: "nippo.view",

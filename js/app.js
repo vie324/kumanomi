@@ -20,6 +20,7 @@ import roleplay from "./pages/roleplay.js";
 import meetings from "./pages/meetings.js";
 import backoffice from "./pages/backoffice.js";
 import hr from "./pages/hr.js";
+import org from "./pages/org.js";
 import assistant from "./pages/assistant.js";
 
 /* ---- ナビゲーション構成 ---- */
@@ -28,7 +29,7 @@ const NAV_GROUPS = [
   { label: "コミュニケーション", pages: [chat, sns, meetings] },
   { label: "毎日の業務", pages: [nippo, kintai, shift] },
   { label: "患者様", pages: [reserve, patients] },
-  { label: "組織運営", pages: [staffPage, roleplay, backoffice, hr] },
+  { label: "組織運営", pages: [org, staffPage, roleplay, backoffice, hr] },
   { label: "サポート", pages: [assistant] },
 ];
 
@@ -176,7 +177,7 @@ function closeMobileNav() { app.classList.remove("nav-open"); }
 /* ---- ログインユーザー切替(デモ用:権限の違いを体験できる) ---- */
 function openUserSwitcher() {
   const me = store.me();
-  const order = { exec: 0, area: 1, hr: 2, manager: 3, mentor: 4, staff: 5 };
+  const order = { ceo: 0, exec: 1, area: 2, chief: 3, hr: 4, manager: 5, mentor: 6, staff: 7 };
   const list = [...store.get("staff")].sort(
     (a, b) => (order[rankOf(a)] ?? 9) - (order[rankOf(b)] ?? 9) || a.id.localeCompare(b.id));
 
