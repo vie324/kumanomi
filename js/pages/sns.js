@@ -4,7 +4,7 @@
    ============================================================ */
 import {
   el, clear, icon, avatar, badge, kv, meter, card, sectionHeader,
-  tabs, segmented, statTile, emptyState, modal, toast, relTime, fmtNum,
+  tabs, segmented, statTile, emptyState, modal, toast, relTime, fmtNum, celebrate,
 } from "../ui.js";
 import { store, todayStr, monthOf } from "../store.js";
 
@@ -461,7 +461,7 @@ export default {
         });
         store.update("staff", toId, (s) => ({ points: (s.points || 0) + pts }));
         m.close();
-        toast(`${store.staffName(toId)}さんに ${pts}pt のサンクスを送りました 🎁`);
+        celebrate(`${store.staffName(toId)}さんに ${pts}pt のサンクスを送りました!`);
         draw();
       });
     }

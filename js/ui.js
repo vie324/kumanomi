@@ -144,6 +144,60 @@ export function icon(name, size = 20) {
   return svg;
 }
 
+/* ---------------- ブランドマーク(くまのみ) ---------------- */
+
+/**
+ * クマノミのロゴマーク。用途に応じて動きが変わる。
+ * motion: "float"(ゆらゆら) | "swim"(泳いで登場) | "wiggle"(ホバーで反応) | "none"
+ */
+export function fishMark(size = 40, motion = "float") {
+  return el("img", {
+    class: `fish-mark m-${motion}`,
+    src: "assets/kumanomi-mark.png",
+    alt: "",
+    width: size, height: size,
+    style: { width: size + "px", height: size + "px" },
+  });
+}
+
+/** 横ロゴ(ロックアップ) */
+export function brandLockup(width = 180) {
+  return el("img", {
+    class: "brand-lockup",
+    src: "assets/kumanomi-wide.png",
+    alt: "くまのみ 整骨院・整体院グループ",
+    style: { width: width + "px" },
+  });
+}
+
+/**
+ * お祝い演出。サンクス送信・テスト合格など「嬉しい瞬間」に呼ぶ。
+ * クマノミが画面を泳いで横切り、泡がふわっと上がる。1.6秒で自動消滅。
+ */
+export function celebrate(message) {
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    if (message) toast(message, "success", { fish: true });
+    return;
+  }
+  const layer = el("div", { class: "celebrate-layer", "aria-hidden": "true" });
+  layer.appendChild(el("img", { class: "celebrate-fish", src: "assets/kumanomi-mark.png", alt: "" }));
+  for (let i = 0; i < 9; i++) {
+    layer.appendChild(el("span", {
+      class: "celebrate-bub",
+      style: {
+        left: 8 + Math.random() * 84 + "%",
+        width: 6 + Math.random() * 12 + "px",
+        height: 6 + Math.random() * 12 + "px",
+        animationDelay: Math.random() * 0.5 + "s",
+        animationDuration: 1.1 + Math.random() * 0.7 + "s",
+      },
+    }));
+  }
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 1900);
+  if (message) toast(message, "success", { fish: true });
+}
+
 /* ---------------- 小部品 ---------------- */
 
 /** 人物アバター(イニシャル+個人カラー) */
@@ -294,9 +348,13 @@ export function table({ columns, rows, onRowClick, empty = "データがあり�
 
 /* ---------------- Empty state ---------------- */
 
-export function emptyState({ icon: ic = "🌊", title = "データがありません", hint = "" }) {
+/**
+ * 空状態。icon を省略するとクマノミがゆらゆら泳いで待っている絵になる。
+ */
+export function emptyState({ icon: ic, title = "データがありません", hint = "" }) {
   return el("div", { class: "empty-state" },
-    el("div", { class: "es-ic" }, ic),
+    ic ? el("div", { class: "es-ic" }, ic)
+       : el("div", { class: "es-fish" }, fishMark(56, "float")),
     el("div", { class: "es-title" }, title),
     hint ? el("div", { class: "es-hint" }, hint) : null);
 }
@@ -356,14 +414,16 @@ export function drawer({ title, body }) {
 /* ---------------- Toast ---------------- */
 
 let toastZone = null;
-export function toast(message, kind = "success") {
+export function toast(message, kind = "success", { fish = false } = {}) {
   if (!toastZone) {
     toastZone = el("div", { class: "toast-zone" });
     document.body.appendChild(toastZone);
   }
   const icName = kind === "success" ? "check" : kind === "error" ? "alert" : "info";
   const t = el("div", { class: `toast ${kind}` },
-    el("span", { class: "t-ic" }, icon(icName, 17)), message);
+    fish ? el("span", { class: "t-fish" }, fishMark(24, "swim"))
+         : el("span", { class: "t-ic" }, icon(icName, 17)),
+    message);
   toastZone.appendChild(t);
   setTimeout(() => {
     t.classList.add("leaving");
@@ -410,7 +470,9 @@ export function aiPanel(title = "AIによる生成結果") {
     el: root,
     thinking(msg = "AIが分析しています") {
       clear(body).appendChild(el("span", { class: "ai-thinking" },
-        el("span", { class: "th-dots" }, el("i"), el("i"), el("i")), msg + "…"));
+        el("span", { class: "th-fish" }, fishMark(26, "swim")),
+        msg + "…",
+        el("span", { class: "th-dots" }, el("i"), el("i"), el("i"))));
     },
     setHTML(html) { body.innerHTML = html; },
     setNode(node) { clear(body).appendChild(node); },
