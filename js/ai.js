@@ -264,6 +264,96 @@ export async function chatReply(text) {
   };
 }
 
+/* ---------------- ロールプレイ:スクリプト比較 + フィードバック ---------------- */
+
+/** 練習用のサンプル書き起こし(録音のシミュレーション) */
+export function sampleRoleplaySpeech(script, quality = "mid") {
+  const lines = script?.lines || [];
+  if (quality === "high") return lines.map((l) => l.text).join("");
+  if (quality === "low") return lines.slice(0, Math.max(1, Math.floor(lines.length / 2))).map((l) => l.text.slice(0, 28) + "…").join("");
+  // mid: 一部を要約・省略し、フィラーを混ぜる
+  return lines.map((l, i) => {
+    if (i === lines.length - 1) return "";
+    const t = l.text.replace(/いただけますか|でしょうか/g, "ですか");
+    return (i === 1 ? "えーっと、" : "") + t;
+  }).join("");
+}
+
+/**
+ * 発話をトークスクリプトと比較して採点する。
+ * 実運用では音声認識 + LLM 評価に置き換わる部分。
+ */
+export async function evaluateRoleplay(script, transcript) {
+  await delay(1900);
+  const text = (transcript || "").replace(/\s+/g, "");
+  const lines = script?.lines || [];
+
+  // 1. カバレッジ:各行のキーワードがどれだけ含まれているか
+  const lineResults = lines.map((l) => {
+    const kws = l.keywords || [];
+    const hit = kws.filter((k) => text.includes(k));
+    const ratio = kws.length ? hit.length / kws.length : 1;
+    return {
+      text: l.text,
+      keywords: kws,
+      hitKeywords: hit,
+      missKeywords: kws.filter((k) => !text.includes(k)),
+      status: ratio >= 0.75 ? "ok" : ratio >= 0.34 ? "partial" : "missing",
+      ratio,
+    };
+  });
+  const coverage = Math.round((lineResults.reduce((a, r) => a + r.ratio, 0) / (lineResults.length || 1)) * 100);
+
+  // 2. フィラー(えーっと・あの・まあ 等)
+  const fillerWords = ["えーっと", "えっと", "あのー", "あの、", "まあ", "なんか", "ええと"];
+  const filler = fillerWords.reduce((a, w) => a + (transcript.split(w).length - 1), 0);
+
+  // 3. ペース:想定尺に対する文字数(日本語はおよそ 6文字/秒)
+  const expectedChars = (script?.durationSec || 90) * 6;
+  const paceRatio = text.length / expectedChars;
+  const pace = Math.max(30, Math.round(100 - Math.abs(1 - paceRatio) * 90));
+
+  // 4. 共感表現
+  const empathyWords = ["ありがとう", "いかが", "お忙しい", "無理のない", "ご不明", "大丈夫", "お聞かせ", "つらい"];
+  const empathyHit = empathyWords.filter((w) => text.includes(w)).length;
+  const empathy = Math.min(100, Math.round((empathyHit / 4) * 100));
+
+  const score = Math.max(0, Math.min(100, Math.round(
+    coverage * 0.55 + pace * 0.15 + empathy * 0.2 + Math.max(0, 100 - filler * 15) * 0.1
+  )));
+
+  // フィードバック生成
+  const good = [];
+  const improve = [];
+  if (coverage >= 80) good.push("スクリプトの要点をほぼ網羅できています");
+  else if (coverage >= 55) good.push("話の骨格は押さえられています");
+  if (filler === 0) good.push("フィラーがゼロで、落ち着いた話し方ができています");
+  if (empathy >= 75) good.push("患者様を受け止める言葉が自然に入っています");
+  if (pace >= 80) good.push("話す量と時間のバランスが適切です");
+  if (!good.length) good.push("最後まで話し切れています。まずはここからです");
+
+  const missed = lineResults.filter((r) => r.status !== "ok");
+  for (const m of missed.slice(0, 3)) {
+    improve.push(`「${m.text.slice(0, 26)}…」の要素が不足しています(不足キーワード:${m.missKeywords.join("・") || "表現全般"})`);
+  }
+  if (filler >= 3) improve.push(`「えーっと」などのフィラーが${filler}回。言葉に詰まったら黙って間を取る練習をしましょう`);
+  if (paceRatio > 1.35) improve.push("説明が長くなりがちです。1文を短く区切ると伝わりやすくなります");
+  if (paceRatio < 0.65) improve.push("説明が駆け足です。根拠や具体例を足して丁寧に伝えましょう");
+  if (empathy < 50) improve.push("共感を示すフレーズ(「いかがでしょうか」「ありがとうございます」)を挟むと印象が大きく変わります");
+  if (!improve.length) improve.push("大きな改善点はありません。この内容を安定して再現できるか、もう一度録音してみましょう");
+
+  const nextAction = missed.length
+    ? `不足していた「${missed[0].missKeywords[0] || missed[0].text.slice(0, 12)}」を意識して、もう一度録音してみましょう。`
+    : "同じ内容を、患者様役に相槌を入れてもらいながら実演してみましょう。";
+
+  return {
+    score,
+    metrics: { coverage, pace, filler, empathy },
+    lineResults,
+    feedback: { good, improve, nextAction },
+  };
+}
+
 /** クイック質問チップ */
 export function quickQuestions() {
   return [

@@ -52,18 +52,19 @@ const stores = [
 ];
 
 const staff = [
-  { id: "s01", name: "佐藤 健太", kana: "さとう けんた", role: "院長", storeId: "st-narimasu", color: "#0c7489", points: 320, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.6, 接客: 4.2, 数値: 4.0, 理念: 4.8, 協調: 4.4 } },
-  { id: "s02", name: "鈴木 美咲", kana: "すずき みさき", role: "柔道整復師", storeId: "st-narimasu", color: "#c2547e", points: 415, joined: "2022-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.8, 接客: 4.7, 数値: 3.5, 理念: 4.2, 協調: 4.6 } },
-  { id: "s03", name: "田中 大輔", kana: "たなか だいすけ", role: "鍼灸師", storeId: "st-narimasu", color: "#4a3aa7", points: 268, joined: "2021-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.3, 接客: 3.6, 数値: 3.9, 理念: 3.8, 協調: 4.0 } },
-  { id: "s04", name: "高橋 由美", kana: "たかはし ゆみ", role: "受付", storeId: "st-narimasu", color: "#b0771a", points: 388, joined: "2020-07-01", licenses: [], skills: { 技術: 3.0, 接客: 4.9, 数値: 3.4, 理念: 4.5, 協調: 4.8 } },
-  { id: "s05", name: "伊藤 翔太", kana: "いとう しょうた", role: "院長", storeId: "st-omiya", color: "#1f7a4d", points: 295, joined: "2018-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.7, 接客: 4.0, 数値: 4.4, 理念: 4.3, 協調: 4.1 } },
-  { id: "s06", name: "渡辺 花子", kana: "わたなべ はなこ", role: "柔道整復師", storeId: "st-omiya", color: "#d95926", points: 342, joined: "2023-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.4, 接客: 4.4, 数値: 3.2, 理念: 4.0, 協調: 4.5 } },
-  { id: "s07", name: "山本 拓海", kana: "やまもと たくみ", role: "院長", storeId: "st-kawagoe", color: "#2a78d6", points: 251, joined: "2019-10-01", licenses: ["柔道整復師", "はり師"], skills: { 技術: 4.5, 接客: 3.9, 数値: 4.2, 理念: 4.1, 協調: 3.9 } },
-  { id: "s08", name: "中村 さくら", kana: "なかむら さくら", role: "鍼灸師", storeId: "st-kawagoe", color: "#a83a52", points: 377, joined: "2022-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.0, 接客: 4.6, 数値: 3.6, 理念: 4.4, 協調: 4.7 } },
-  { id: "s09", name: "小林 誠", kana: "こばやし まこと", role: "統括マネージャー", storeId: "st-narimasu", color: "#3d4f6b", points: 198, joined: "2017-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.2, 接客: 4.1, 数値: 4.8, 理念: 4.6, 協調: 4.3 } },
-  { id: "s10", name: "加藤 恵", kana: "かとう めぐみ", role: "マネージャー", storeId: "st-omiya", color: "#7b5cc4", points: 289, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.1, 接客: 4.5, 数値: 4.5, 理念: 4.2, 協調: 4.6 } },
-  { id: "s11", name: "吉田 陽菜", kana: "よしだ ひな", role: "柔道整復師", storeId: "st-urawa", color: "#0f8f7a", points: 305, joined: "2024-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.2, 接客: 4.3, 数値: 3.0, 理念: 3.9, 協調: 4.4 } },
-  { id: "s12", name: "山口 蓮", kana: "やまぐち れん", role: "院長", storeId: "st-urawa", color: "#c46a1f", points: 233, joined: "2020-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.4, 接客: 3.8, 数値: 4.1, 理念: 4.0, 協調: 3.8 } },
+  { id: "s01", name: "佐藤 健太", kana: "さとう けんた", role: "院長", storeId: "st-narimasu", color: "#0c7489", points: 320, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.6, 接客: 4.2, 数値: 4.0, 理念: 4.8, 協調: 4.4 }, rank: "manager" },
+  { id: "s02", name: "鈴木 美咲", kana: "すずき みさき", role: "柔道整復師", storeId: "st-narimasu", color: "#c2547e", points: 415, joined: "2022-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.8, 接客: 4.7, 数値: 3.5, 理念: 4.2, 協調: 4.6 }, rank: "mentor", mentorId: "s01", menteeIds: ["s11", "s06"] },
+  { id: "s03", name: "田中 大輔", kana: "たなか だいすけ", role: "鍼灸師", storeId: "st-narimasu", color: "#4a3aa7", points: 268, joined: "2021-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.3, 接客: 3.6, 数値: 3.9, 理念: 3.8, 協調: 4.0 }, rank: "staff", mentorId: "s01" },
+  { id: "s04", name: "高橋 由美", kana: "たかはし ゆみ", role: "受付", storeId: "st-narimasu", color: "#b0771a", points: 388, joined: "2020-07-01", licenses: [], skills: { 技術: 3.0, 接客: 4.9, 数値: 3.4, 理念: 4.5, 協調: 4.8 }, rank: "staff", mentorId: "s01" },
+  { id: "s05", name: "伊藤 翔太", kana: "いとう しょうた", role: "院長", storeId: "st-omiya", color: "#1f7a4d", points: 295, joined: "2018-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.7, 接客: 4.0, 数値: 4.4, 理念: 4.3, 協調: 4.1 }, rank: "manager" },
+  { id: "s06", name: "渡辺 花子", kana: "わたなべ はなこ", role: "柔道整復師", storeId: "st-omiya", color: "#d95926", points: 342, joined: "2023-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.4, 接客: 4.4, 数値: 3.2, 理念: 4.0, 協調: 4.5 }, rank: "staff", mentorId: "s02" },
+  { id: "s07", name: "山本 拓海", kana: "やまもと たくみ", role: "院長", storeId: "st-kawagoe", color: "#2a78d6", points: 251, joined: "2019-10-01", licenses: ["柔道整復師", "はり師"], skills: { 技術: 4.5, 接客: 3.9, 数値: 4.2, 理念: 4.1, 協調: 3.9 }, rank: "manager" },
+  { id: "s08", name: "中村 さくら", kana: "なかむら さくら", role: "鍼灸師", storeId: "st-kawagoe", color: "#a83a52", points: 377, joined: "2022-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.0, 接客: 4.6, 数値: 3.6, 理念: 4.4, 協調: 4.7 }, rank: "mentor", mentorId: "s07", menteeIds: ["s03"] },
+  { id: "s09", name: "小林 誠", kana: "こばやし まこと", role: "統括マネージャー", storeId: "st-narimasu", color: "#3d4f6b", points: 198, joined: "2017-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.2, 接客: 4.1, 数値: 4.8, 理念: 4.6, 協調: 4.3 }, rank: "exec" },
+  { id: "s10", name: "加藤 恵", kana: "かとう めぐみ", role: "マネージャー", storeId: "st-omiya", color: "#7b5cc4", points: 289, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.1, 接客: 4.5, 数値: 4.5, 理念: 4.2, 協調: 4.6 }, rank: "area", areaStoreIds: ["st-omiya", "st-urawa"] },
+  { id: "s11", name: "吉田 陽菜", kana: "よしだ ひな", role: "柔道整復師", storeId: "st-urawa", color: "#0f8f7a", points: 305, joined: "2024-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.2, 接客: 4.3, 数値: 3.0, 理念: 3.9, 協調: 4.4 }, rank: "staff", mentorId: "s02" },
+  { id: "s12", name: "山口 蓮", kana: "やまぐち れん", role: "院長", storeId: "st-urawa", color: "#c46a1f", points: 233, joined: "2020-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.4, 接客: 3.8, 数値: 4.1, 理念: 4.0, 協調: 3.8 }, rank: "manager" },
+  { id: "s13", name: "森 あかり", kana: "もり あかり", role: "本部人事", storeId: "st-narimasu", color: "#5b6f8a", points: 120, joined: "2021-04-01", licenses: [], skills: { 技術: 2.0, 接客: 4.4, 数値: 4.7, 理念: 4.5, 協調: 4.6 }, rank: "hr" },
 ];
 
 /** 施術者(受付・本部職を除く) */
@@ -784,10 +785,181 @@ const staffingRules = stores.map((st) => ({
 }));
 
 // ============================================================
+// チャット(グループ・DM・メンション)
+// ============================================================
+
+/** チャットルーム。kind: group(グループ) / dm(個別) / store(店舗) */
+const chatRooms = [
+  { id: "cr-all", kind: "group", name: "全社アナウンス", icon: "📢", desc: "全社員向けの連絡", memberIds: staff.map((s) => s.id), announceOnly: false, pinnedMessageId: null },
+  { id: "cr-narimasu", kind: "store", name: "成増店", icon: "🏠", desc: "成増店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-narimasu").map((s) => s.id), pinnedMessageId: null },
+  { id: "cr-omiya", kind: "store", name: "大宮店", icon: "🏠", desc: "大宮店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-omiya").map((s) => s.id), pinnedMessageId: null },
+  { id: "cr-kawagoe", kind: "store", name: "川越店", icon: "🏠", desc: "川越店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-kawagoe").map((s) => s.id), pinnedMessageId: null },
+  { id: "cr-urawa", kind: "store", name: "浦和店", icon: "🏠", desc: "浦和店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-urawa").map((s) => s.id), pinnedMessageId: null },
+  { id: "cr-managers", kind: "group", name: "院長・マネージャー", icon: "🧭", desc: "責任者間の連携", memberIds: ["s01", "s05", "s07", "s12", "s09", "s10"], pinnedMessageId: null },
+  { id: "cr-tech", kind: "group", name: "技術委員会", icon: "✋", desc: "手技・症例の相談", memberIds: ["s01", "s03", "s05", "s07", "s08", "s02"], pinnedMessageId: null },
+  { id: "cr-mentor-s02", kind: "group", name: "メンター:鈴木班", icon: "🌱", desc: "鈴木メンターとメンティー", memberIds: ["s02", "s11", "s06"], pinnedMessageId: null },
+  { id: "cr-dm-s01-s02", kind: "dm", name: null, memberIds: ["s01", "s02"], pinnedMessageId: null },
+  { id: "cr-dm-s01-s09", kind: "dm", name: null, memberIds: ["s01", "s09"], pinnedMessageId: null },
+  { id: "cr-dm-s01-s13", kind: "dm", name: null, memberIds: ["s01", "s13"], pinnedMessageId: null },
+];
+
+function makeChatMessages() {
+  const msgs = [];
+  let n = 1;
+  const M = (roomId, authorId, dayOff, hm, text, opts = {}) => {
+    msgs.push({
+      id: `cm${String(n++).padStart(3, "0")}`,
+      roomId, authorId,
+      date: iso(addDays(TODAY, dayOff), hm),
+      text,
+      mentions: opts.mentions || [],
+      reactions: opts.reactions || {},   // { "👍": ["s01","s02"] }
+      readBy: opts.readBy || [],
+      replyToId: opts.replyToId || null,
+      attachment: opts.attachment || null, // { kind:"image"|"file", name }
+      edited: false,
+    });
+    return msgs[msgs.length - 1].id;
+  };
+
+  // --- 全社アナウンス ---
+  M("cr-all", "s09", -3, "09:00", "おはようございます。今月の全社目標を共有します。各店の院長は朝礼で必ず展開をお願いします。", { reactions: { "👍": ["s01", "s05", "s07", "s12"] }, readBy: ["s01", "s02", "s05", "s07"] });
+  M("cr-all", "s13", -1, "10:30", "【人事より】8月分の勤怠締めは9/3(水)です。打刻漏れの修正申請は9/1までにお願いします。", { reactions: { "🙏": ["s01", "s05", "s07"] }, readBy: ["s01", "s05"] });
+  M("cr-all", "s09", 0, "08:40", "本日より成増店で新ポータルのテスト運用を開始します。使い方で迷ったらAIアシスタントに聞いてください🐠", { reactions: { "🎉": ["s01", "s02", "s03", "s04"], "👍": ["s05"] }, readBy: ["s01", "s02"] });
+
+  // --- 成増店 ---
+  const nb1 = M("cr-narimasu", "s01", 0, "09:15", "おはようございます!本日の予約18件、14時に新規の方(紹介)がご来院予定です。", { reactions: { "👍": ["s02", "s03", "s04"] }, readBy: ["s02", "s03", "s04"] });
+  M("cr-narimasu", "s04", 0, "09:22", "承知しました!問診票と初回セットを準備しておきます。", { replyToId: nb1, readBy: ["s01", "s02"] });
+  M("cr-narimasu", "s02", 0, "09:28", "@佐藤 健太 14時の新規の方、姿勢分析もやっておきますか?", { mentions: ["s01"], readBy: ["s01"] });
+  M("cr-narimasu", "s01", 0, "09:31", "@鈴木 美咲 お願いします!初回カウンセリングの流れでいきましょう。", { mentions: ["s02"], reactions: { "👍": ["s02"] }, readBy: ["s02", "s04"] });
+  M("cr-narimasu", "s03", 0, "09:45", "鍼の在庫が残り8箱になりました。発注しておきます。", { attachment: { kind: "image", name: "在庫棚.jpg" }, readBy: ["s01"] });
+  M("cr-narimasu", "s04", -1, "19:50", "本日もお疲れさまでした!明日は9時30分朝礼です🌅", { reactions: { "🙌": ["s01", "s02", "s03"] }, readBy: ["s01", "s02", "s03"] });
+
+  // --- 院長・マネージャー ---
+  M("cr-managers", "s09", -2, "13:05", "@全員 今週のマネージャー会議、アクションプランの進捗を各自まとめておいてください。", { mentions: ["s01", "s05", "s07", "s12", "s10"], reactions: { "👍": ["s01", "s05", "s07"] }, readBy: ["s01", "s05", "s10"] });
+  M("cr-managers", "s07", -2, "18:20", "川越店、夕方枠の稼働が下がっています。LINE配信のタイミングを相談させてください。", { readBy: ["s09", "s10"] });
+  M("cr-managers", "s10", -2, "18:35", "@山本 拓海 マーケ委員会で文面のドラフトを用意しました。明日共有しますね。", { mentions: ["s07"], reactions: { "🙏": ["s07"] }, readBy: ["s07", "s09"] });
+  M("cr-managers", "s01", 0, "08:10", "成増店のポータル移行、初日は受付フローを重点的に見ます。気づきがあれば随時共有します。", { readBy: ["s09"] });
+
+  // --- 技術委員会 ---
+  M("cr-tech", "s07", -4, "21:10", "次回の技術研修は「胸椎モビライゼーション」で確定しました。事前に実技チェックを受けておいてください。", { reactions: { "👍": ["s01", "s03", "s08"] }, readBy: ["s01", "s03"] });
+  M("cr-tech", "s03", -3, "12:40", "坐骨神経痛の症例で相談です。梨状筋のリリース後に一時的に症状が強くなるケース、みなさんどう対応されていますか?", { readBy: ["s07", "s08", "s01"] });
+  M("cr-tech", "s08", -3, "13:15", "@田中 大輔 初回は刺激量を落として様子見が安全だと思います。翌日の反応を必ず確認するようにしています。", { mentions: ["s03"], reactions: { "👍": ["s03", "s07"], "💡": ["s01"] }, readBy: ["s03", "s07"] });
+
+  // --- メンター班 ---
+  M("cr-mentor-s02", "s02", -1, "20:10", "今週もお疲れさまでした!日報を読ませてもらいました。二人とも提案の型が定着してきていますね👏", { reactions: { "🙌": ["s11", "s06"] }, readBy: ["s11", "s06"] });
+  M("cr-mentor-s02", "s11", -1, "20:32", "ありがとうございます!テストの点数がまだ伸びないので、来週は解剖学を重点的にやります。", { readBy: ["s02"] });
+  M("cr-mentor-s02", "s02", -1, "20:40", "@吉田 陽菜 AIテストの週5問モードがおすすめです。分からなかった問題だけ一緒に見ましょう。", { mentions: ["s11"], reactions: { "🙏": ["s11"] }, readBy: ["s11"] });
+
+  // --- DM ---
+  M("cr-dm-s01-s02", "s02", 0, "07:55", "おはようございます。本日、家庭の事情で18時に上がらせていただきたいのですが大丈夫でしょうか?", { readBy: ["s01"] });
+  M("cr-dm-s01-s02", "s01", 0, "08:02", "了解です!18時以降は私が引き継ぎます。無理せずどうぞ。", { reactions: { "🙏": ["s02"] }, readBy: ["s02"] });
+  M("cr-dm-s01-s09", "s09", -1, "17:20", "成増店の移行、初週の所感を金曜までにもらえますか?幹部会議で共有したいです。", { readBy: ["s01"] });
+  M("cr-dm-s01-s09", "s01", -1, "17:44", "承知しました。現場の声もまとめて出します。", { readBy: ["s09"] });
+  M("cr-dm-s01-s13", "s13", 0, "11:05", "先月の残業時間が36時間を超えているスタッフが1名います。シフトの組み方をご相談させてください。", { readBy: [] });
+
+  return msgs;
+}
+
+// ============================================================
+// ロールプレイ(トークスクリプト練習)
+// ============================================================
+
+const talkScripts = [
+  {
+    id: "sc01", title: "初回カウンセリング(問診の導入)", category: "初回対応", level: "基礎",
+    goal: "患者様の不安をほぐし、施術計画に納得いただく土台をつくる",
+    durationSec: 90,
+    lines: [
+      { role: "スタッフ", text: "本日はご来院ありがとうございます。担当させていただく〇〇です。よろしくお願いいたします。", keywords: ["ありがとう", "担当", "よろしく"] },
+      { role: "スタッフ", text: "まずはお身体の状態を詳しくお聞かせください。今、一番お困りの症状はどちらでしょうか。", keywords: ["お聞かせ", "お困り", "症状"] },
+      { role: "スタッフ", text: "その痛みはいつ頃から出ていますか。きっかけになった出来事はありましたか。", keywords: ["いつ頃", "きっかけ"] },
+      { role: "スタッフ", text: "日常生活で一番つらいのはどんな場面でしょうか。お仕事や睡眠には影響が出ていますか。", keywords: ["日常生活", "仕事", "睡眠"] },
+      { role: "スタッフ", text: "ありがとうございます。ここまでのお話をもとに検査をさせていただき、原因と改善の道筋をご説明しますね。", keywords: ["検査", "原因", "ご説明"] },
+    ],
+  },
+  {
+    id: "sc02", title: "回数券のご提案", category: "提案", level: "実践",
+    goal: "施術計画への納得を得たうえで、金額ではなく通院設計として提案する",
+    durationSec: 120,
+    lines: [
+      { role: "スタッフ", text: "検査の結果、〇〇様の腰の痛みは骨盤まわりの筋力低下が主な原因と考えられます。", keywords: ["検査の結果", "原因"] },
+      { role: "スタッフ", text: "改善までの目安として、まず週1回を4週間、その後は間隔を空けながら計8回ほどの施術をおすすめしています。", keywords: ["週1回", "目安", "8回"] },
+      { role: "スタッフ", text: "というのも、筋肉の状態が定着するまでにはおよそ3ヶ月かかると言われているためです。", keywords: ["3ヶ月", "定着"] },
+      { role: "スタッフ", text: "この通院計画に沿ってご来院いただける場合、8回分の回数券をご用意しています。1回あたり約800円おトクになります。", keywords: ["回数券", "おトク"] },
+      { role: "スタッフ", text: "もちろん都度払いでも大丈夫です。まずは計画に納得いただけたかが一番大事なので、ご不明な点はありますか。", keywords: ["都度払い", "納得", "ご不明"] },
+    ],
+  },
+  {
+    id: "sc03", title: "電話でのご予約対応", category: "受付", level: "基礎",
+    goal: "名乗り・症状確認・枠案内・持ち物案内を漏れなく行う",
+    durationSec: 75,
+    lines: [
+      { role: "スタッフ", text: "お電話ありがとうございます。くまのみ整骨院 成増店、〇〇でございます。", keywords: ["ありがとうございます", "くまのみ"] },
+      { role: "スタッフ", text: "ご予約ですね、ありがとうございます。差し支えなければ、今どのような症状でお困りかお聞かせいただけますか。", keywords: ["ご予約", "症状"] },
+      { role: "スタッフ", text: "承知しました。直近ですと明日の14時、または明後日の10時にご案内できますが、いかがでしょうか。", keywords: ["ご案内", "いかが"] },
+      { role: "スタッフ", text: "ありがとうございます。当日は保険証と、動きやすい服装でお越しください。初回は検査を含めて約75分いただきます。", keywords: ["保険証", "服装", "75分"] },
+    ],
+  },
+  {
+    id: "sc04", title: "離脱しそうな患者様へのフォロー", category: "リテンション", level: "応用",
+    goal: "責めずに状況を聞き、通院を再開しやすい選択肢を示す",
+    durationSec: 90,
+    lines: [
+      { role: "スタッフ", text: "〇〇様、その後お身体の調子はいかがでしょうか。前回のご来院から少し空きましたので、気になってご連絡しました。", keywords: ["いかが", "気になって"] },
+      { role: "スタッフ", text: "お忙しい時期が続いていらっしゃるのですね。無理のない範囲で大丈夫ですよ。", keywords: ["お忙しい", "無理のない"] },
+      { role: "スタッフ", text: "回数券の残りが3回分ございまして、有効期限が来月末までとなっています。", keywords: ["回数券", "有効期限"] },
+      { role: "スタッフ", text: "土曜の朝や平日の夜の枠もございますので、ご都合のよいお時間があればお取りしておきます。", keywords: ["土曜", "夜", "ご都合"] },
+    ],
+  },
+];
+
+function makeRoleplaySessions() {
+  return [
+    {
+      id: "rp01", staffId: "s11", scriptId: "sc02", date: addDays(TODAY, -5), durationSec: 108,
+      transcript: "検査の結果、腰の痛みは骨盤まわりの筋力低下が原因と考えられます。えーっと、週1回を4週間くらい通っていただくのがおすすめです。回数券もありまして、8回分で1回あたり安くなります。どうされますか。",
+      score: 62,
+      metrics: { coverage: 58, pace: 72, filler: 4, empathy: 55 },
+      feedback: {
+        good: ["原因の説明を最初に持ってこられていて、順序は正しいです", "回数券の金額メリットに触れられています"],
+        improve: ["「3ヶ月かかる」という根拠の説明が抜けています。ここがあると提案の納得感が大きく変わります", "「都度払いでも大丈夫」の一言がないため、選択を迫られている印象になります", "「えーっと」などのフィラーが4回。間を取る意識をしましょう"],
+        nextAction: "根拠(3ヶ月)と選択肢(都度払い)の2点を足して、もう一度録音してみましょう。",
+      },
+      reviewedBy: "s02",
+    },
+    {
+      id: "rp02", staffId: "s06", scriptId: "sc01", date: addDays(TODAY, -3), durationSec: 84,
+      transcript: "本日はご来院ありがとうございます。担当させていただく渡辺です。よろしくお願いいたします。まずはお身体の状態を詳しくお聞かせください。今、一番お困りの症状はどちらでしょうか。その痛みはいつ頃から出ていますか。日常生活で一番つらいのはどんな場面でしょうか。ありがとうございます。検査をさせていただいて、原因をご説明しますね。",
+      score: 88,
+      metrics: { coverage: 92, pace: 86, filler: 0, empathy: 84 },
+      feedback: {
+        good: ["名乗りから症状確認までの流れが完璧です", "フィラーがゼロで、落ち着いた話し方ができています", "「ありがとうございます」で受け止めてから次に進めています"],
+        improve: ["「きっかけになった出来事」の確認が抜けています。原因特定に効く質問なので加えましょう"],
+        nextAction: "きっかけの確認を1問足すだけで満点レベルです。次回の初回対応で意識してみてください。",
+      },
+      reviewedBy: "s05",
+    },
+    {
+      id: "rp03", staffId: "s03", scriptId: "sc04", date: addDays(TODAY, -1), durationSec: 71,
+      transcript: "その後お身体の調子はいかがでしょうか。前回から空きましたので連絡しました。回数券の残りが3回ありまして、有効期限が来月末です。ご都合のよい時間があればお取りしておきます。",
+      score: 74,
+      metrics: { coverage: 76, pace: 80, filler: 1, empathy: 62 },
+      feedback: {
+        good: ["残数と期限を具体的に伝えられています", "枠のご提案まで踏み込めています"],
+        improve: ["相手の状況を受け止める一言(「お忙しい時期が続いていらっしゃるのですね」)が抜けています", "「無理のない範囲で」の配慮表現があると、催促の印象が和らぎます"],
+        nextAction: "共感フレーズを1つ入れてから本題に移る練習をしましょう。",
+      },
+      reviewedBy: null,
+    },
+  ];
+}
+
+// ============================================================
 // エクスポート
 // ============================================================
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export function createSeed() {
   const patients = makePatients();
@@ -818,6 +990,10 @@ export function createSeed() {
     registerSales: makeRegisterSales(),
     notifications: makeNotifications(),
     faq,
+    chatRooms,
+    chatMessages: makeChatMessages(),
+    talkScripts,
+    roleplaySessions: makeRoleplaySessions(),
   };
 }
 
