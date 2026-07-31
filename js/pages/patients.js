@@ -10,6 +10,7 @@ import {
   avatar, staffChip, fmtDate, fmtYen,
 } from "../ui.js";
 import { store, todayStr } from "../store.js";
+import { can, isClockedInToday, rankLabel, rankOf } from "../auth.js";
 import {
   delay, sampleVoiceTranscript, voiceToSoap,
   kartePatientMessage, analyzePosture,
@@ -72,6 +73,119 @@ function matchesFilter(p, fid) {
   return true;
 }
 
+/* ============================================================
+   アクセス制御 — 出勤打刻がないと顧客情報は見られない
+   ・can("patients.view")           … 閲覧できるか(打刻 or 責任者以上)
+   ・can("patients.viewWithoutClockIn") … 打刻なしでも見られる例外権限か
+   ・can("patients.edit")           … 書き込み(カルテ保存・LINE送信など)
+   ============================================================ */
+
+/** 今日の自分の勤怠レコード(打刻時刻の表示に使う) */
+function myAttendanceToday() {
+  const me = store.me();
+  if (!me) return null;
+  const t = todayStr();
+  return store.get("attendance").find((a) => a.staffId === me.id && a.date === t) || null;
+}
+
+/** 書き込み可否と、できない理由 */
+function editGuard() {
+  const me = store.me();
+  const allowed = can("patients.edit");
+  if (allowed) return { allowed: true, reason: "" };
+  const reason = rankOf(me) === "hr"
+    ? "本部人事の権限では患者様の情報を編集できません。閲覧のみのモードです。"
+    : "出勤打刻がないため、カルテの保存や送信はできません。勤怠管理から出勤打刻を行ってください。";
+  return { allowed: false, reason };
+}
+
+/** 「閲覧のみ」の注記 */
+function readOnlyNote(reason) {
+  return el("div", { class: "pt-ro" }, icon("info", 14),
+    el("span", {}, el("strong", {}, "閲覧のみ:"), reason));
+}
+
+/** 書き込みボタンを無効化して理由をツールチップに入れる */
+function lockWrite(btn, guard) {
+  if (guard.allowed) return btn;
+  btn.disabled = true;
+  btn.title = guard.reason;
+  btn.classList.add("pt-locked");
+  return btn;
+}
+
+/**
+ * ページ上部に出す「なぜ見えているか」のバッジ。
+ * 打刻済み → good / 責任者権限での閲覧(未打刻)→ warn(監査注記つき)
+ */
+function accessBadge() {
+  const me = store.me();
+  const clocked = me ? isClockedInToday(me.id) : false;
+
+  if (clocked) {
+    const at = myAttendanceToday();
+    const b = badge(at?.clockIn ? `出勤中のため閲覧できます(${at.clockIn} 打刻)` : "出勤中のため閲覧できます", "good");
+    b.title = `本日の出勤打刻を確認しました${at?.clockIn ? `(${at.clockIn})` : ""}。閲覧が許可されています。`;
+    return el("div", { class: "pt-access ok", role: "status" },
+      el("span", { class: "pt-access-ic" }, icon("check", 13)), b);
+  }
+
+  const b = badge("責任者権限で閲覧中(未打刻)", "warn");
+  b.title = "打刻がなくても閲覧できる権限です。アクセスは記録されます。";
+  return el("div", { class: "pt-access warn", role: "status" },
+    el("span", { class: "pt-access-ic" }, icon("eye", 13)), b,
+    el("span", { class: "pt-access-note", title: "誰がいつ患者情報を開いたかは監査ログに残ります" },
+      "アクセスは記録されます"));
+}
+
+/* ---- 未打刻ロック画面 ---- */
+function lockScreen(root, draw) {
+  const me = store.me();
+
+  root.appendChild(sectionHeader("顧客・カルテ",
+    "患者様の個人情報を扱うページです。閲覧には本日の出勤打刻が必要です。"));
+
+  const goBtn = el("button", { class: "btn primary lg" },
+    icon("clock", 17), "勤怠管理へ移動して打刻する");
+  goBtn.addEventListener("click", () => { location.hash = "#/kintai"; });
+
+  const reloadBtn = el("button", { class: "btn ghost lg" }, icon("refresh", 16), "再読み込み");
+  reloadBtn.addEventListener("click", () => {
+    toast("打刻状況を再確認しました", "info");
+    draw();
+  });
+
+  const step = (n, text) => el("li", { class: "pt-gate-step" },
+    el("span", { class: "pt-gate-num" }, n), el("span", { class: "pt-gate-steptxt" }, text));
+
+  root.appendChild(el("div", { class: "perm-gate pt-gate" },
+    el("div", { class: "pt-gate-kicker" }, icon("eye", 12), "個人情報保護のためのアクセス制限"),
+    el("div", { class: "pt-gate-shield" },
+      el("div", { class: "pg-ic" }, el("span", { class: "pt-gate-lock" }, "🔒"))),
+    el("div", { class: "pg-title" }, "出勤打刻をすると閲覧できます"),
+    el("div", { class: "pg-desc" },
+      "患者様の個人情報保護のため、顧客情報・カルテは出勤中のスタッフのみ閲覧できます。勤怠管理から出勤打刻を行ってください。"),
+
+    el("div", { class: "pt-gate-who" },
+      avatar(me, 34),
+      el("span", { class: "pt-gate-whotxt" },
+        el("span", { class: "pt-gate-name" }, me?.name || "—", el("i", {}, "さん")),
+        el("span", { class: "pt-gate-rank" },
+          `${store.storeName(me?.storeId)}・${rankLabel(me)}`)),
+      badge(`${fmtDate(todayStr())} 未打刻`, "warn")),
+
+    el("ol", { class: "pt-gate-steps" },
+      step(1, "勤怠管理を開く"),
+      step(2, "「出勤打刻」を押す"),
+      step(3, "顧客・カルテに戻る")),
+
+    el("div", { class: "pg-actions" }, goBtn, reloadBtn),
+
+    el("div", { class: "pt-gate-note" }, icon("info", 13),
+      el("span", {}, "院長・マネージャー以上は打刻がなくても閲覧できます(緊急対応のため)。")),
+  ));
+}
+
 /* ---------------- LINE風プレビュー ---------------- */
 
 function lineBubble(text) {
@@ -112,6 +226,7 @@ function riskCard() {
   const highs = store.get("patients").filter((p) => p.churnRisk === "high");
   if (!highs.length) return null;
 
+  const guard = editGuard();
   const panel = aiPanel("AIリマインド文面");
   panel.el.style.display = "none";
 
@@ -122,9 +237,10 @@ function riskCard() {
     const wrap = el("div", { class: "stack", style: { gap: "16px" } });
     for (const p of highs) {
       const msg = reminderMessage(p);
-      const send = el("button", { class: "btn primary sm" },
-        icon("send", 13), p.lineLinked ? "LINEで送信" : "SMSで送信");
+      const send = lockWrite(el("button", { class: "btn primary sm" },
+        icon("send", 13), p.lineLinked ? "LINEで送信" : "SMSで送信"), guard);
       send.addEventListener("click", () => {
+        if (!can("patients.edit")) return;
         send.disabled = true;
         clear(send).append(icon("check", 13), "送信済み");
         toast(`${p.name}様へ送信しました(シミュレーション)`);
@@ -137,6 +253,7 @@ function riskCard() {
           send),
         lineBubble(msg)));
     }
+    if (!guard.allowed) wrap.appendChild(readOnlyNote(guard.reason));
     panel.setNode(wrap);
   });
 
@@ -196,7 +313,8 @@ function renderList(root) {
   const nHigh = patients.filter((p) => p.churnRisk === "high").length;
 
   root.appendChild(sectionHeader("顧客・カルテ",
-    "来患ノートは廃止。カルテ・写真・姿勢分析・回数券・LINE連携をここに一本化しました。"));
+    "来患ノートは廃止。カルテ・写真・姿勢分析・回数券・LINE連携をここに一本化しました。",
+    accessBadge()));
 
   root.appendChild(el("div", { class: "kpi-row" },
     statTile({ label: "登録患者数", value: `${patients.length}名`, icon: "users", tone: "brand", sub: "全店舗合計" }),
@@ -317,9 +435,13 @@ function ticketCard(p) {
 
   const left = Math.max(t.total - t.used, 0);
   const expDays = -daysSince(t.expires);
-  const notify = el("button", { class: "btn soft block" }, icon("line", 16), "残数をLINEで通知");
-  notify.addEventListener("click", () =>
-    toast(`${p.name}様へ回数券の残数(${left}回)をLINEで通知しました(シミュレーション)`));
+  const guard = editGuard();
+  const notify = lockWrite(
+    el("button", { class: "btn soft block" }, icon("line", 16), "残数をLINEで通知"), guard);
+  notify.addEventListener("click", () => {
+    if (!can("patients.edit")) return;
+    toast(`${p.name}様へ回数券の残数(${left}回)をLINEで通知しました(シミュレーション)`);
+  });
 
   return card({
     title: "回数券(デジタル)", sub: t.name, class: "pt-ticket",
@@ -339,6 +461,7 @@ function ticketCard(p) {
         kv("購入日", fmtDate(t.purchased, { withYear: true })),
         kv("購入金額", fmtYen(t.price))),
       notify,
+      guard.allowed ? null : readOnlyNote(guard.reason),
       copy),
   });
 }
@@ -346,6 +469,7 @@ function ticketCard(p) {
 /* ---- 新規カルテ作成(ボイス入力) ---- */
 function newKarteCard(p, draw) {
   const me = store.me();
+  const guard = editGuard();
   const menuSel = el("select", { class: "select" },
     store.get("menus").map((m) => el("option", { value: m.id }, m.name)));
 
@@ -365,7 +489,7 @@ function newKarteCard(p, draw) {
   });
 
   let lastTranscript = null;
-  const recBtn = el("button", { class: "btn accent" }, "🎤 ボイス入力を開始");
+  const recBtn = lockWrite(el("button", { class: "btn accent" }, "🎤 ボイス入力を開始"), guard);
   const recArea = el("div", { class: "pt-rec", hidden: true },
     el("span", { class: "pt-rec-mic" }, icon("mic", 20)),
     el("span", { class: "pt-rec-bars" }, [0, 1, 2, 3, 4, 5, 6].map(() => el("i"))),
@@ -377,7 +501,7 @@ function newKarteCard(p, draw) {
       "AIがSOAP形式に整理しています…"));
 
   recBtn.addEventListener("click", async () => {
-    if (recBtn.disabled) return;
+    if (recBtn.disabled || !can("patients.edit")) return;
     recBtn.disabled = true;
     transcriptBox.hidden = true;
     recArea.hidden = false;
@@ -402,8 +526,13 @@ function newKarteCard(p, draw) {
     toast("SOAPに自動整理しました。内容を確認・編集して保存してください", "info");
   });
 
-  const saveBtn = el("button", { class: "btn primary lg block" }, icon("check", 17), "カルテを保存");
+  const saveBtn = lockWrite(
+    el("button", { class: "btn primary lg block" }, icon("check", 17), "カルテを保存"), guard);
   saveBtn.addEventListener("click", () => {
+    if (!can("patients.edit")) {
+      toast("カルテの保存権限がありません", "error");
+      return;
+    }
     const vals = {};
     for (const [key] of SOAP_DEF) vals[key] = ta[key].value.trim();
     if (!vals.subjective && !vals.objective && !vals.assessment && !vals.plan) {
@@ -445,12 +574,23 @@ function newKarteCard(p, draw) {
     draw();
   });
 
+  if (!guard.allowed) {
+    menuSel.disabled = true;
+    for (const [key] of SOAP_DEF) {
+      ta[key].disabled = true;
+      ta[key].placeholder = "閲覧のみのため入力できません";
+    }
+  }
+
   return card({
-    title: "新規カルテ作成", sub: "ボイス入力対応", class: "pt-new",
+    title: "新規カルテ作成",
+    sub: guard.allowed ? "ボイス入力対応" : "閲覧のみ",
+    class: `pt-new ${guard.allowed ? "" : "readonly"}`,
     body: el("div", { class: "stack", style: { gap: "13px" } },
       el("div", { class: "pt-lead" }, icon("sparkle", 14),
         el("span", {}, "施術内容を話すだけ。AIが書き起こしてSOAP形式に自動整理します。",
           el("strong", {}, "紙の来患ノートは不要です。"))),
+      guard.allowed ? null : readOnlyNote(guard.reason),
       el("div", { class: "form-row" },
         el("span", { class: "field", style: { flex: "1.4" } }, el("label", {}, "施術メニュー"), menuSel),
         el("span", { class: "field", style: { flex: "1" } }, el("label", {}, "担当"),
@@ -635,19 +775,24 @@ function aiMessageCard(p, latest, draw) {
     });
   }
 
+  const guard = editGuard();
   const panel = aiPanel("患者様向けメッセージ");
   panel.el.style.display = "none";
   const btn = aiButton("AIで患者様向けメッセージを作成", async () => {
     panel.el.style.display = "";
     panel.thinking(`${fmtDate(latest.date)}のカルテを読み込んでいます`);
     const msg = await kartePatientMessage(p, latest);
-    const send = el("button", { class: "btn primary block" }, icon("send", 15), "LINEで送信");
+    const send = lockWrite(
+      el("button", { class: "btn primary block" }, icon("send", 15), "LINEで送信"), guard);
     send.addEventListener("click", () => {
+      if (!can("patients.edit")) return;
       store.update("karte", latest.id, { sentToLine: true, aiPatientMessage: msg });
       toast("送信しました(シミュレーション)");
       draw();
     });
-    panel.setNode(el("div", { class: "stack", style: { gap: "10px" } }, lineBubble(msg), send));
+    panel.setNode(el("div", { class: "stack", style: { gap: "10px" } },
+      lineBubble(msg), send,
+      guard.allowed ? null : readOnlyNote(guard.reason)));
   });
 
   return card({
@@ -655,6 +800,7 @@ function aiMessageCard(p, latest, draw) {
     body: el("div", { class: "stack", style: { gap: "12px" } },
       el("div", { class: "pt-lead" }, icon("line", 14),
         "最新カルテの内容から、施術サマリー・セルフケア・回数券残数をまとめたフォローメッセージを作成します。"),
+      guard.allowed ? null : readOnlyNote(guard.reason),
       latest.sentToLine
         ? el("div", { class: "flex wrap", style: { gap: "8px" } },
             badge("送信済み", "good"),
@@ -665,8 +811,9 @@ function aiMessageCard(p, latest, draw) {
 }
 
 function renderDetail(root, patientId, draw) {
-  root.appendChild(el("a", { class: "pt-back", href: "#/patients" },
-    icon("chevL", 15), "一覧へ戻る"));
+  root.appendChild(el("div", { class: "pt-detail-bar" },
+    el("a", { class: "pt-back", href: "#/patients" }, icon("chevL", 15), "一覧へ戻る"),
+    accessBadge()));
 
   const p = store.byId("patients", patientId);
   if (!p) {
@@ -699,6 +846,8 @@ export default {
     const patientId = params?.[0] || null;
     const draw = () => {
       clear(root);
+      // 個人情報保護:出勤打刻がない一般スタッフには一覧も詳細も出さない
+      if (!can("patients.view")) { lockScreen(root, draw); return; }
       if (patientId) renderDetail(root, patientId, draw);
       else renderList(root);
     };

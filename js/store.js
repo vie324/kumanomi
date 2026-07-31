@@ -109,6 +109,42 @@ export const store = {
 
   /** 未読通知数 */
   unreadCount() { return state.notifications.filter((n) => !n.read).length; },
+
+  /** ログインユーザーを切り替える(デモで権限の違いを体験するため) */
+  switchUser(staffId) {
+    if (!store.byId("staff", staffId)) return;
+    state.currentUserId = staffId;
+    persist();
+    listeners.forEach((fn) => fn("*"));
+  },
+
+  /** 自分が参加しているチャットルーム */
+  myRooms() {
+    const meId = state.currentUserId;
+    return (state.chatRooms || []).filter((r) => r.memberIds.includes(meId));
+  },
+
+  /** ルーム内の未読件数(自分の readBy に入っていない他人の発言) */
+  unreadInRoom(roomId) {
+    const meId = state.currentUserId;
+    return (state.chatMessages || []).filter(
+      (m) => m.roomId === roomId && m.authorId !== meId && !(m.readBy || []).includes(meId)
+    ).length;
+  },
+
+  /** 全ルームの未読合計 */
+  unreadChatCount() {
+    return store.myRooms().reduce((a, r) => a + store.unreadInRoom(r.id), 0);
+  },
+
+  /** 自分宛メンションの未読件数 */
+  unreadMentionCount() {
+    const meId = state.currentUserId;
+    const roomIds = new Set(store.myRooms().map((r) => r.id));
+    return (state.chatMessages || []).filter(
+      (m) => roomIds.has(m.roomId) && (m.mentions || []).includes(meId) && !(m.readBy || []).includes(meId)
+    ).length;
+  },
 };
 
 // 日付ユーティリティも re-export(ページから使いやすいように)

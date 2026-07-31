@@ -6,6 +6,8 @@
 const pages = new Map();
 let outlet = null;
 let onNavigate = null;
+let hashBound = false;
+let guard = null;
 
 export const router = {
   /** ページモジュール({id,title,icon,group,render})を登録 */
@@ -14,19 +16,27 @@ export const router = {
   pages() { return [...pages.values()]; },
   get(id) { return pages.get(id); },
 
+  /** アクセス可否のフック。(pageId) => boolean を設定する */
+  setGuard(fn) { guard = fn; },
+
   init(outletEl, navigateHook) {
     outlet = outletEl;
     onNavigate = navigateHook;
-    window.addEventListener("hashchange", () => router.render());
+    if (!hashBound) {
+      window.addEventListener("hashchange", () => router.render());
+      hashBound = true;
+    }
     router.render();
   },
 
-  /** 現在のルートを解析 → {id, params} */
+  /** 現在のルートを解析 → {id, params}(権限がなければダッシュボードへ) */
   current() {
     const hash = location.hash.replace(/^#\/?/, "");
     const parts = hash.split("/").filter(Boolean);
-    const id = parts[0] || "dashboard";
-    return { id: pages.has(id) ? id : "dashboard", params: parts.slice(1).map(decodeURIComponent) };
+    let id = parts[0] || "dashboard";
+    if (!pages.has(id)) id = "dashboard";
+    if (guard && !guard(id)) return { id: "dashboard", params: [], denied: id };
+    return { id, params: parts.slice(1).map(decodeURIComponent) };
   },
 
   navigate(path) {

@@ -142,7 +142,415 @@
 .page-nippo .nippo-ratecell.hi { color: var(--good-text); font-weight: 800; }
 .page-nippo .nippo-ratecell.lo { color: var(--warn-text); }
 
+/* ============================================================
+   閲覧範囲バー(全タブ共通・ページ上部)
+   ============================================================ */
+.page-nippo .nippo-scopebar {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 10px;
+  margin: -4px 0 14px;
+}
+.page-nippo .nippo-scope,
+.page-nippo .nippo-myrate {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-width: 0;
+  padding: 6px 13px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  font-size: var(--fs-xs); color: var(--ink-2);
+  box-shadow: var(--shadow-1);
+}
+.page-nippo .nippo-scope { color: var(--accent-ink); background: var(--accent-soft); border-color: transparent; }
+.page-nippo .nippo-scope-l { color: var(--ink-3); font-weight: 600; }
+.page-nippo .nippo-scope strong { color: var(--accent-ink); font-weight: 800; }
+.page-nippo .nippo-myrate strong {
+  font-size: var(--fs-lg); font-weight: 800;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.page-nippo .nippo-myrate-l { font-weight: 700; color: var(--ink-2); }
+.page-nippo .nippo-myrate-s { color: var(--ink-3); }
+.page-nippo .nippo-myrate.good { background: var(--good-soft); border-color: transparent; }
+.page-nippo .nippo-myrate.good strong,
+.page-nippo .nippo-myrate.good .nippo-myrate-l { color: var(--good-text); }
+.page-nippo .nippo-myrate.warn { background: var(--warn-soft); border-color: transparent; }
+.page-nippo .nippo-myrate.warn strong,
+.page-nippo .nippo-myrate.warn .nippo-myrate-l { color: var(--warn-text); }
+
+/* ============================================================
+   提出状況カード(みんなの日報タブの主役)
+   ============================================================ */
+.page-nippo .nippo-subcard {
+  position: relative;
+  padding: 18px 20px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+.page-nippo .nippo-subcard::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 4px;
+  background: var(--brand-grad);
+}
+.page-nippo .nippo-subcard.full::before { background: var(--good); }
+.page-nippo .nippo-subcard.holiday::before { background: var(--hairline-strong); }
+.page-nippo .nippo-subcard-note {
+  display: flex; align-items: center; gap: 9px;
+  font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.6;
+}
+
+.page-nippo .nippo-subgrid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 22px;
+  align-items: center;
+}
+.page-nippo .nippo-subring { display: flex; justify-content: center; }
+
+/* 提出率リング */
+.page-nippo .nippo-ringwrap { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+.page-nippo .nippo-ring { position: relative; width: 132px; height: 132px; flex: none; }
+.page-nippo .nippo-ring-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px; pointer-events: none;
+}
+.page-nippo .nippo-ring-val {
+  font-size: 30px; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.page-nippo .nippo-ring-lbl { font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3); }
+.page-nippo .nippo-ring-legend { display: flex; flex-direction: column; gap: 3px; }
+.page-nippo .nippo-ring-lgitem {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); color: var(--ink-2);
+}
+.page-nippo .nippo-ring-sw { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.page-nippo .nippo-ring-lglabel { min-width: 42px; }
+.page-nippo .nippo-ring-lgitem strong { font-variant-numeric: tabular-nums; }
+.page-nippo .nippo-subinfo { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+
+.page-nippo .nippo-subtitle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); font-weight: 800;
+  letter-spacing: 0.03em; color: var(--ink-3);
+}
+.page-nippo .nippo-subbig {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
+  line-height: 1.05;
+}
+.page-nippo .nippo-subbig strong {
+  font-size: 42px; font-weight: 800;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.page-nippo .nippo-subbig-unit { font-size: var(--fs-md); font-weight: 800; color: var(--ink-2); }
+.page-nippo .nippo-subbig-sep { font-size: var(--fs-lg); color: var(--ink-3); margin: 0 2px; }
+.page-nippo .nippo-subbig-total {
+  font-size: var(--fs-md); font-weight: 700; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.page-nippo .nippo-subbar {
+  display: flex; gap: 2px;
+  height: 9px; width: 100%; max-width: 460px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.page-nippo .nippo-subbar-fill { display: block; height: 100%; transition: width var(--dur-slow) var(--ease); }
+.page-nippo .nippo-subbar-fill.good { background: var(--good); }
+.page-nippo .nippo-subbar-fill.warn { background: var(--warn); }
+
+.page-nippo .nippo-subtags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.page-nippo .nippo-missing {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+  padding-top: 3px;
+}
+.page-nippo .nippo-missing-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-xs); font-weight: 800; color: var(--warn-text);
+}
+.page-nippo .nippo-allin {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-sm); font-weight: 700; color: var(--good-text);
+}
+.page-nippo .nippo-remind {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 10px 0 4px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-2);
+  color: var(--ink-2); font-family: inherit; font-size: var(--fs-xs); font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--dur), background var(--dur), color var(--dur);
+}
+.page-nippo .nippo-remind:hover { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-ink); }
+.page-nippo .nippo-remind-name { white-space: nowrap; }
+.page-nippo .nippo-remind-act {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding-left: 7px; margin-left: 1px;
+  border-left: 1px solid var(--hairline-strong);
+  color: var(--brand-ink); font-weight: 800;
+}
+.page-nippo .nippo-remind.done {
+  border-color: transparent; background: var(--good-soft); color: var(--good-text);
+  cursor: default;
+}
+.page-nippo .nippo-remind.self {
+  border-color: color-mix(in srgb, var(--brand) 45%, transparent);
+  background: var(--brand-soft); color: var(--brand-ink);
+}
+.page-nippo .nippo-remind.self .nippo-remind-act { border-left-color: color-mix(in srgb, var(--brand) 35%, transparent); }
+.page-nippo .nippo-remind.done .nippo-remind-act { color: var(--good-text); border-left-color: color-mix(in srgb, var(--good) 35%, transparent); }
+
+.page-nippo .nippo-subhint {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.6;
+}
+.page-nippo .nippo-subhint svg { margin-top: 2px; }
+
+/* ---- 一覧の「なぜ見えるか」バッジ / 行の誘導 ---- */
+.page-nippo .nippo-staffcell {
+  display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.page-nippo .nippo-reason {
+  gap: 3px; padding: 0 7px; height: 20px; font-size: 10.5px;
+}
+.page-nippo .nippo-open {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3);
+  white-space: nowrap;
+}
+.page-nippo .table tbody tr.clickable:hover .nippo-open { color: var(--brand-ink); }
+
+/* ============================================================
+   メンター制度
+   ============================================================ */
+.page-nippo .nippo-mentorcard { display: flex; flex-direction: column; gap: 10px; }
+.page-nippo .nippo-mentornote {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 9px 11px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--fs-xs); line-height: 1.6;
+}
+.page-nippo .nippo-mentornote svg { margin-top: 2px; flex: none; }
+
+.page-nippo .nippo-mentorlead {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 12px 15px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--fs-sm); line-height: 1.65;
+}
+.page-nippo .nippo-mentorlead svg { margin-top: 2px; flex: none; }
+
+.page-nippo .nippo-mentee-head { display: flex; align-items: center; gap: 11px; }
+.page-nippo .nippo-mentee-headmeta { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); }
+.page-nippo .nippo-mentee-headmeta strong { margin-left: 4px; }
+
+.page-nippo .nippo-mentee-list { display: flex; flex-direction: column; gap: 4px; }
+.page-nippo .nippo-mentee-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center; gap: 10px;
+  width: 100%; padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  font-family: inherit; font-size: var(--fs-sm); color: var(--ink);
+  text-align: left; cursor: pointer;
+  transition: background var(--dur), border-color var(--dur);
+}
+.page-nippo .nippo-mentee-row:hover { background: var(--surface-2); border-color: var(--hairline); }
+.page-nippo .nippo-mentee-row.unread {
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+.page-nippo .nippo-mentee-row.unread:hover { background: var(--warn-soft); }
+.page-nippo .nippo-mentee-date {
+  font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink-2);
+  font-size: var(--fs-xs);
+}
+.page-nippo .nippo-mentee-comment {
+  min-width: 0; color: var(--ink-2); line-height: 1.5;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.page-nippo .nippo-mentee-meta { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.page-nippo .nippo-mentee-yen { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* ---- 自分の日報ミニリスト ---- */
+.page-nippo .nippo-minilist { display: flex; flex-direction: column; gap: 3px; }
+.page-nippo .nippo-minirow {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 8px 9px;
+  border: 1px solid transparent; border-radius: var(--r-md);
+  background: transparent;
+  font-family: inherit; font-size: var(--fs-xs); color: var(--ink);
+  text-align: left; cursor: pointer;
+  transition: background var(--dur), border-color var(--dur);
+}
+.page-nippo .nippo-minirow:hover { background: var(--surface-2); border-color: var(--hairline); }
+.page-nippo .nippo-minirow.lg { font-size: var(--fs-sm); padding: 10px; }
+.page-nippo .nippo-minidate {
+  font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink-2);
+  white-space: nowrap;
+}
+.page-nippo .nippo-minicomment {
+  flex: 1; min-width: 0; color: var(--ink-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.page-nippo .nippo-miniyen {
+  margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.page-nippo .nippo-minirow.lg .nippo-miniyen { margin-left: 0; }
+
+/* ---- 5枚のKPIタイル ---- */
+.page-nippo .kpi-row.nippo-kpi5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1280px) { .page-nippo .kpi-row.nippo-kpi5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .page-nippo .kpi-row.nippo-kpi5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .page-nippo .kpi-row.nippo-kpi5 { grid-template-columns: 1fr; } }
+
+/* ============================================================
+   日報の詳細モーダル
+   modal() は body 直下に出るため .page-nippo 配下にならない。
+   ページ専用の .nippo-modal を付けてスコープしている。
+   ============================================================ */
+.nippo-modal .modal-foot { justify-content: space-between; align-items: center; }
+.nippo-modal .nippo-dpos {
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.nippo-modal .nippo-detail { display: flex; flex-direction: column; gap: 16px; }
+
+.nippo-modal .nippo-dhead {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 10px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--hairline);
+}
+.nippo-modal .nippo-dhead-meta {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
+}
+.nippo-modal .nippo-ddate {
+  font-size: var(--fs-lg); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.nippo-modal .nippo-dtags { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+.nippo-modal .nippo-reason { gap: 3px; padding: 0 7px; height: 20px; font-size: 10.5px; }
+
+.nippo-modal .nippo-dtop {
+  display: grid;
+  grid-template-columns: minmax(0, 190px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+.nippo-modal .nippo-drate {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding: 18px 14px; min-height: 152px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+  text-align: center;
+}
+.nippo-modal .nippo-drate-l {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-xs); font-weight: 800; letter-spacing: 0.04em; color: var(--ink-3);
+}
+.nippo-modal .nippo-drate-v {
+  font-size: 46px; font-weight: 800; line-height: 1.1;
+  font-variant-numeric: tabular-nums; color: var(--ink-2);
+}
+.nippo-modal .nippo-drate-s { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.5; }
+.nippo-modal .nippo-drate.good { background: var(--good-soft); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.nippo-modal .nippo-drate.good .nippo-drate-v,
+.nippo-modal .nippo-drate.good .nippo-drate-l { color: var(--good-text); }
+.nippo-modal .nippo-drate.mid { background: var(--brand-soft); border-color: color-mix(in srgb, var(--brand) 40%, transparent); }
+.nippo-modal .nippo-drate.mid .nippo-drate-v,
+.nippo-modal .nippo-drate.mid .nippo-drate-l { color: var(--brand-ink); }
+.nippo-modal .nippo-drate.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.nippo-modal .nippo-drate.warn .nippo-drate-v,
+.nippo-modal .nippo-drate.warn .nippo-drate-l { color: var(--warn-text); }
+
+.nippo-modal .nippo-dnums {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+.nippo-modal .nippo-dnum.grow { grid-column: span 2; }
+.nippo-modal .nippo-dnum {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  min-width: 0;
+}
+.nippo-modal .nippo-dnum.wide { grid-column: 1 / -1; }
+.nippo-modal .nippo-dnum-l { font-size: var(--fs-xs); font-weight: 700; color: var(--ink-3); }
+.nippo-modal .nippo-dnum-v {
+  font-size: var(--fs-lg); font-weight: 800;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.nippo-modal .nippo-dnum.wide .nippo-dnum-v { font-size: var(--fs-xl); color: var(--brand-ink); }
+
+.nippo-modal .nippo-dsec { display: flex; flex-direction: column; gap: 9px; }
+.nippo-modal .nippo-dsec h4 {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-sm); font-weight: 800; color: var(--ink-2);
+}
+.nippo-modal .nippo-dsec h4 svg { color: var(--brand); }
+.nippo-modal .nippo-dcomment {
+  padding: 13px 15px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border-left: 3px solid var(--brand);
+  font-size: var(--fs-sm); line-height: 1.85; color: var(--ink);
+  white-space: pre-wrap;
+}
+.nippo-modal .nippo-dnote { font-size: var(--fs-sm); line-height: 1.7; }
+
+.nippo-modal .nippo-datt { display: flex; flex-wrap: wrap; gap: 7px; }
+.nippo-modal .nippo-dattitem {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  font-size: var(--fs-xs); color: var(--ink-2);
+}
+.nippo-modal .nippo-dattitem .l { color: var(--ink-3); font-weight: 700; }
+.nippo-modal .nippo-dattitem strong { font-variant-numeric: tabular-nums; }
+
+.nippo-modal .nippo-dmc {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.nippo-modal .nippo-dmc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: var(--fs-sm); }
+.nippo-modal .nippo-dmc p { font-size: var(--fs-sm); line-height: 1.8; white-space: pre-wrap; }
+.nippo-modal .nippo-dmc-form { display: flex; flex-direction: column; gap: 8px; }
+
 /* ---- モバイル(390px で横スクロールなし) ---- */
+@media (max-width: 640px) {
+  .nippo-modal .nippo-dtop { grid-template-columns: 1fr; }
+  .nippo-modal .nippo-dnums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nippo-modal .nippo-dnum.grow { grid-column: 1 / -1; }
+  .nippo-modal .nippo-dhead { justify-content: flex-start; }
+  .nippo-modal .nippo-dhead-meta { align-items: flex-start; }
+  .nippo-modal .nippo-dtags { justify-content: flex-start; }
+  .nippo-modal .nippo-drate-v { font-size: 38px; }
+  .nippo-modal .modal-foot { gap: 6px; }
+  .nippo-modal .modal-foot .btn { padding: 0 10px; }
+}
+
 @media (max-width: 480px) {
   .page-nippo .nippo-numgrid { gap: 10px; }
   .page-nippo .nippo-rate-val { font-size: 38px; }
@@ -150,4 +558,22 @@
   .page-nippo .nippo-controls { flex-direction: column; align-items: stretch; }
   .page-nippo .nippo-datenav { justify-content: center; }
   .page-nippo .segmented { justify-content: center; }
+
+  .page-nippo .nippo-scopebar { gap: 7px; }
+  .page-nippo .nippo-scope, .page-nippo .nippo-myrate { width: 100%; }
+  .page-nippo .nippo-subcard { padding: 15px 14px 15px 16px; }
+  .page-nippo .nippo-subgrid { grid-template-columns: 1fr; gap: 12px; }
+  .page-nippo .nippo-subring { justify-content: flex-start; }
+  .page-nippo .nippo-subbig strong { font-size: 34px; }
+  .page-nippo .nippo-remind { max-width: 100%; }
+  .page-nippo .nippo-remind-name { overflow: hidden; text-overflow: ellipsis; }
+
+  /* メンティーカードの補足(店舗・役職)が語中で折れないように */
+  .page-nippo .nippo-menteecard .card-sub { display: inline-block; white-space: nowrap; }
+
+  .page-nippo .nippo-mentee-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .page-nippo .nippo-mentee-comment { grid-column: 1 / -1; white-space: normal; }
+  .page-nippo .nippo-mentee-meta { gap: 6px; }
+  .page-nippo .nippo-minirow { flex-wrap: wrap; row-gap: 4px; }
+  .page-nippo .nippo-minicomment { flex-basis: 100%; order: 3; }
 }

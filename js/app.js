@@ -5,26 +5,30 @@
 import { store } from "./store.js";
 import { router } from "./router.js";
 import { el, icon, avatar, badge, toast, relTime, fmtDate, confirmDialog, drawer, clear } from "./ui.js";
+import { canSeePage, rankLabel, scopeLabel, RANKS, rankOf } from "./auth.js";
 
 import dashboard from "./pages/dashboard.js";
 import sns from "./pages/sns.js";
+import chat from "./pages/chat.js";
 import nippo from "./pages/nippo.js";
 import kintai from "./pages/kintai.js";
 import shift from "./pages/shift.js";
 import reserve from "./pages/reserve.js";
 import patients from "./pages/patients.js";
 import staffPage from "./pages/staff.js";
+import roleplay from "./pages/roleplay.js";
 import meetings from "./pages/meetings.js";
 import backoffice from "./pages/backoffice.js";
+import hr from "./pages/hr.js";
 import assistant from "./pages/assistant.js";
 
 /* ---- ナビゲーション構成 ---- */
 const NAV_GROUPS = [
   { label: "ホーム", pages: [dashboard] },
-  { label: "コミュニケーション", pages: [sns, meetings] },
+  { label: "コミュニケーション", pages: [chat, sns, meetings] },
   { label: "毎日の業務", pages: [nippo, kintai, shift] },
   { label: "患者様", pages: [reserve, patients] },
-  { label: "組織運営", pages: [staffPage, backoffice] },
+  { label: "組織運営", pages: [staffPage, roleplay, backoffice, hr] },
   { label: "サポート", pages: [assistant] },
 ];
 
@@ -44,18 +48,21 @@ const app = document.getElementById("app");
 function buildShell() {
   const me = store.me();
 
-  // --- Sidebar ---
+  // --- Sidebar(権限で表示するページを絞る) ---
   const nav = el("nav", { class: "sidebar-nav" });
   for (const group of NAV_GROUPS) {
+    const visible = group.pages.filter((p) => canSeePage(p.id, me));
+    if (!visible.length) continue;
     nav.appendChild(el("div", { class: "nav-group-label" }, group.label));
-    for (const p of group.pages) {
+    for (const p of visible) {
+      const badgeCount = p.id === "chat" ? store.unreadChatCount() : 0;
       const item = el("button", {
         class: "nav-item", dataset: { page: p.id },
         onclick: () => { router.navigate(p.id); closeMobileNav(); },
       },
         el("span", { class: "nav-ic" }, icon(p.icon, 19)),
         el("span", { class: "nav-label" }, p.title),
-        p.id === "sns" ? el("span", { class: "nav-badge", dataset: { role: "sns-badge" } }, "3") : null,
+        badgeCount > 0 ? el("span", { class: "nav-badge", dataset: { role: "chat-badge" } }, String(badgeCount)) : null,
       );
       nav.appendChild(item);
     }
@@ -141,11 +148,12 @@ function buildShell() {
     if (ok) { store.reset(); location.reload(); }
   } }, icon("settings", 19));
 
-  const userBtn = el("button", { class: "topbar-user" },
+  const userBtn = el("button", { class: "topbar-user", "aria-label": "ログインユーザーの切替", onclick: openUserSwitcher },
     avatar(me, 34),
     el("span", { class: "user-meta" },
       el("span", { class: "user-name" }, me.name),
-      el("span", { class: "user-role" }, `${store.storeName(me.storeId)}・${me.role}`)));
+      el("span", { class: "user-role" }, `${store.storeName(me.storeId)}・${me.role}`)),
+    icon("chevD", 14));
 
   const mobileBtn = el("button", { class: "icon-btn mobile-nav-btn", "aria-label": "メニュー", onclick: () => app.classList.toggle("nav-open") }, icon("menu", 20));
 
@@ -164,6 +172,47 @@ function buildShell() {
 }
 
 function closeMobileNav() { app.classList.remove("nav-open"); }
+
+/* ---- ログインユーザー切替(デモ用:権限の違いを体験できる) ---- */
+function openUserSwitcher() {
+  const me = store.me();
+  const order = { exec: 0, area: 1, hr: 2, manager: 3, mentor: 4, staff: 5 };
+  const list = [...store.get("staff")].sort(
+    (a, b) => (order[rankOf(a)] ?? 9) - (order[rankOf(b)] ?? 9) || a.id.localeCompare(b.id));
+
+  const body = el("div", { class: "user-switch" },
+    el("p", { class: "us-lead" },
+      "権限によって見える情報が変わります。切り替えて動作をご確認ください。"),
+    el("div", { class: "us-list" },
+      list.map((s) => el("button", {
+        class: `us-item ${s.id === me.id ? "on" : ""}`,
+        onclick: () => {
+          d.close();
+          store.switchUser(s.id);
+          rebuild();
+          toast(`${s.name}さん(${rankLabel(s)})に切り替えました`, "info");
+        },
+      },
+        avatar(s, 38),
+        el("span", { class: "us-meta" },
+          el("span", { class: "us-name" }, s.name,
+            s.id === me.id ? badge("ログイン中", "brand") : null),
+          el("span", { class: "us-role" }, `${store.storeName(s.storeId)}・${s.role}`),
+          el("span", { class: "us-scope" }, icon("eye", 12), scopeLabel(s))),
+        el("span", { class: "us-rank" }, RANKS[rankOf(s)]?.label || "スタッフ")))),
+    el("div", { class: "us-note" },
+      icon("info", 14),
+      el("span", {}, "実運用では社員アカウントでのログインになります。この切替はデモ専用の機能です。")),
+  );
+  const d = drawer({ title: "ログインユーザーを切り替える", body });
+}
+
+/** ユーザー切替やデータ変更後にシェルとページを作り直す */
+function rebuild() {
+  const built = buildShell();
+  titleRef.el = built.titleEl;
+  router.init(built.main, onNavigate);
+}
 
 /* ---- 通知ドロワー ---- */
 function openNotifications() {
@@ -202,13 +251,19 @@ function openNotifications() {
 }
 
 /* ---- 起動 ---- */
-const { titleEl, main } = buildShell();
+const titleRef = { el: null };
 
-router.init(main, (page) => {
-  titleEl.textContent = page.title;
+function onNavigate(page) {
+  if (titleRef.el) titleRef.el.textContent = page.title;
   document.title = `${page.title} | くまのみ ポータル`;
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.page === page.id));
-});
+}
+
+router.setGuard((pageId) => canSeePage(pageId));
+
+const built = buildShell();
+titleRef.el = built.titleEl;
+router.init(built.main, onNavigate);
 
 function refreshBell() {
   const dot = document.querySelector(".icon-btn .dot");
