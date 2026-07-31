@@ -62,13 +62,16 @@ function buildShell() {
   }
 
   const sidebar = el("aside", { class: "sidebar" },
-    el("div", { class: "sidebar-logo" },
-      el("span", { class: "logo-mark" }, "🐠"),
-      el("span", { class: "logo-text" },
-        el("span", { class: "logo-name" }, "KUMANOMI"),
-        el("span", { class: "logo-sub" }, "整体院グループ統合ポータル"))),
+    el("button", {
+      class: "sidebar-logo", "aria-label": "ダッシュボードへ",
+      onclick: () => { router.navigate("dashboard"); closeMobileNav(); },
+    },
+      el("img", { class: "logo-lockup", src: "assets/kumanomi-wide.png", alt: "くまのみ 整骨院・整体院グループ" }),
+      el("img", { class: "logo-mark", src: "assets/kumanomi-mark.png", alt: "" })),
     nav,
-    el("div", { class: "sidebar-foot" }, "成増店 先行導入版 v1.0", el("br"), "SaaS一体化プロジェクト"),
+    el("div", { class: "sidebar-foot" },
+      el("img", { class: "foot-fish", src: "assets/kumanomi-mark.png", alt: "" }),
+      el("span", {}, "成増店 先行導入版 v1.0", el("br"), "SaaS一体化プロジェクト")),
   );
 
   // --- Topbar ---
@@ -203,7 +206,7 @@ const { titleEl, main } = buildShell();
 
 router.init(main, (page) => {
   titleEl.textContent = page.title;
-  document.title = `${page.title} | KUMANOMI`;
+  document.title = `${page.title} | くまのみ ポータル`;
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.page === page.id));
 });
 
@@ -221,5 +224,5 @@ setTimeout(() => {
 // 初回訪問メッセージ
 if (!sessionStorage.getItem("kumanomi.welcomed")) {
   sessionStorage.setItem("kumanomi.welcomed", "1");
-  setTimeout(() => toast(`おはようございます、${store.me().name.split(" ")[0]}さん!今日も一日よろしくお願いします🐠`, "info"), 1200);
+  setTimeout(() => toast(`おはようございます、${store.me().name.split(" ")[0]}さん!今日も一日よろしくお願いします`, "info", { fish: true }), 1200);
 }

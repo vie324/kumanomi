@@ -67,54 +67,135 @@ strong { font-weight: 700; }
 
 .app.sidebar-slim { grid-template-columns: var(--sidebar-w-slim) minmax(0, 1fr); }
 
-/* ---- Splash ---- */
+/* ---- Splash(クマノミが泳いで登場)---- */
 .splash {
   position: fixed; inset: 0; z-index: 9999;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 10px; background: var(--page);
+  gap: 6px;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--brand) 9%, transparent) 0%, transparent 58%),
+    var(--page);
   animation: splash-in 0.4s var(--ease);
 }
-.splash.hide { opacity: 0; pointer-events: none; transition: opacity 0.4s var(--ease); }
-.splash-mark { font-size: 54px; animation: splash-bob 1.6s ease-in-out infinite; }
-.splash-name { font-size: 22px; font-weight: 800; letter-spacing: 0.18em; color: var(--brand); }
-.splash-sub { font-size: var(--fs-sm); color: var(--ink-3); }
-@keyframes splash-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.splash.hide { opacity: 0; pointer-events: none; transition: opacity 0.5s var(--ease); }
+
+.splash-sea { position: relative; width: 230px; height: 190px; }
+.splash-fish {
+  position: absolute; left: 50%; top: 46%;
+  width: 126px; height: 126px;
+  margin: -63px 0 0 -63px;
+  animation: fish-swim-in 1s var(--ease) both, fish-float 3s ease-in-out 1s infinite;
+  filter: drop-shadow(0 8px 18px color-mix(in srgb, var(--brand) 32%, transparent));
+}
+@keyframes fish-swim-in {
+  0% { opacity: 0; transform: translateX(-90px) rotate(-12deg) scale(0.7); }
+  60% { opacity: 1; transform: translateX(10px) rotate(4deg) scale(1.04); }
+  100% { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+}
+@keyframes fish-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-11px) rotate(2deg); }
+}
+
+/* 泡 */
+.splash-sea .bub {
+  position: absolute; bottom: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 46%, transparent);
+  animation: bubble-rise 3.4s ease-in infinite;
+  opacity: 0;
+}
+.splash-sea .b1 { left: 18%; width: 9px; height: 9px; animation-delay: 0.2s; }
+.splash-sea .b2 { left: 34%; width: 6px; height: 6px; animation-delay: 1.1s; }
+.splash-sea .b3 { left: 58%; width: 11px; height: 11px; animation-delay: 0.65s; }
+.splash-sea .b4 { left: 74%; width: 7px; height: 7px; animation-delay: 1.7s; }
+.splash-sea .b5 { left: 46%; width: 5px; height: 5px; animation-delay: 2.2s; }
+@keyframes bubble-rise {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  15% { opacity: 0.95; }
+  75% { opacity: 0.6; }
+  100% { opacity: 0; transform: translateY(-172px) scale(1.15); }
+}
+
+.splash-logo { width: 190px; height: auto; animation: splash-logo-in 0.7s var(--ease) 0.35s both; }
+@keyframes splash-logo-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.splash-sub {
+  font-size: var(--fs-sm); color: var(--ink-3);
+  animation: splash-logo-in 0.7s var(--ease) 0.6s both;
+}
 @keyframes splash-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---- Sidebar ---- */
+/* 深い海の中にいるようなサイドバー。ロゴのオレンジがいちばん映える背景。 */
 .sidebar {
   grid-area: sidebar;
   position: sticky; top: 0; height: 100vh;
   display: flex; flex-direction: column;
-  background: linear-gradient(180deg, var(--brand-deep) 0%, #062b34 100%);
-  color: #d7e8ec;
+  background:
+    radial-gradient(ellipse 130% 55% at 22% 0%, rgba(86, 198, 219, 0.22) 0%, transparent 62%),
+    linear-gradient(180deg, #135f70 0%, #0d4b5b 52%, #093846 100%);
+  color: #dceef2;
   overflow: hidden auto;
   z-index: 40;
 }
 :root[data-theme="dark"] .sidebar {
-  background: linear-gradient(180deg, #101b1e 0%, #0b1517 100%);
+  background:
+    radial-gradient(ellipse 120% 60% at 20% 0%, rgba(64, 176, 199, 0.1) 0%, transparent 60%),
+    linear-gradient(180deg, #16120f 0%, #100d0b 100%);
   border-right: 1px solid var(--hairline);
 }
 
+/* 海面から差す光と、ゆっくり昇る泡 */
+.sidebar::before {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(180, 230, 240, 0.5) 42%, transparent 44%),
+    radial-gradient(circle, rgba(180, 230, 240, 0.42) 42%, transparent 44%),
+    radial-gradient(circle, rgba(180, 230, 240, 0.36) 42%, transparent 44%);
+  background-size: 7px 7px, 5px 5px, 9px 9px;
+  background-position: 18% 100%, 62% 100%, 84% 100%;
+  background-repeat: no-repeat;
+  animation: sidebar-bubbles 11s linear infinite;
+  opacity: 0.75;
+}
+@keyframes sidebar-bubbles {
+  0% { background-position: 18% 105%, 62% 108%, 84% 112%; opacity: 0; }
+  12% { opacity: 0.7; }
+  85% { opacity: 0.4; }
+  100% { background-position: 22% -6%, 58% -10%, 80% -14%; opacity: 0; }
+}
+.sidebar > * { position: relative; z-index: 1; }
+
 .sidebar-logo {
   display: flex; align-items: center; gap: 10px;
-  padding: 18px 18px 14px;
+  padding: 16px 16px 14px;
   color: #fff;
+  cursor: pointer;
+  background: none; width: 100%;
+  text-align: left;
 }
+/* 横ロゴ(通常時)。ホバーでクマノミがひと泳ぎ */
+.sidebar-logo .logo-lockup {
+  width: 178px; height: auto;
+  transition: transform var(--dur-slow) var(--ease);
+}
+.sidebar-logo:hover .logo-lockup { transform: translateX(3px) scale(1.03); }
+
+/* スリム時に使う魚マーク単体 */
 .sidebar-logo .logo-mark {
-  width: 36px; height: 36px; flex: none;
-  display: grid; place-items: center;
-  font-size: 21px;
-  background: linear-gradient(135deg, var(--accent) 0%, #f5a05e 100%);
-  border-radius: 11px;
-  box-shadow: 0 4px 12px rgba(232, 111, 45, 0.35);
+  width: 40px; height: 40px; flex: none;
+  display: none;
+  animation: fish-float 4s ease-in-out infinite;
+  filter: drop-shadow(0 3px 8px rgba(226, 98, 26, 0.45));
 }
-.sidebar-logo .logo-name {
-  font-weight: 800; font-size: 15.5px; letter-spacing: 0.14em; white-space: nowrap;
-}
-.sidebar-logo .logo-sub {
-  font-size: 10px; letter-spacing: 0.08em; color: #8fb4bd; white-space: nowrap;
-}
+.app.sidebar-slim .sidebar-logo .logo-lockup { display: none; }
+.app.sidebar-slim .sidebar-logo .logo-mark { display: block; }
 
 .sidebar-nav { flex: 1; padding: 4px 12px 16px; }
 .nav-group-label {
@@ -140,25 +221,37 @@ strong { font-weight: 700; }
 .nav-item.active {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 3px 0 0 #f8a423;
 }
-.nav-item .nav-ic { flex: none; display: grid; place-items: center; width: 22px; }
+.nav-item.active .nav-ic { color: #f8a423; }
+.nav-item .nav-ic {
+  flex: none; display: grid; place-items: center; width: 22px;
+  transition: transform var(--dur) var(--ease);
+}
+.nav-item:hover .nav-ic { transform: translateY(-2px) scale(1.08); }
 .nav-item .nav-badge {
   margin-left: auto;
   min-width: 19px; height: 19px; padding: 0 5px;
   display: grid; place-items: center;
-  background: var(--accent); color: #fff;
+  background: linear-gradient(135deg, #f8a423 0%, #e2621a 100%);
+  color: #fff;
   border-radius: var(--r-full);
   font-size: 10.5px; font-weight: 700;
+  box-shadow: 0 2px 6px rgba(226, 98, 26, 0.4);
 }
 
 .sidebar-foot {
+  display: flex; align-items: center; gap: 9px;
   padding: 12px 16px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.09);
   font-size: 10.5px; color: #7da4ae; white-space: nowrap;
 }
+/* フッターでクマノミがのんびり泳いでいる */
+.sidebar-foot .foot-fish {
+  width: 26px; height: 26px; flex: none;
+  animation: fish-float 4.5s ease-in-out infinite;
+}
 
-.app.sidebar-slim .sidebar-logo .logo-text,
 .app.sidebar-slim .nav-group-label,
 .app.sidebar-slim .nav-item .nav-label,
 .app.sidebar-slim .nav-item .nav-badge,
@@ -269,6 +362,26 @@ strong { font-weight: 700; }
 }
 .page { max-width: 1280px; margin: 0 auto; }
 
+/* カードが上から順にふわっと現れる(ページを開くたび少し嬉しい) */
+@media (prefers-reduced-motion: no-preference) {
+  .page > .card,
+  .page > .grid > .card,
+  .page > .kpi-row > .stat-tile,
+  .page > .grid > .stat-tile {
+    animation: card-rise 0.5s var(--ease) both;
+  }
+  .page > .kpi-row > .stat-tile:nth-child(1) { animation-delay: 0.02s; }
+  .page > .kpi-row > .stat-tile:nth-child(2) { animation-delay: 0.07s; }
+  .page > .kpi-row > .stat-tile:nth-child(3) { animation-delay: 0.12s; }
+  .page > .kpi-row > .stat-tile:nth-child(4) { animation-delay: 0.17s; }
+  .page > .card:nth-of-type(2) { animation-delay: 0.06s; }
+  .page > .card:nth-of-type(3) { animation-delay: 0.1s; }
+}
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
 /* ---- Page header ---- */
 .page-head {
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -309,12 +422,14 @@ strong { font-weight: 700; }
   .topbar-user .user-meta { display: none; }
   .topbar-date { display: none; }
   .main { padding: 16px 14px 80px; }
-  .app.sidebar-slim .sidebar-logo .logo-text,
   .app.sidebar-slim .nav-group-label,
   .app.sidebar-slim .nav-item .nav-label,
   .app.sidebar-slim .nav-item .nav-badge,
   .app.sidebar-slim .sidebar-foot { display: block; }
   .app.sidebar-slim .nav-item { justify-content: flex-start; padding: 9px 10px; }
+  .app.sidebar-slim .sidebar-logo .logo-lockup { display: block; }
+  .app.sidebar-slim .sidebar-logo .logo-mark { display: none; }
+  .app.sidebar-slim .sidebar-logo { justify-content: flex-start; padding-inline: 16px; }
 }
 
 @media (max-width: 640px) {

@@ -3,7 +3,7 @@
    左:チャットスレッド / 右:FAQ検索・アコーディオン
    ============================================================ */
 
-import { el, icon, clear, emptyState, toast } from "../ui.js";
+import { el, icon, clear, emptyState, toast, fishMark } from "../ui.js";
 import { store } from "../store.js";
 import { chatReply, quickQuestions } from "../ai.js";
 
@@ -12,7 +12,7 @@ let chatLog = [];
 let pending = false;
 
 const WELCOME =
-  "こんにちは!KUMANOMIポータルのAIアシスタントです🐠\n" +
+  "こんにちは!くまのみポータルのAIアシスタントです。\n" +
   "システムの使い方、シフトや日報のルール、患者様対応のフローなど、何でも日本語で質問してください。\n" +
   "下のクイック質問をタップするか、右の「よくある質問」からも聞けます。";
 
@@ -33,7 +33,7 @@ export default {
     };
 
     const aiRow = (children) => el("div", { class: "as-row ai" },
-      el("span", { class: "as-avatar", "aria-hidden": "true" }, "🐠"),
+      el("span", { class: "as-avatar", "aria-hidden": "true" }, fishMark(28, "float")),
       el("div", { class: "as-col" }, children));
 
     const bubbleFor = (m) => {
@@ -118,7 +118,7 @@ export default {
 
     const chatCard = el("section", { class: "as-chat card" },
       el("div", { class: "as-chat-head" },
-        el("span", { class: "as-head-ic", "aria-hidden": "true" }, "🐠"),
+        el("span", { class: "as-head-ic", "aria-hidden": "true" }, fishMark(34, "wiggle")),
         el("div", { class: "as-head-meta" },
           el("div", { class: "as-head-title" }, "使い方アシスタント"),
           el("div", { class: "as-head-sub" }, "操作方法・社内ルール、何でも質問OK")),

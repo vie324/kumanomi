@@ -6,40 +6,44 @@
 :root {
   color-scheme: light;
 
-  /* ---- Surfaces & ink ---- */
-  --page: #f4f6f5;
+  /* ---- Surfaces & ink(ほんのり暖色を含む白=クマノミの体色に馴染む)---- */
+  --page: #f8f6f3;
   --surface: #ffffff;
-  --surface-2: #f7f9f8;
-  --surface-3: #eef2f1;
-  --ink: #17211f;
-  --ink-2: #4d5a57;
-  --ink-3: #8a938f;
-  --hairline: #e3e7e5;
-  --hairline-strong: #cfd6d3;
-  --shadow-1: 0 1px 2px rgba(23, 33, 31, 0.05);
-  --shadow-2: 0 4px 16px rgba(23, 33, 31, 0.08);
-  --shadow-3: 0 12px 40px rgba(23, 33, 31, 0.16);
-  --scrim: rgba(17, 24, 22, 0.44);
+  --surface-2: #fbf8f5;
+  --surface-3: #f3efea;
+  --ink: #221a15;
+  --ink-2: #5b544e;
+  --ink-3: #948c85;
+  --hairline: #ebe5de;
+  --hairline-strong: #d8d1c8;
+  --shadow-1: 0 1px 2px rgba(34, 26, 21, 0.05);
+  --shadow-2: 0 4px 16px rgba(34, 26, 21, 0.08);
+  --shadow-3: 0 12px 40px rgba(34, 26, 21, 0.16);
+  --scrim: rgba(26, 18, 12, 0.44);
 
-  /* ---- Brand (深海ティール × クマノミオレンジ) ---- */
-  --brand: #0c7489;
-  --brand-strong: #085e70;
-  --brand-deep: #073d49;
-  --brand-soft: #e2f1f4;
-  --brand-ink: #0a5b6c;
+  /* ---- Brand:くまのみオレンジ(ロゴ由来)---- */
+  --brand: #e2621a;          /* ロゴ本体のオレンジ */
+  --brand-strong: #c9500a;   /* ボタン等・白文字 4.6:1 */
+  --brand-deep: #0b3f4c;     /* 相棒の深海(サイドバー等) */
+  --brand-soft: #fdeee2;
+  --brand-ink: #a63e08;      /* ライト面のブランド文字 6.3:1 */
   --on-brand: #ffffff;
-  --accent: #e86f2d;
-  --accent-strong: #cf5a1b;
-  --accent-soft: #fdeee3;
-  --accent-ink: #b04c14;
+  --brand-glow: #f8b838;     /* ロゴ尾びれのゴールド */
+  --brand-grad: linear-gradient(135deg, #f8a423 0%, #e2621a 55%, #cf5410 100%);
+
+  /* ---- Accent:イソギンチャクの海(セカンダリ)---- */
+  --accent: #0c7489;
+  --accent-strong: #0a6274;
+  --accent-soft: #e2f1f4;
+  --accent-ink: #0a5b6c;
 
   /* ---- Status (固定・チャート系列と混用しない) ---- */
   --good: #0ca30c;
   --good-soft: #e6f6e6;
   --good-text: #067006;
-  --warn: #c98500;
-  --warn-soft: #fdf3dc;
-  --warn-text: #8a5c00;
+  --warn: #b8860b;
+  --warn-soft: #fbf3d9;
+  --warn-text: #7d5c00;
   --serious: #d95926;
   --serious-soft: #fcebe2;
   --critical: #d03b3b;
@@ -55,10 +59,10 @@
   --series-6: #008300;
   --series-7: #4a3aa7;
   --series-8: #e34948;
-  --chart-grid: #e6e9e7;
-  --chart-axis: #c4cbc8;
-  --chart-muted: #8a938f;
-  --chart-deemph: #d4dad7;
+  --chart-grid: #efeae3;
+  --chart-axis: #d1c9bf;
+  --chart-muted: #948c85;
+  --chart-deemph: #ded7cd;
   --chart-surface: #ffffff;
   --seq-100: #cde2fb;
   --seq-250: #86b6ef;
@@ -97,30 +101,33 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --page: #0e1413;
-  --surface: #182120;
-  --surface-2: #1e2928;
-  --surface-3: #253130;
-  --ink: #f2f5f4;
-  --ink-2: #b4c0bc;
-  --ink-3: #78847f;
-  --hairline: #2b3735;
-  --hairline-strong: #3a4744;
+  --page: #12100e;
+  --surface: #1c1917;
+  --surface-2: #24201d;
+  --surface-3: #2e2924;
+  --ink: #f6f3f0;
+  --ink-2: #c0b8b0;
+  --ink-3: #857d76;
+  --hairline: #332e29;
+  --hairline-strong: #443d36;
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.45);
   --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.6);
   --scrim: rgba(0, 0, 0, 0.6);
 
-  --brand: #2fa3ba;
-  --brand-strong: #4db8cd;
-  --brand-deep: #0b2a31;
-  --brand-soft: #10333c;
-  --brand-ink: #7fd0e0;
-  --on-brand: #06272e;
-  --accent: #f08447;
-  --accent-strong: #f79a64;
-  --accent-soft: #3a2415;
-  --accent-ink: #f5a878;
+  --brand: #ff9a4d;
+  --brand-strong: #ffb066;
+  --brand-deep: #0b2229;
+  --brand-soft: #3a2415;
+  --brand-ink: #ffb066;
+  --on-brand: #3a1a05;
+  --brand-glow: #ffc861;
+  --brand-grad: linear-gradient(135deg, #ffc861 0%, #ff9a4d 55%, #f0803a 100%);
+
+  --accent: #4db8cd;
+  --accent-strong: #7fd0e0;
+  --accent-soft: #10333c;
+  --accent-ink: #7fd0e0;
 
   --good: #0ca30c;
   --good-soft: #12300f;
@@ -142,11 +149,11 @@
   --series-6: #008300;
   --series-7: #9085e9;
   --series-8: #e66767;
-  --chart-grid: #263230;
-  --chart-axis: #3a4744;
-  --chart-muted: #78847f;
-  --chart-deemph: #37423f;
-  --chart-surface: #182120;
+  --chart-grid: #2c2723;
+  --chart-axis: #443d36;
+  --chart-muted: #857d76;
+  --chart-deemph: #423b34;
+  --chart-surface: #1c1917;
   --seq-100: #0d366b;
   --seq-250: #1c5cab;
   --seq-400: #2a78d6;

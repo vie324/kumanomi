@@ -32,10 +32,11 @@
   flex: none;
   display: grid;
   place-items: center;
-  font-size: 20px;
   background: var(--brand-soft);
   border-radius: var(--r-full);
+  overflow: hidden;
 }
+.page-assistant .as-head-ic .fish-mark { width: 30px; height: 30px; }
 .page-assistant .as-head-meta { flex: 1; min-width: 0; line-height: 1.35; }
 .page-assistant .as-head-title { font-size: var(--fs-md); font-weight: 800; }
 .page-assistant .as-head-sub {
@@ -68,11 +69,12 @@
   flex: none;
   display: grid;
   place-items: center;
-  font-size: 16px;
   background: var(--brand-soft);
   border: 1px solid var(--hairline);
   border-radius: var(--r-full);
+  overflow: hidden;
 }
+.page-assistant .as-avatar .fish-mark { width: 24px; height: 24px; }
 
 .page-assistant .as-col {
   display: flex;

@@ -6,7 +6,7 @@
    ============================================================ */
 import {
   el, clear, icon, badge, avatar, card, sectionHeader, tabs, table, emptyState,
-  staffChip, kv, fmtDate, toast, aiButton, aiPanel, meter, modal, chip, segmented,
+  staffChip, kv, fmtDate, toast, aiButton, aiPanel, meter, modal, chip, segmented, celebrate,
 } from "../ui.js";
 import { radar } from "../charts.js";
 import { store, todayStr } from "../store.js";
@@ -327,7 +327,8 @@ function openTakeTestModal(t, rerender) {
       else results.push({ staffId: me.id, score, date: todayStr() });
       return { results };
     });
-    toast("採点結果を保存しました");
+    if (score >= 80) celebrate(`${score}点!合格ラインクリアです`);
+    else toast("採点結果を保存しました");
     rerender();
 
     clear(closeBtn).append(icon("check", 15), "閉じる");
