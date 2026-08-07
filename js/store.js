@@ -3,7 +3,7 @@
    シードデータ + localStorage 永続化 + 変更通知(pub/sub)
    ============================================================ */
 
-import { createSeed, SCHEMA_VERSION, todayStr, addDays, monthOf, dow, mondayOf, SHIFT_TYPES } from "./data.js";
+import { createSeed, SCHEMA_VERSION, todayStr, addDays, monthOf, dow, mondayOf, SHIFT_TYPES, LEAVE_TYPES, bedsOf } from "./data.js";
 
 const LS_KEY = "kumanomi.state.v1";
 
@@ -148,4 +148,4 @@ export const store = {
 };
 
 // 日付ユーティリティも re-export(ページから使いやすいように)
-export { todayStr, addDays, monthOf, dow, mondayOf, SHIFT_TYPES };
+export { todayStr, addDays, monthOf, dow, mondayOf, SHIFT_TYPES, LEAVE_TYPES, bedsOf };

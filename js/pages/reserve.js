@@ -1,6 +1,8 @@
 /* ============================================================
-   予約管理(Salon One 代替)— 日/週ビューのタイムテーブル、
-   空き枠クリックで新規予約、予約詳細でステータス変更+回数券消化、
+   予約管理(Salon One 代替)— ベッド基軸のタイムテーブル。
+   予約枠は「ベッド×時間」で管理し、予約カードをドラッグして
+   別のベッド・時間帯へ移動できる(クリックで詳細から変更も可)。
+   空き枠クリックで新規予約、来院処理で回数券を自動消化、
    稼働率KPI と LINE予約比率ドーナツ
    ============================================================ */
 import {
@@ -8,7 +10,7 @@ import {
   modal, toast, statTile, meter, statusBadge, emptyState,
   fmtDate, fmtPct, clear,
 } from "../ui.js";
-import { store, todayStr, addDays, dow, mondayOf } from "../store.js";
+import { store, todayStr, addDays, dow, mondayOf, bedsOf } from "../store.js";
 import { donut } from "../charts.js";
 
 const SLOTS = ["10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
@@ -46,7 +48,12 @@ export default {
 
     /* ---------------- helpers ---------------- */
     const practitionersOf = (storeId) =>
-      store.get("staff").filter((s) => s.storeId === storeId && ["院長", "柔道整復師", "鍼灸師"].includes(s.role));
+      store.get("staff").filter((s) => s.storeId === storeId && ["院長", "柔道整復師", "鍼灸師", "エステティシャン", "店長"].includes(s.role));
+    const bedsFor = (storeId) => bedsOf(store.byId("stores", storeId));
+    const bedName = (bedId, storeId = state.storeId) =>
+      bedsFor(storeId).find((b) => b.id === bedId)?.name || "ベッド1";
+    /** 旧データなど bedId 未設定の予約は先頭ベッド扱いにする */
+    const bedIdOf = (r) => r.bedId || bedsFor(r.storeId)[0]?.id;
     const resFor = (date, storeId) =>
       store.get("reservations").filter((r) => r.date === date && r.storeId === storeId);
     const weekDates = () => {
@@ -58,12 +65,34 @@ export default {
       const endH = Number(start.slice(0, 2)) + Math.ceil((menu?.minutes || 60) / 60);
       return `${String(Math.min(endH, 20)).padStart(2, "0")}:${start.slice(3)}`;
     };
+    /** 指定枠(ベッド×時間)に有効な予約があるか */
+    const slotTaken = (storeId, date, bedId, start, exceptId = null) =>
+      store.get("reservations").some((x) =>
+        x.id !== exceptId && x.storeId === storeId && x.date === date
+        && bedIdOf(x) === bedId && x.start === start && isActive(x));
+
+    /* ---------------- 予約枠の移動(ドラッグ&詳細から共用) ---------------- */
+    function moveReservation(id, bedId, start) {
+      const r = store.byId("reservations", id);
+      if (!r) return false;
+      if (bedIdOf(r) === bedId && r.start === start) return false;
+      if (slotTaken(r.storeId, r.date, bedId, start, id)) {
+        toast("移動先の枠にはすでに予約が入っています", "error");
+        return false;
+      }
+      const menu = store.byId("menus", r.menuId);
+      store.update("reservations", id, { bedId, start, end: endTimeOf(start, menu) });
+      toast(`${resName(r)}様の予約を「${bedName(bedId, r.storeId)}・${start}〜」に移動しました`);
+      draw();
+      return true;
+    }
 
     /* ---------------- 新規予約モーダル ---------------- */
-    function openNewModal({ staffId, start } = {}) {
+    function openNewModal({ bedId, start } = {}) {
       if (dow(state.date) === CLOSED_DOW) { toast("水曜日は定休日のため予約を登録できません", "error"); return; }
       const staffList = practitionersOf(state.storeId);
       if (!staffList.length) { toast("この店舗には施術者が登録されていません", "error"); return; }
+      const beds = bedsFor(state.storeId);
       const pats = store.get("patients").filter((p) => p.storeId === state.storeId);
 
       const patSel = el("select", { class: "select" },
@@ -77,7 +106,9 @@ export default {
         store.get("menus").map((m) => el("option", { value: m.id }, m.name)));
       const staffSel = el("select", { class: "select" },
         staffList.map((s) => el("option", { value: s.id }, `${s.name}(${s.role})`)));
-      if (staffId) staffSel.value = staffId;
+      const bedSel = el("select", { class: "select" },
+        beds.map((b) => el("option", { value: b.id }, b.name)));
+      if (bedId) bedSel.value = bedId;
       const timeSel = el("select", { class: "select" }, SLOTS.map((t) => el("option", { value: t }, t)));
       if (start) timeSel.value = start;
 
@@ -87,13 +118,14 @@ export default {
       const body = el("div", { class: "page-reserve" },
         el("div", { class: "stack", style: { gap: "12px" } },
           el("div", { class: "rv-lead" }, icon("calendar", 15),
-            `${fmtDate(state.date, { withYear: true })}・${store.storeName(state.storeId)} の予約を登録します`),
+            `${fmtDate(state.date, { withYear: true })}・${store.storeName(state.storeId)} の予約を登録します(枠はベッド単位)`),
           el("div", { class: "field" }, el("label", {}, "患者様"), patSel),
           guestField,
           el("div", { class: "field" }, el("label", {}, "メニュー"), menuSel),
           el("div", { class: "form-row" },
-            el("div", { class: "field" }, el("label", {}, "担当"), staffSel),
-            el("div", { class: "field" }, el("label", {}, "開始時間"), timeSel))));
+            el("div", { class: "field" }, el("label", {}, "ベッド(予約枠)"), bedSel),
+            el("div", { class: "field" }, el("label", {}, "開始時間"), timeSel)),
+          el("div", { class: "field" }, el("label", {}, "担当"), staffSel)));
 
       const m = modal({ title: "新規予約", body, actions: [cancelBtn, saveBtn] });
       cancelBtn.addEventListener("click", () => m.close());
@@ -101,16 +133,16 @@ export default {
         const patientId = patSel.value || null;
         const guestName = guestInput.value.trim();
         if (!patientId && !guestName) { toast("患者様を選択するか、お名前を入力してください", "error"); return; }
-        const conflict = store.get("reservations").some((r) =>
-          r.storeId === state.storeId && r.staffId === staffSel.value
-          && r.date === state.date && r.start === timeSel.value && isActive(r));
-        if (conflict) { toast("この時間帯は既に予約が入っています", "error"); return; }
+        if (slotTaken(state.storeId, state.date, bedSel.value, timeSel.value)) {
+          toast("このベッド・時間帯には既に予約が入っています", "error"); return;
+        }
         const menu = store.byId("menus", menuSel.value);
         store.add("reservations", {
           patientId,
           guestName: patientId ? null : guestName,
           storeId: state.storeId,
           staffId: staffSel.value,
+          bedId: bedSel.value,
           date: state.date,
           start: timeSel.value,
           end: endTimeOf(timeSel.value, menu),
@@ -120,7 +152,7 @@ export default {
           note: "",
         });
         m.close();
-        toast(`予約を登録しました(${timeSel.value}〜・${store.staffName(staffSel.value)})`);
+        toast(`予約を登録しました(${bedName(bedSel.value)}・${timeSel.value}〜・担当 ${store.staffName(staffSel.value)})`);
         draw();
       });
     }
@@ -159,6 +191,17 @@ export default {
             patient.name, icon("chevR", 14))
         : el("span", { class: "rv-guestname" }, r.guestName || "—", badge("新規", "accent"));
 
+      /* 枠(ベッド×時間)の変更 — ドラッグできない端末でもここから移動できる */
+      const bedSel = el("select", { class: "select" },
+        bedsFor(r.storeId).map((b) => el("option", { value: b.id, selected: b.id === bedIdOf(r) }, b.name)));
+      const timeSel = el("select", { class: "select" },
+        SLOTS.map((t) => el("option", { value: t, selected: t === r.start }, t)));
+      const moveBtn = el("button", {
+        class: "btn soft",
+        disabled: !isActive(r),
+        onclick: () => { if (moveReservation(r.id, bedSel.value, timeSel.value)) m.close(); },
+      }, icon("edit", 14), "枠を変更");
+
       const body = el("div", { class: "page-reserve" },
         el("div", { class: "rv-detail-top" },
           avatar({ name: resName(r) }, 40),
@@ -167,12 +210,18 @@ export default {
             el("div", { class: "flex wrap", style: { gap: "6px" } },
               badge(r.source, SOURCE_KIND[r.source] ?? ""),
               statusBadge(r.status),
+              badge(bedName(bedIdOf(r), r.storeId), "brand"),
               ticket ? badge(`回数券 残り${Math.max(ticket.total - ticket.used, 0)}回`, "brand") : null))),
         el("div", { class: "rv-detail-kv" },
           kv("日時", `${fmtDate(r.date, { withYear: true })} ${r.start}〜${r.end}`),
+          kv("予約枠", bedName(bedIdOf(r), r.storeId)),
           kv("メニュー", store.menuName(r.menuId)),
           kv("担当", `${store.staffName(r.staffId)}(${staffMember?.role || "—"})`),
           kv("店舗", store.storeName(r.storeId))),
+        el("div", { class: "field", style: { marginTop: "10px" } },
+          el("label", {}, "予約枠の変更(ベッド・開始時間)"),
+          el("div", { class: "flex wrap", style: { gap: "8px", alignItems: "center" } }, bedSel, timeSel, moveBtn),
+          el("span", { class: "hint" }, "タイムテーブル上で予約カードをドラッグしても移動できます")),
         el("div", { class: "field", style: { marginTop: "10px" } },
           el("label", {}, "ステータス変更"),
           el("div", { class: "flex wrap", style: { gap: "8px" } }, doneBtn, cancelStBtn, noshowBtn),
@@ -194,15 +243,15 @@ export default {
       const done = list.filter((r) => r.status === "done").length;
       const cancelled = list.filter((r) => r.status === "cancelled" || r.status === "noshow").length;
       const active = list.filter(isActive).length;
-      const slots = practitionersOf(state.storeId).length * SLOTS.length;
+      const slots = bedsFor(state.storeId).length * SLOTS.length; // ベッド基軸の総枠数
       const isToday = state.date === todayStr();
       const occTile = el("div", { class: "stat-tile" },
         el("div", { class: "stat-top" },
-          el("span", { class: "stat-label" }, "稼働率"),
+          el("span", { class: "stat-label" }, "ベッド稼働率"),
           el("span", { class: "stat-ic", style: { background: "var(--brand-soft)", color: "var(--brand-ink)" } }, icon("target", 18))),
         el("div", { style: { marginTop: "6px" } },
           meter({
-            label: `${active}/${slots}枠`,
+            label: `${active}/${slots}枠(${bedsFor(state.storeId).length}ベッド)`,
             value: active, max: slots,
             fmt: (v, mx) => fmtPct(mx ? (v / mx) * 100 : 0),
           })));
@@ -244,77 +293,117 @@ export default {
           (id) => { state.storeId = id; draw(); }));
     }
 
-    /* ---------------- 日ビュー:タイムテーブル ---------------- */
+    /* ---------------- 日ビュー:ベッド×時間のタイムテーブル ---------------- */
+    let draggingId = null; // ドラッグ中の予約ID
+
     function resCardNode(r) {
-      return el("button", {
+      const node = el("button", {
         class: `rv-card st-${r.status}`,
         onclick: () => openDetail(r),
         "aria-label": `${resName(r)} ${r.start}の予約詳細`,
+        title: isActive(r) ? "ドラッグで別の枠へ移動できます" : null,
       },
         el("span", { class: "rv-menu" }, store.menuName(r.menuId)),
         el("span", { class: "rv-name" }, resName(r)),
+        el("span", { class: "rv-staffline" },
+          avatar(store.byId("staff", r.staffId), 16),
+          el("span", { class: "rv-staffname" }, store.staffName(r.staffId))),
         el("span", { class: "rv-badges" },
           badge(r.source, SOURCE_KIND[r.source] ?? ""),
           statusBadge(r.status)));
+
+      if (isActive(r)) {
+        node.setAttribute("draggable", "true");
+        node.addEventListener("dragstart", (e) => {
+          draggingId = r.id;
+          node.classList.add("dragging");
+          e.dataTransfer.effectAllowed = "move";
+          try { e.dataTransfer.setData("text/plain", r.id); } catch (err) { /* noop */ }
+        });
+        node.addEventListener("dragend", () => {
+          draggingId = null;
+          node.classList.remove("dragging");
+          root.querySelectorAll(".rv-slot.drop-ok").forEach((c) => c.classList.remove("drop-ok"));
+        });
+      }
+      return node;
     }
 
     function buildDayGrid() {
-      const staffList = practitionersOf(state.storeId);
-      const sub = `${store.storeName(state.storeId)}・空き枠をクリックすると新規予約を登録できます`;
+      const beds = bedsFor(state.storeId);
+      const sub = `${store.storeName(state.storeId)}・${beds.length}ベッド。空き枠クリックで新規予約/予約カードはドラッグで枠移動`;
       if (dow(state.date) === CLOSED_DOW) {
         return card({
-          title: "タイムテーブル", sub,
+          title: "タイムテーブル(ベッド基軸)", sub,
           body: emptyState({ icon: "🌙", title: "水曜日は定休日です", hint: "日付ナビで前後の日に移動できます" }),
         });
       }
       const dateRes = resFor(state.date, state.storeId);
       const grid = el("div", {
         class: "rv-grid",
-        style: { gridTemplateColumns: `54px repeat(${staffList.length}, minmax(150px, 1fr))` },
+        style: { gridTemplateColumns: `54px repeat(${beds.length}, minmax(150px, 1fr))` },
       });
       grid.appendChild(el("div", { class: "rv-cell rv-time rv-corner" }));
-      for (const s of staffList) {
+      for (const b of beds) {
         grid.appendChild(el("div", { class: "rv-cell rv-h" },
-          avatar(s, 26),
+          el("span", { class: "rv-bedic" }, "🛏"),
           el("span", { class: "rv-hname" },
-            el("span", { class: "rv-hn" }, s.name),
-            el("span", { class: "rv-hr" }, s.role))));
+            el("span", { class: "rv-hn" }, b.name),
+            el("span", { class: "rv-hr" }, "予約枠"))));
       }
       for (const t of SLOTS) {
         grid.appendChild(el("div", { class: "rv-cell rv-time" }, t));
-        for (const s of staffList) {
-          const cellRes = dateRes.filter((r) => r.staffId === s.id && r.start === t);
+        for (const b of beds) {
+          const cellRes = dateRes.filter((r) => bedIdOf(r) === b.id && r.start === t);
           const cell = el("div", { class: "rv-cell rv-slot" });
+
+          /* --- ドロップ先(ベッド×時間) --- */
+          cell.addEventListener("dragover", (e) => {
+            if (!draggingId) return;
+            if (slotTaken(state.storeId, state.date, b.id, t, draggingId)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            cell.classList.add("drop-ok");
+          });
+          cell.addEventListener("dragleave", () => cell.classList.remove("drop-ok"));
+          cell.addEventListener("drop", (e) => {
+            e.preventDefault();
+            cell.classList.remove("drop-ok");
+            const id = draggingId || e.dataTransfer.getData("text/plain");
+            draggingId = null;
+            if (id) moveReservation(id, b.id, t);
+          });
+
           for (const r of cellRes) cell.appendChild(resCardNode(r));
           if (!cellRes.some(isActive)) {
             cell.appendChild(el("button", {
               class: "rv-add",
-              "aria-label": `${s.name} ${t} に新規予約を登録`,
-              onclick: () => openNewModal({ staffId: s.id, start: t }),
+              "aria-label": `${b.name} ${t} に新規予約を登録`,
+              onclick: () => openNewModal({ bedId: b.id, start: t }),
             }, icon("plus", 15)));
           }
           grid.appendChild(cell);
         }
       }
-      return card({ title: "タイムテーブル", sub, body: el("div", { class: "rv-scroll" }, grid) });
+      return card({ title: "タイムテーブル(ベッド基軸)", sub, body: el("div", { class: "rv-scroll" }, grid) });
     }
 
-    /* ---------------- 週ビュー:予約数サマリー ---------------- */
+    /* ---------------- 週ビュー:ベッド別の予約数サマリー ---------------- */
     function heatLevel(c) { return c <= 0 ? 0 : c >= 4 ? 4 : c; }
 
     function buildWeekGrid() {
-      const staffList = practitionersOf(state.storeId);
+      const beds = bedsFor(state.storeId);
       const dates = weekDates();
       const all = store.get("reservations");
-      const countOf = (staffId, d) =>
-        all.filter((r) => r.storeId === state.storeId && r.staffId === staffId && r.date === d).length;
+      const countOf = (bedId, d) =>
+        all.filter((r) => r.storeId === state.storeId && bedIdOf(r) === bedId && r.date === d).length;
       const gotoDay = (d) => { state.date = d; state.view = "day"; draw(); };
 
       const grid = el("div", {
         class: "rv-grid rv-week",
         style: { gridTemplateColumns: `minmax(136px, 1.3fr) repeat(7, minmax(66px, 1fr))` },
       });
-      grid.appendChild(el("div", { class: "rv-cell rv-wname rv-corner" }, "施術者"));
+      grid.appendChild(el("div", { class: "rv-cell rv-wname rv-corner" }, "ベッド"));
       for (const d of dates) {
         const w = dow(d);
         const isToday = d === todayStr();
@@ -326,30 +415,30 @@ export default {
           el("span", { class: `rv-wd ${isToday ? "pill" : ""}` }, `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`),
           el("span", { class: `rv-wdow ${w === 0 ? "sun" : w === 6 ? "sat" : ""}` }, w === CLOSED_DOW ? "定休" : DOW_JA[w])));
       }
-      for (const s of staffList) {
+      for (const b of beds) {
         grid.appendChild(el("div", { class: "rv-cell rv-wname" },
-          avatar(s, 26),
+          el("span", { class: "rv-bedic" }, "🛏"),
           el("span", { class: "rv-hname" },
-            el("span", { class: "rv-hn" }, s.name),
-            el("span", { class: "rv-hr" }, s.role))));
+            el("span", { class: "rv-hn" }, b.name),
+            el("span", { class: "rv-hr" }, "予約枠"))));
         for (const d of dates) {
           if (dow(d) === CLOSED_DOW) {
             grid.appendChild(el("div", { class: "rv-cell rv-wcell" },
               el("span", { class: "rv-heat closed" }, "—")));
             continue;
           }
-          const c = countOf(s.id, d);
+          const c = countOf(b.id, d);
           grid.appendChild(el("button", {
             class: "rv-cell rv-wcell",
             onclick: () => gotoDay(d),
-            title: `${s.name} ${fmtDate(d)}:${c}件`,
-            "aria-label": `${s.name} ${fmtDate(d)} 予約${c}件。クリックで日ビューへ`,
+            title: `${b.name} ${fmtDate(d)}:${c}件`,
+            "aria-label": `${b.name} ${fmtDate(d)} 予約${c}件。クリックで日ビューへ`,
           }, el("span", { class: `rv-heat lv${heatLevel(c)}` }, c || "")));
         }
       }
       const legendItems = [1, 2, 3, 4].map((l) => el("span", { class: `rv-heat mini lv${l}` }));
       return card({
-        title: "週間サマリー",
+        title: "週間サマリー(ベッド別)",
         sub: `${store.storeName(state.storeId)}・セルをクリックすると日ビューに移動します`,
         body: el("div", {},
           el("div", { class: "rv-scroll" }, grid),
@@ -378,7 +467,7 @@ export default {
       });
 
       const byStatus = (st) => list.filter((r) => r.status === st).length;
-      const free = Math.max(practitionersOf(state.storeId).length * SLOTS.length - list.filter(isActive).length, 0);
+      const free = Math.max(bedsFor(state.storeId).length * SLOTS.length - list.filter(isActive).length, 0);
       const statusCard = card({
         title: "この日の内訳",
         sub: store.storeName(state.storeId),
@@ -387,7 +476,7 @@ export default {
           kv("来院済", `${byStatus("done")}件`),
           kv("キャンセル", `${byStatus("cancelled")}件`),
           kv("無断キャンセル", `${byStatus("noshow")}件`),
-          kv("空き枠", dow(state.date) === CLOSED_DOW ? badge("定休日") : `${free}枠`)),
+          kv("空き枠(ベッド×時間)", dow(state.date) === CLOSED_DOW ? badge("定休日") : `${free}枠`)),
       });
       return el("div", { class: "grid cols-2 mt-16" }, donutCard, statusCard);
     }
@@ -398,7 +487,7 @@ export default {
       clear(root);
       root.append(
         sectionHeader("予約管理",
-          "紙の来患ノートの代わりに、予約・来院・回数券消化をこの画面で完結します",
+          "予約枠はベッド基軸。予約カードをつかんで(ドラッグして)別のベッド・時間帯へ移動できます",
           [el("button", { class: "btn primary", onclick: () => openNewModal() }, icon("plus", 16), "新規予約")]),
         buildKpis(),
         buildToolbar(),

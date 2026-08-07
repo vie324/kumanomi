@@ -158,6 +158,9 @@
 .page-shift .sh-chip.t-full { background: var(--accent-soft); color: var(--accent-ink); }
 .page-shift .sh-chip.t-training { background: var(--good-soft); color: var(--good-text); }
 .page-shift .sh-chip.t-off { background: var(--surface-3); color: var(--ink-3); }
+.page-shift .sh-chip.t-paid { background: color-mix(in srgb, var(--series-3, #1baf7a) 16%, var(--surface)); color: var(--good-text); }
+.page-shift .sh-chip.t-special { background: color-mix(in srgb, #6d5bd0 14%, var(--surface)); color: #6d5bd0; }
+.page-shift .sh-chip.t-birthday { background: color-mix(in srgb, #e87ba4 16%, var(--surface)); color: #c2547e; }
 .page-shift .sh-chip.t-none { background: none; color: var(--ink-3); opacity: 0.5; }
 
 /* ---- 充足判定行 ---- */
@@ -437,4 +440,72 @@
   .page-shift .month-grid { --mg-name: 96px; --mg-day: 25px; --mg-sum: 52px; }
   .page-shift .mg-r { display: none; }
   .page-shift .mg-name .avatar { display: none; }
+}
+
+/* ============================================================
+   希望休の申請(月単位)モーダル
+   ============================================================ */
+.page-shift .wish-monthnav {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.page-shift .wish-count { font-size: var(--fs-xs); color: var(--ink-3); margin-left: auto; }
+
+.page-shift .wish-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  font-size: var(--fs-xs);
+}
+.page-shift .wish-lg {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  font-weight: 700;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+}
+.page-shift .wish-lg.t-off { background: var(--surface-3); color: var(--ink-2); }
+.page-shift .wish-lg.t-paid { background: color-mix(in srgb, var(--series-3, #1baf7a) 14%, var(--surface)); color: var(--good-text); }
+.page-shift .wish-lg.t-special { background: color-mix(in srgb, #6d5bd0 12%, var(--surface)); color: #6d5bd0; }
+.page-shift .wish-lg.t-birthday { background: color-mix(in srgb, #e87ba4 14%, var(--surface)); color: #c2547e; }
+.page-shift .wish-lg-emoji { font-size: 13px; }
+
+.page-shift .wish-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.page-shift .wc-h {
+  text-align: center;
+  font-size: var(--fs-xs); font-weight: 800; color: var(--ink-3);
+  padding: 3px 0;
+}
+.page-shift .wc-h.sun { color: var(--critical-text); }
+.page-shift .wc-h.sat { color: var(--series-1, #2a78d6); }
+.page-shift .wc-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 2px;
+  min-height: 52px;
+  padding: 5px 2px 4px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.page-shift .wc-cell.blank { border: none; background: none; min-height: 0; }
+.page-shift .wc-cell:not(.blank):not(:disabled):hover { border-color: var(--brand); transform: translateY(-1px); }
+.page-shift .wc-cell:disabled { opacity: 0.55; cursor: not-allowed; background: var(--surface-2); }
+.page-shift .wc-cell.closed .wc-mark { font-size: 9px; color: var(--ink-3); }
+.page-shift .wc-day { font-size: var(--fs-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
+.page-shift .wc-cell.sun .wc-day { color: var(--critical-text); }
+.page-shift .wc-cell.sat .wc-day { color: var(--series-1, #2a78d6); }
+.page-shift .wc-mark { font-size: 10.5px; font-weight: 800; line-height: 1.2; min-height: 14px; }
+.page-shift .wc-cell.on { border-width: 1.5px; }
+.page-shift .wc-cell.on.t-off { background: var(--surface-3); border-color: var(--hairline-strong); }
+.page-shift .wc-cell.on.t-paid { background: color-mix(in srgb, var(--series-3, #1baf7a) 15%, var(--surface)); border-color: var(--good); color: var(--good-text); }
+.page-shift .wc-cell.on.t-special { background: color-mix(in srgb, #6d5bd0 13%, var(--surface)); border-color: #6d5bd0; color: #6d5bd0; }
+.page-shift .wc-cell.on.t-birthday { background: color-mix(in srgb, #e87ba4 15%, var(--surface)); border-color: #e87ba4; color: #c2547e; }
+
+@media (max-width: 640px) {
+  .page-shift .wc-cell { min-height: 46px; border-radius: 8px; }
+  .page-shift .wc-day { font-size: var(--fs-xs); }
+  .page-shift .wc-mark { font-size: 9.5px; }
 }

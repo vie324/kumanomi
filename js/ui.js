@@ -494,6 +494,121 @@ export function staffChip(staffId, { size = 30, withRole = true } = {}) {
       withRole ? el("span", { class: "small muted" }, `${store.storeName(s.storeId)}・${s.role}`) : null));
 }
 
+/* ---------------- ボイス入力 ---------------- */
+
+/**
+ * テキストエリア用のボイス入力ボタン。
+ * 対応ブラウザでは Web Speech API(ja-JP)で書き起こし、
+ * 非対応環境ではサンプル文を1文字ずつ流し込んで動作を再現する(デモ)。
+ * micButton(textarea, { samples: ["…"], label })
+ */
+export function micButton(ta, { samples = [], label = "ボイス入力" } = {}) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null;
+  let timer = null;
+  let sampleIdx = 0;
+  let listening = false;
+
+  const btn = el("button", { class: "btn soft sm mic-btn", type: "button" }, icon("mic", 14), label);
+
+  const emitInput = () => ta.dispatchEvent(new Event("input", { bubbles: true }));
+
+  const setUI = (on) => {
+    listening = on;
+    btn.classList.toggle("rec", on);
+    clear(btn).append(icon("mic", 14), on ? "録音中…(タップで停止)" : label);
+  };
+
+  const stop = () => {
+    if (rec) { try { rec.stop(); } catch (e) { /* noop */ } rec = null; }
+    if (timer) { clearInterval(timer); timer = null; }
+    setUI(false);
+  };
+
+  const startNative = () => {
+    rec = new SR();
+    rec.lang = "ja-JP";
+    rec.interimResults = true;
+    rec.continuous = true;
+    const base = ta.value ? ta.value.replace(/\s+$/, "") + "\n" : "";
+    rec.onresult = (e) => {
+      let fin = "", interim = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) fin += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      ta.value = base + fin + interim;
+      emitInput();
+    };
+    rec.onerror = () => { stop(); startSample(); }; // マイク不可ならデモ入力へ
+    rec.onend = () => { if (listening) setUI(false); };
+    rec.start();
+    setUI(true);
+    toast("マイクに向かって話してください(ja-JP)", "info");
+  };
+
+  const startSample = () => {
+    const text = samples.length ? samples[sampleIdx++ % samples.length] : "";
+    if (!text) { toast("この環境では音声認識を利用できません", "info"); return; }
+    const base = ta.value ? ta.value.replace(/\s+$/, "") + "\n" : "";
+    let pos = 0;
+    setUI(true);
+    toast("デモ用のボイス入力を再生しています(実運用ではマイク音声を書き起こします)", "info");
+    timer = setInterval(() => {
+      pos += 4;
+      ta.value = base + text.slice(0, pos);
+      emitInput();
+      ta.scrollTop = ta.scrollHeight;
+      if (pos >= text.length) stop();
+    }, 34);
+  };
+
+  btn.addEventListener("click", () => {
+    if (listening) { stop(); return; }
+    if (SR) startNative(); else startSample();
+  });
+  return btn;
+}
+
+/* ---------------- 画像添付ヘルパー ---------------- */
+
+/**
+ * 画像ファイル → 縮小済み dataURL。
+ * localStorage 永続化のため長辺 maxSize px・JPEG に圧縮する。
+ */
+export function fileToDataURL(file, { maxSize = 1080, quality = 0.82 } = {}) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error("読み込みに失敗しました"));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("画像として読み込めませんでした"));
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        if (scale >= 1 && String(fr.result).length < 400000) { resolve(fr.result); return; }
+        const cv = document.createElement("canvas");
+        cv.width = Math.max(1, Math.round(img.width * scale));
+        cv.height = Math.max(1, Math.round(img.height * scale));
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL("image/jpeg", quality));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+/** 画像プレビューを大きく開くだけのモーダル */
+export function openImageModal(src, title = "画像プレビュー") {
+  const m = modal({
+    title,
+    body: el("div", { class: "img-modal-body" },
+      el("img", { src, alt: title, class: "img-modal-img" })),
+  });
+  return m;
+}
+
 /** ステータス→バッジ */
 export function statusBadge(status) {
   const map = {

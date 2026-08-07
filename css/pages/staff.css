@@ -349,3 +349,18 @@
   .page-staff .st-test-stats { gap: 14px; }
   .page-staff .st-score-val { font-size: 38px; }
 }
+
+/* ---- 点数非公開のプレースホルダ ---- */
+.page-staff .st-scorelock {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 90px;
+  padding: 14px;
+  border: 1px dashed var(--hairline-strong);
+  border-radius: var(--r-md);
+  color: var(--ink-3);
+  font-size: var(--fs-xs); font-weight: 600;
+  text-align: center;
+  background: var(--surface-2);
+}
+.page-staff .st-scorelock.lg { min-height: 200px; font-size: var(--fs-sm); }
+.page-staff .st-scorelock svg { flex: none; }

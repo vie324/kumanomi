@@ -122,6 +122,8 @@ const RULES = {
     return !!ctx?.storeId && managedStores(me).includes(ctx.storeId);
   },
   "shift.generateAI": (me, ctx) => RULES["shift.edit"](me, ctx),
+  // 必要人数ルール・充足判定・他スタッフの希望休提出状況は責任者(院長以上)と本部人事のみ
+  "shift.viewStaffing": (me) => rankLevel(me) >= 3 || rankOf(me) === "hr",
 
   /* --- 勤怠 --- */
   "kintai.punch": (me) => rankOf(me) !== "hr",
@@ -147,9 +149,14 @@ const RULES = {
   "staff.viewEvaluations": (me) => rankLevel(me) >= 3 && rankOf(me) !== "hr",
   "staff.viewInterviews": (me) => rankLevel(me) >= 2 && rankOf(me) !== "hr",
   "roleplay.review": (me) => rankLevel(me) >= 2 && rankOf(me) !== "hr",
+  // テスト点数・スキルスコア・評価は「自分/配下/メンティー」のみ(一般社員は他人の点数を見られない)
+  "staff.viewScores": (me, ctx) =>
+    ctx?.staffId ? canSeeStaff(ctx.staffId, me) : rankLevel(me) >= 3,
 
   /* --- バックオフィス --- */
   "backoffice.approve": (me) => rankLevel(me) >= 3,
+  // 在庫の発注・入荷は院長以上のみ(一般社員は閲覧のみ)
+  "inventory.order": (me) => rankLevel(me) >= 3 && rankOf(me) !== "hr",
 
   /* --- 会議 --- */
   "meetings.edit": (me) => rankLevel(me) >= 3,

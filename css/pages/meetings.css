@@ -138,3 +138,6 @@
 .page-meetings .pm-warn { color: var(--warn-text); font-weight: 700; }
 .page-meetings .pm-cell-action { display: inline-flex; gap: 6px; }
 .page-meetings .pm-more { background: var(--ink-3); }
+
+/* アクションアイテム → タスクリスト連携ボタン */
+.page-meetings .pm-ai-row .pm-totask { flex: none; align-self: center; white-space: nowrap; }

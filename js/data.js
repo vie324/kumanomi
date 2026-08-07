@@ -45,13 +45,20 @@ const iso = (dateStr, hm) => `${dateStr}T${hm}:00`;
 // ============================================================
 
 /** category: 整骨院/整体院/鍼灸院 は責任者=院長、美容・エステ は責任者=店長 */
+/** beds: 予約枠の基軸になるベッド数(予約はベッド単位で管理する) */
 const stores = [
-  { id: "st-narimasu", name: "成増店", short: "成増", category: "整骨院", isPilot: true, phone: "03-5967-xxxx", address: "東京都板橋区成増2-XX-X", lat: 35.7772, lng: 139.632, openHour: "10:00", closeHour: "20:00", color: "#2a78d6" },
-  { id: "st-omiya", name: "大宮店", short: "大宮", category: "整体院", isPilot: false, phone: "048-641-xxxx", address: "埼玉県さいたま市大宮区桜木町1-XX", lat: 35.9063, lng: 139.6242, openHour: "10:00", closeHour: "20:00", color: "#eb6834" },
-  { id: "st-kawagoe", name: "川越店", short: "川越", category: "鍼灸院", isPilot: false, phone: "049-224-xxxx", address: "埼玉県川越市脇田町X-X", lat: 35.9086, lng: 139.4823, openHour: "10:00", closeHour: "20:00", color: "#1baf7a" },
-  { id: "st-urawa", name: "浦和店", short: "浦和", category: "整体院", isPilot: false, phone: "048-813-xxxx", address: "埼玉県さいたま市浦和区高砂1-XX", lat: 35.8598, lng: 139.6574, openHour: "10:00", closeHour: "20:00", color: "#eda100" },
-  { id: "st-biyou", name: "ビューティー大宮店", short: "美容大宮", category: "美容・エステ", isPilot: false, phone: "048-641-yyyy", address: "埼玉県さいたま市大宮区宮町X-X", lat: 35.908, lng: 139.626, openHour: "10:00", closeHour: "20:00", color: "#e87ba4" },
+  { id: "st-narimasu", name: "成増店", short: "成増", category: "整骨院", isPilot: true, phone: "03-5967-xxxx", address: "東京都板橋区成増2-XX-X", lat: 35.7772, lng: 139.632, openHour: "10:00", closeHour: "20:00", color: "#2a78d6", beds: 4 },
+  { id: "st-omiya", name: "大宮店", short: "大宮", category: "整体院", isPilot: false, phone: "048-641-xxxx", address: "埼玉県さいたま市大宮区桜木町1-XX", lat: 35.9063, lng: 139.6242, openHour: "10:00", closeHour: "20:00", color: "#eb6834", beds: 3 },
+  { id: "st-kawagoe", name: "川越店", short: "川越", category: "鍼灸院", isPilot: false, phone: "049-224-xxxx", address: "埼玉県川越市脇田町X-X", lat: 35.9086, lng: 139.4823, openHour: "10:00", closeHour: "20:00", color: "#1baf7a", beds: 3 },
+  { id: "st-urawa", name: "浦和店", short: "浦和", category: "整体院", isPilot: false, phone: "048-813-xxxx", address: "埼玉県さいたま市浦和区高砂1-XX", lat: 35.8598, lng: 139.6574, openHour: "10:00", closeHour: "20:00", color: "#eda100", beds: 3 },
+  { id: "st-biyou", name: "ビューティー大宮店", short: "美容大宮", category: "美容・エステ", isPilot: false, phone: "048-641-yyyy", address: "埼玉県さいたま市大宮区宮町X-X", lat: 35.908, lng: 139.626, openHour: "10:00", closeHour: "20:00", color: "#e87ba4", beds: 2 },
 ];
+
+/** 店舗のベッド一覧(予約グリッドの列になる) */
+export function bedsOf(store) {
+  const n = store?.beds || 3;
+  return Array.from({ length: n }, (_, i) => ({ id: `${store.id}-b${i + 1}`, name: `ベッド${i + 1}` }));
+}
 
 /** 店舗カテゴリから責任者の呼称(院長/店長)を返す */
 export function directorTitle(store) {
@@ -269,6 +276,7 @@ function makeReservations(patients) {
     if (dow(date) === 3) continue; // 水曜定休
     for (const st of stores) {
       const staffHere = practitioners.filter((s) => s.storeId === st.id);
+      const bedN = st.beds || 3;
       const count = st.id === "st-narimasu" ? ri(5, 8) : ri(3, 6);
       const used = new Set();
       for (let i = 0; i < count; i++) {
@@ -276,7 +284,12 @@ function makeReservations(patients) {
         const sf = pick(staffHere);
         const key = `${sf.id}-${start}`;
         if (used.has(key)) continue;
+        // ベッドは同時刻の空きから割当(予約枠はベッド基軸)
+        let bed = 1;
+        while (bed <= bedN && used.has(`bed${bed}-${start}`)) bed++;
+        if (bed > bedN) continue;
         used.add(key);
+        used.add(`bed${bed}-${start}`);
         const menu = pick(menus.filter((m) => (st.category === "美容・エステ" ? m.kind === "beauty" : m.kind === "treatment")));
         const pt = rnd() > 0.16 ? pick(patients.filter((p) => p.storeId === st.id)) : null;
         const endH = Number(start.slice(0, 2)) + Math.ceil(menu.minutes / 60);
@@ -288,6 +301,7 @@ function makeReservations(patients) {
           guestName: pt ? null : pick(["新規:川口様", "新規:白石様", "新規:三浦様", "新規:内藤様"]),
           storeId: st.id,
           staffId: sf.id,
+          bedId: `${st.id}-b${bed}`,
           date, start,
           end: `${pad(Math.min(endH, 20))}:${start.slice(3)}`,
           menuId: menu.id,
@@ -311,6 +325,17 @@ const SHIFT_TYPES = {
   full: { label: "通し", start: "09:30", end: "20:30" },
   training: { label: "研修", start: "10:00", end: "17:00" },
   off: { label: "休み", start: null, end: null },
+  paid: { label: "有給", start: null, end: null },
+  special: { label: "特休", start: null, end: null },
+  birthday: { label: "誕生日休", start: null, end: null },
+};
+
+/** 希望休申請で選べる休暇種別(月単位で申請する) */
+const LEAVE_TYPES = {
+  off: { label: "希望休", short: "休", emoji: "🙌" },
+  paid: { label: "有給休暇", short: "有", emoji: "🌴" },
+  special: { label: "特別休暇", short: "特", emoji: "🎗" },
+  birthday: { label: "誕生日休暇", short: "誕", emoji: "🎂" },
 };
 
 function makeShifts() {
@@ -383,19 +408,25 @@ function makeAttendance(shifts) {
   return att;
 }
 
+/** 希望休は月単位で申請する(翌月分)。wishes: { "YYYY-MM-DD": off|paid|special|birthday } */
 function makeShiftRequests() {
-  const nextMon = addDays(mondayOf(TODAY), 7);
-  return staff.slice(0, 8).map((sf, i) => ({
-    id: `sr${i + 1}`,
-    staffId: sf.id,
-    weekOf: nextMon,
-    wishes: {
-      [addDays(nextMon, ri(0, 6))]: "off",
-      [addDays(nextMon, ri(0, 6))]: "late",
-    },
-    note: pick(["", "", "土曜は早番希望です", "研修参加のため17時退勤希望", ""]),
-    submittedAt: addDays(TODAY, -ri(0, 3)),
-  }));
+  const [ty, tm] = TODAY.split("-").map(Number);
+  const nm = new Date(ty, tm, 1); // 翌月1日
+  const month = `${nm.getFullYear()}-${pad(nm.getMonth() + 1)}`;
+  return staff.slice(0, 8).map((sf, i) => {
+    const wishes = {};
+    wishes[`${month}-${pad(ri(2, 14))}`] = pick(["off", "off", "off", "paid"]);
+    wishes[`${month}-${pad(ri(15, 27))}`] = pick(["off", "off", "paid", "special"]);
+    if (i === 2) wishes[`${month}-${pad(ri(2, 27))}`] = "birthday";
+    return {
+      id: `sr${i + 1}`,
+      staffId: sf.id,
+      month,
+      wishes,
+      note: pick(["", "", "子どもの行事のためお願いします", "通院のため", ""]),
+      submittedAt: addDays(TODAY, -ri(0, 3)),
+    };
+  });
 }
 
 // ============================================================
@@ -752,11 +783,20 @@ function makeCashbook() {
   return arr;
 }
 
+/** デモ用の領収書画像(SVGをdata URLにしたもの) */
+function receiptSvg(title, amount, date) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="440" viewBox="0 0 360 440"><rect width="360" height="440" fill="#fffdf7"/><rect x="14" y="14" width="332" height="412" fill="none" stroke="#d8cdb8" stroke-width="2" stroke-dasharray="6 4"/><text x="180" y="64" font-size="26" text-anchor="middle" fill="#584a33" font-family="sans-serif" font-weight="bold">領 収 書</text><text x="40" y="120" font-size="15" fill="#6b5d45" font-family="sans-serif">くまのみ整骨院グループ 御中</text><line x1="40" y1="132" x2="320" y2="132" stroke="#c9bda3"/><text x="180" y="200" font-size="34" text-anchor="middle" fill="#3c3222" font-family="sans-serif" font-weight="bold">¥${Number(amount).toLocaleString("ja-JP")}-</text><text x="40" y="252" font-size="14" fill="#6b5d45" font-family="sans-serif">但し ${title} として</text><text x="40" y="282" font-size="13" fill="#8a7c62" font-family="sans-serif">${date}</text><rect x="252" y="330" width="64" height="64" fill="none" stroke="#c56a5a" stroke-width="2" rx="8"/><text x="284" y="368" font-size="13" text-anchor="middle" fill="#c56a5a" font-family="sans-serif">領収印</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 function makeExpenses() {
   return [
-    { id: "ex01", staffId: "s02", date: addDays(TODAY, -1), amount: 1280, category: "交通費", memo: "研修会場(大宮)までの往復", status: "pending" },
-    { id: "ex02", staffId: "s03", date: addDays(TODAY, -2), amount: 5980, category: "書籍・学習", memo: "トリガーポイント解剖書", status: "pending" },
-    { id: "ex03", staffId: "s07", date: addDays(TODAY, -4), amount: 3200, category: "会議費", memo: "委員会打合せ カフェ代(4名)", status: "approved", approvedBy: "s09" },
+    { id: "ex01", staffId: "s02", date: addDays(TODAY, -1), amount: 1280, category: "交通費", memo: "研修会場(大宮)までの往復", status: "pending",
+      routeFrom: "成増駅", routeTo: "大宮駅", distanceKm: 28.4, receiptImage: receiptSvg("交通費(電車)", 1280, addDays(TODAY, -1)) },
+    { id: "ex02", staffId: "s03", date: addDays(TODAY, -2), amount: 5980, category: "書籍・学習", memo: "トリガーポイント解剖書", status: "pending",
+      receiptImage: receiptSvg("書籍代", 5980, addDays(TODAY, -2)) },
+    { id: "ex03", staffId: "s07", date: addDays(TODAY, -4), amount: 3200, category: "会議費", memo: "委員会打合せ カフェ代(4名)", status: "approved", approvedBy: "s09",
+      receiptImage: receiptSvg("会議費(飲食)", 3200, addDays(TODAY, -4)) },
     { id: "ex04", staffId: "s04", date: addDays(TODAY, -6), amount: 2420, category: "消耗品", memo: "受付用文具一式", status: "approved", approvedBy: "s01" },
     { id: "ex05", staffId: "s06", date: addDays(TODAY, -8), amount: 12800, category: "備品", memo: "施術用スツール", status: "rejected", rejectReason: "本部一括購入の対象のため" },
     { id: "ex06", staffId: "s10", date: addDays(TODAY, -3), amount: 890, category: "郵送費", memo: "保険会社への書類送付", status: "approved", approvedBy: "s09" },
@@ -801,24 +841,28 @@ function makeNotifications() {
     { id: "nt05", type: "info", title: "回数券の期限が近い患者様", body: "回数券の有効期限が30日以内の患者様が2名います。LINEでのご案内を検討してください。", date: iso(addDays(TODAY, -1), "10:00"), read: true, link: "#/patients" },
     { id: "nt06", type: "info", title: "明日のマネージャー会議", body: "アジェンダ:タスクチェック→数値報告→アクションプラン。資料はダッシュボードから自動生成されます。", date: iso(addDays(TODAY, -1), "09:00"), read: true, link: "#/meetings" },
     { id: "nt07", type: "test", title: "未受験のテストがあります", body: "「解剖学基礎(脊柱・骨盤帯)」の受験期限は今週金曜です。", date: iso(addDays(TODAY, -2), "12:00"), read: true, link: "#/staff" },
+    { id: "nt08", type: "info", title: "【毎月のお願い】1minuteアンケート", body: "今月の1minuteアンケート(所要1分)にまだ回答していない方は、社内SNSのリンクからご回答ください。", date: iso(TODAY, "09:05"), read: false, link: "#/sns" },
+    { id: "nt09", type: "info", title: "【毎月のお願い】交通費の申請", body: "今月の交通費をまとめて申請してください(領収書画像・金額・区間・距離)。", date: iso(TODAY, "09:06"), read: false, link: "#/backoffice/expense" },
   ];
 }
 
 const faq = [
-  { id: "f01", q: "シフト希望はどこから出せますか?", keywords: ["シフト", "希望", "提出"], a: "「シフト管理」ページの「希望を提出」ボタンから提出できます。締切は毎週金曜21時で、翌週分はAIが希望と必要人数をもとに自動作成し、院長承認後に確定します。" },
+  { id: "f01", q: "シフト希望はどこから出せますか?", keywords: ["シフト", "希望", "希望休", "提出", "有給", "誕生日"], a: "「シフト管理」ページの「希望休を申請」ボタンから、翌月分をまとめて(月単位で)提出します。日ごとに「希望休・有給休暇・特別休暇・誕生日休暇」を選べます。締切は前月20日です。提出内容はAIシフト作成に反映されます。" },
   { id: "f02", q: "GPS打刻ができません", keywords: ["GPS", "打刻", "出勤", "位置"], a: "出勤打刻は店舗から200m以内でのみ有効です。位置情報の許可がオフになっていないかブラウザ設定を確認してください。電波状況で取得できない場合は「位置が取得できない場合」から責任者承認付きの手動打刻を申請できます。" },
   { id: "f03", q: "回数券の残数はどこで確認できますか?", keywords: ["回数券", "残数", "消化"], a: "「顧客管理」で患者様を開くと回数券の残数と消化率が表示されます。残数は施術録の保存時に自動で消化され、患者様のLINEにも自動通知されます。" },
   { id: "f04", q: "カルテのボイス入力の使い方は?", keywords: ["ボイス", "音声", "カルテ", "入力"], a: "施術後、カルテ画面の「ボイス入力」を押して施術内容を話すと、AIがSOAP形式(主観・客観・評価・計画)に自動整理します。内容を確認して保存するだけです。" },
-  { id: "f05", q: "サンクスカードの送り方は?", keywords: ["サンクス", "カード", "ポイント", "感謝"], a: "「社内SNS」の「サンクスを送る」から、相手とメッセージ、ポイント(10/20/30pt)を選んで送信します。月の持ちポイントは200ptです。" },
-  { id: "f06", q: "日報はいつまでに提出しますか?", keywords: ["日報", "提出", "締切"], a: "退勤打刻の前に「日報」ページから提出してください。数字(売上・施術数・新規・成約)を入れると契約率は自動計算されます。ボイス入力からのAI下書きも使えます。" },
-  { id: "f07", q: "経費の申請方法は?", keywords: ["経費", "申請", "精算"], a: "「在庫・経費」ページの「経費を申請」から金額・カテゴリ・メモを入力して提出します。承認状況は同じ画面で確認でき、承認されると給与と合わせて精算されます。" },
-  { id: "f08", q: "在庫の発注はどうすればいいですか?", keywords: ["在庫", "発注", "備品"], a: "在庫が発注点を下回ると自動でアラートが出ます。「在庫・経費」ページの該当品目から「発注」を押すと発注記録が残り、入荷時に「入荷」で在庫数が更新されます。" },
+  { id: "f05", q: "サンクスカードの送り方は?", keywords: ["サンクス", "カード", "ポイント", "感謝"], a: "「社内SNS」の「サンクスを送る」から、相手とメッセージ、ギフト(10/20/30pt)を選んで送信します。持ちポイント(月の上限)はありません。送ると送信ボーナス10pt、受け取るとギフト分のポイントがそのまま貯まります。" },
+  { id: "f06", q: "日報はいつまでに提出しますか?", keywords: ["日報", "提出", "締切"], a: "退勤打刻の前に「日報」ページから提出してください。入力項目は「個人売上・施術数(新患込み)・新患数・成約数・コメント(振り返り)」の5つだけです。" },
+  { id: "f07", q: "経費の申請方法は?", keywords: ["経費", "申請", "精算", "領収書", "交通費"], a: "「在庫・経費」ページの「経費を申請」から金額・カテゴリ・メモに加えて領収書の画像を添付して提出します。交通費は「交通費を申請」から区間(どこからどこまで)と距離も記録します(月1回まとめて申請)。承認されると給与と合わせて精算されます。" },
+  { id: "f08", q: "在庫の発注はどうすればいいですか?", keywords: ["在庫", "発注", "備品"], a: "在庫が発注点を下回ると自動でアラートが出ます。発注・入荷の操作は院長以上のみ行えます(一般スタッフは在庫の閲覧のみ)。必要な品があれば店舗の責任者に連絡してください。" },
   { id: "f09", q: "患者様へのLINE送信はどうやりますか?", keywords: ["LINE", "送信", "連携", "患者"], a: "カルテ保存後に「AIで患者様向けメッセージを作成」を押すと、施術内容と写真をまとめた文面が生成されます。内容を確認して「LINEで送信」を押すと、連携済みの患者様に送信されます(デモでは送信をシミュレートします)。" },
   { id: "f10", q: "予約の変更・キャンセルは?", keywords: ["予約", "変更", "キャンセル"], a: "「予約管理」でその予約をクリックし、時間・担当・ステータスを変更できます。キャンセル時は理由を残すと分析に反映されます。" },
   { id: "f11", q: "テストはどこから受けられますか?", keywords: ["テスト", "受験", "問題"], a: "「スタッフ管理」の「テスト」タブに自分に割り当てられたテストが表示されます。AIが研修テーマから自動作成した問題で、受験後すぐに採点と解説が表示されます。" },
   { id: "f12", q: "姿勢分析の使い方は?", keywords: ["姿勢", "分析", "写真", "ポイント"], a: "カルテで患者様の姿勢写真を登録すると、AIが33箇所のランドマーク(肩峰・耳孔・上前腸骨棘など)を自動検出し、肩の高さ差・骨盤の傾き・頭部前方偏位を数値化します。グリッド線合わせは不要です。" },
   { id: "f13", q: "会議の議事録はどう作りますか?", keywords: ["会議", "議事録", "アクション"], a: "「会議・議事録」で会議を開き、メモ欄に走り書きで記録して「AIで議事録に整形」を押すと、要点・決定事項・アクションアイテム(担当者・期限つき)に自動整理されます。" },
   { id: "f14", q: "デモデータを最初の状態に戻したい", keywords: ["リセット", "初期化", "デモ", "データ"], a: "トップバーの設定(歯車)から「デモデータをリセット」を選ぶと、初期状態に戻ります。" },
+  { id: "f15", q: "タスクリストの使い方は?", keywords: ["タスク", "TODO", "議事録", "チャット"], a: "「タスク」ページで自分のタスクを管理できます。チャットのメッセージは吹き出し横の📋ボタン、議事録のアクションアイテムは「タスクへ」ボタンからタスクリストに送れます。担当者と期限を付けて、未着手→進行中→完了で管理します。" },
+  { id: "f16", q: "予約のベッド(枠)を変更したい", keywords: ["予約", "ベッド", "枠", "変更", "移動"], a: "「予約管理」はベッド基軸のタイムテーブルです。PCでは予約カードをドラッグして別のベッド・時間帯へ移動できます。予約カードをクリックすると詳細からベッド・開始時間を選び直すこともできます。" },
 ];
 
 // ============================================================
@@ -1005,6 +1049,23 @@ function makeRoleplaySessions() {
 }
 
 // ============================================================
+// タスクリスト(チャット・議事録から飛ばせる)
+// ============================================================
+
+/**
+ * source.kind: chat(チャット発) / meeting(議事録発) / manual(手動)
+ * status: todo | doing | done
+ */
+function makeTasks() {
+  return [
+    { id: "tk01", title: "離反リスク患者リストへの声かけ結果を集計", note: "マネージャー会議の宿題。金曜までに各店分をまとめる。", ownerId: "s01", createdBy: "s09", due: addDays(TODAY, 2), status: "doing", source: { kind: "meeting", refId: "mt01", label: "マネージャー会議" }, createdAt: addDays(TODAY, -6) },
+    { id: "tk02", title: "鍼(セイリン J15)の発注を院長に依頼", note: "在庫が残り8箱。チャットの報告から起票。", ownerId: "s01", createdBy: "s03", due: addDays(TODAY, 1), status: "todo", source: { kind: "chat", refId: "cr-narimasu", label: "成増店ルーム" }, createdAt: addDays(TODAY, -1) },
+    { id: "tk03", title: "受付メンバーへのボイス入力レクチャー", note: "", ownerId: "s01", createdBy: "s01", due: addDays(TODAY, 3), status: "todo", source: { kind: "meeting", refId: "mt05", label: "導入キックオフ" }, createdAt: addDays(TODAY, -7) },
+    { id: "tk04", title: "夕方枠のLINEリマインド配信文面を確認", note: "マーケ委員会のドラフトにコメントを返す。", ownerId: "s07", createdBy: "s10", due: addDays(TODAY, -1), status: "todo", source: { kind: "chat", refId: "cr-managers", label: "院長・マネージャー" }, createdAt: addDays(TODAY, -2) },
+  ];
+}
+
+// ============================================================
 // エクスポート
 // ============================================================
 
@@ -1014,7 +1075,7 @@ const orgChangeLog = [
   { id: "og02", date: addDays(TODAY, -32), staffId: "s12", fromId: "s15", toId: "s16", by: "s09", note: "浦和店をエリアBへ移管" },
 ];
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export function createSeed() {
   const patients = makePatients();
@@ -1044,6 +1105,7 @@ export function createSeed() {
     expenses: makeExpenses(),
     registerSales: makeRegisterSales(),
     notifications: makeNotifications(),
+    tasks: makeTasks(),
     faq,
     chatRooms,
     chatMessages: makeChatMessages(),
@@ -1053,4 +1115,4 @@ export function createSeed() {
   };
 }
 
-export { SHIFT_TYPES };
+export { SHIFT_TYPES, LEAVE_TYPES };

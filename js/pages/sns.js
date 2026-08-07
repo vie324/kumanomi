@@ -3,13 +3,18 @@
    感謝を送り合う文化と連絡事項を1箇所に。
    ============================================================ */
 import {
-  el, clear, icon, avatar, badge, kv, meter, card, sectionHeader,
+  el, clear, icon, avatar, badge, kv, card, sectionHeader,
   tabs, segmented, statTile, emptyState, modal, toast, relTime, fmtNum, celebrate,
+  fileToDataURL, openImageModal,
 } from "../ui.js";
 import { store, todayStr, monthOf } from "../store.js";
 
-const MONTHLY_BUDGET = 200; // 月の持ちポイント(FAQ準拠)
+/* 手持ちポイント(月の上限)は廃止。
+   送ると SEND_BONUS pt、受け取るとギフト分のポイントがそのまま貯まる。 */
+const SEND_BONUS = 10;
 const PT_OPTIONS = [10, 20, 30];
+const MAX_POST_IMAGES = 3;
+const SURVEY_URL = "https://forms.gle/xjRUN51dF7Rj8vqs9";
 
 const TYPE_META = {
   notice: { label: "連絡", emoji: "📣", kind: "brand" },
@@ -27,13 +32,27 @@ function nowIso() {
 
 function byDateDesc(a, b) { return a.date < b.date ? 1 : -1; }
 
-/** 今月自分が送ったサンクスポイント合計 */
+/** 今月自分が送ったサンクス(件数と送信ボーナス) */
 function sentThisMonth() {
   const meId = store.me().id;
   const m = monthOf(todayStr());
-  return store.get("posts")
-    .filter((p) => p.type === "thanks" && p.authorId === meId && (p.date || "").startsWith(m))
-    .reduce((a, p) => a + (p.points || 0), 0);
+  const mine = store.get("posts")
+    .filter((p) => p.type === "thanks" && p.authorId === meId && (p.date || "").startsWith(m));
+  return { count: mine.length, bonus: mine.length * SEND_BONUS };
+}
+
+/** 今月自分が受け取ったサンクスポイント合計 */
+function receivedThisMonth() {
+  const meId = store.me().id;
+  const m = monthOf(todayStr());
+  const mine = store.get("posts")
+    .filter((p) => p.type === "thanks" && p.toId === meId && (p.date || "").startsWith(m));
+  return { count: mine.length, points: mine.reduce((a, p) => a + (p.points || 0), 0) };
+}
+
+/** 今月の獲得ポイント(受取+送信ボーナス) */
+function earnedThisMonth() {
+  return receivedThisMonth().points + sentThisMonth().bonus;
 }
 
 function myRank() {
@@ -52,6 +71,7 @@ export default {
     let activeChannel = null;
     let composerType = "notice";
     let composerDraft = "";
+    let composerImages = [];          // 添付画像 dataURL(最大3枚)
     const expanded = new Set();       // コメント展開中の投稿ID
     const commentDrafts = new Map();  // 投稿ID → 下書き
 
@@ -65,7 +85,7 @@ export default {
       ));
 
       const main = el("div", { class: "sns-main" });
-      const side = el("aside", { class: "sns-side" }, pointsCard(), philosophyCard());
+      const side = el("aside", { class: "sns-side" }, pointsCard(), monthlyCard(), philosophyCard());
       root.appendChild(el("div", { class: "sns-layout" }, main, side));
 
       const posts = store.get("posts");
@@ -97,7 +117,7 @@ export default {
       main.appendChild(list);
     }
 
-    /* ---- 投稿フォーム ---- */
+    /* ---- 投稿フォーム(画像を1〜3枚添付できる) ---- */
     function composer() {
       const me = store.me();
       const ta = el("textarea", {
@@ -115,9 +135,49 @@ export default {
       );
       segWrap.appendChild(buildSeg());
 
+      /* --- 画像添付 --- */
+      const fileIn = el("input", {
+        type: "file", accept: "image/*", multiple: true,
+        style: { display: "none" },
+      });
+      const thumbs = el("div", { class: "attach-thumbs composer-thumbs" });
+      const attachBtn = el("button", { class: "btn ghost sm", type: "button", onclick: () => fileIn.click() },
+        "🖼", el("span", {}, `画像(${composerImages.length}/${MAX_POST_IMAGES})`));
+
+      const paintThumbs = () => {
+        clear(thumbs);
+        composerImages.forEach((src, i) => {
+          thumbs.appendChild(el("span", { class: "attach-thumb" },
+            el("img", { src, alt: `添付画像${i + 1}` }),
+            el("button", {
+              class: "at-del", type: "button", "aria-label": "この画像を外す",
+              onclick: () => { composerImages.splice(i, 1); paintThumbs(); },
+            }, "×")));
+        });
+        clear(attachBtn).append("🖼", el("span", {}, `画像(${composerImages.length}/${MAX_POST_IMAGES})`));
+        attachBtn.disabled = composerImages.length >= MAX_POST_IMAGES;
+      };
+
+      fileIn.addEventListener("change", async () => {
+        const files = [...(fileIn.files || [])];
+        fileIn.value = "";
+        if (!files.length) return;
+        const room = MAX_POST_IMAGES - composerImages.length;
+        if (files.length > room) toast(`画像は最大${MAX_POST_IMAGES}枚までです`, "info");
+        for (const f of files.slice(0, room)) {
+          try {
+            composerImages.push(await fileToDataURL(f));
+          } catch (e) {
+            toast(`「${f.name}」を読み込めませんでした`, "error");
+          }
+        }
+        paintThumbs();
+      });
+      paintThumbs();
+
       const submit = () => {
         const body = composerDraft.trim();
-        if (!body) { toast("共有する内容を入力してください", "error"); return; }
+        if (!body && !composerImages.length) { toast("共有する内容を入力してください", "error"); return; }
         store.addFirst("posts", {
           type: composerType,
           channelId: "ch-all",
@@ -125,19 +185,35 @@ export default {
           date: nowIso(),
           title: composerType === "chourei" ? `朝礼メモ(${store.storeName(me.storeId)})` : null,
           body,
+          images: [...composerImages],
           likes: [], comments: [], pinned: false,
         });
         composerDraft = "";
+        composerImages = [];
         toast("タイムラインに投稿しました");
         draw();
       };
 
       return el("div", { class: "card composer" },
         el("div", { class: "composer-row" }, avatar(me, 38), ta),
+        thumbs,
         el("div", { class: "composer-foot" },
           segWrap,
+          attachBtn, fileIn,
           el("span", { class: "spacer" }),
           el("button", { class: "btn primary", onclick: submit }, icon("send", 15), "投稿する")));
+    }
+
+    /* ---- 投稿画像のグリッド表示 ---- */
+    function postImages(p) {
+      const imgs = p.images || [];
+      if (!imgs.length) return null;
+      return el("div", { class: `post-images n${Math.min(imgs.length, 3)}` },
+        imgs.slice(0, MAX_POST_IMAGES).map((src, i) => el("button", {
+          class: "post-img",
+          "aria-label": `添付画像${i + 1}を拡大`,
+          onclick: () => openImageModal(src, "添付画像"),
+        }, el("img", { src, alt: `添付画像${i + 1}`, loading: "lazy" }))));
     }
 
     /* ---- 投稿カード(type別) ---- */
@@ -161,7 +237,8 @@ export default {
               ? el("span", { class: "channel-chip" }, `${channel.icon} ${channel.name}`)
               : null)),
         p.title ? el("h4", { class: "post-title" }, p.title) : null,
-        el("p", { class: "post-body" }, p.body),
+        p.body ? el("p", { class: "post-body" }, p.body) : null,
+        postImages(p),
         postFoot(p),
         expanded.has(p.id) ? commentsBlock(p) : null,
       );
@@ -263,12 +340,13 @@ export default {
       const me = store.me();
       const staffCount = store.get("staff").length;
       const sent = sentThisMonth();
+      const recv = receivedThisMonth();
       const thanksPosts = store.get("posts").filter((p) => p.type === "thanks").sort(byDateDesc);
 
       main.appendChild(el("div", { class: "kpi-row sns-kpi" },
-        statTile({ label: "累計獲得ポイント", value: `${fmtNum(me.points)} pt`, icon: "gift", tone: "accent", sub: "サンクスで受け取った合計" }),
+        statTile({ label: "累計獲得ポイント", value: `${fmtNum(me.points)} pt`, icon: "gift", tone: "accent", sub: "送っても受け取っても貯まります" }),
+        statTile({ label: "今月の獲得", value: `+${fmtNum(earnedThisMonth())} pt`, icon: "heart", tone: "good", sub: `受取 ${fmtNum(recv.points)}pt+送信ボーナス ${fmtNum(sent.bonus)}pt` }),
         statTile({ label: "全社ランキング", value: `${myRank()}位`, icon: "award", tone: "brand", sub: `全${staffCount}名中` }),
-        statTile({ label: "今月の送信", value: `${fmtNum(sent)} pt`, icon: "heart", tone: "good", sub: `残り ${fmtNum(Math.max(0, MONTHLY_BUDGET - sent))}pt / 月${MONTHLY_BUDGET}pt` }),
       ));
 
       if (!thanksPosts.length) {
@@ -363,17 +441,42 @@ export default {
     function pointsCard() {
       const me = store.me();
       const sent = sentThisMonth();
-      const remaining = Math.max(0, MONTHLY_BUDGET - sent);
+      const recv = receivedThisMonth();
       return el("div", { class: "card points-card" },
-        el("div", { class: "pc-head" }, "🎁 今月のサンクスポイント"),
+        el("div", { class: "pc-head" }, "🎁 サンクスポイント"),
         el("div", { class: "pc-num" },
-          el("span", { class: "pc-big" }, fmtNum(remaining)),
-          el("span", { class: "pc-unit" }, `/ ${MONTHLY_BUDGET}pt 残っています`)),
-        meter({ label: "今月の使用分", value: sent, max: MONTHLY_BUDGET, fmt: (v) => `${v}pt`, kind: "accent" }),
+          el("span", { class: "pc-big" }, fmtNum(me.points)),
+          el("span", { class: "pc-unit" }, "pt(累計)")),
+        el("div", { class: "pc-earnnote" },
+          icon("sparkle", 13),
+          el("span", {}, "手持ちポイントの制限はありません。", el("strong", {}, `送ると+${SEND_BONUS}pt`), "、", el("strong", {}, "受け取るとギフト分"), "が貯まります。")),
         el("div", { class: "pc-kv" },
-          kv("累計獲得ポイント", `${fmtNum(me.points)} pt`),
+          kv("今月の獲得", `+${fmtNum(earnedThisMonth())} pt`),
+          kv("今月:送った", `${fmtNum(sent.count)}件(+${fmtNum(sent.bonus)}pt)`),
+          kv("今月:受け取った", `${fmtNum(recv.count)}件(+${fmtNum(recv.points)}pt)`),
           kv("全社ランキング", `${myRank()}位 / ${store.get("staff").length}名`)),
         el("button", { class: "btn accent block", onclick: openThanksModal }, icon("gift", 16), "サンクスを送る"));
+    }
+
+    /* 毎月のお願い(1minuteアンケート+交通費申請) */
+    function monthlyCard() {
+      const m = Number(monthOf(todayStr()).slice(5));
+      return el("div", { class: "card monthly-card" },
+        el("div", { class: "mc-head" }, "📌 毎月のお願い", badge(`${m}月分`, "accent")),
+        el("a", {
+          class: "mc-item", href: SURVEY_URL, target: "_blank", rel: "noopener noreferrer",
+        },
+          el("span", { class: "mc-ic" }, "📝"),
+          el("span", { class: "mc-main" },
+            el("span", { class: "mc-title" }, "1minuteアンケートに回答"),
+            el("span", { class: "mc-sub" }, "所要1分・月1回(Googleフォームが開きます)")),
+          icon("chevR", 15)),
+        el("a", { class: "mc-item", href: "#/backoffice/expense" },
+          el("span", { class: "mc-ic" }, "🚃"),
+          el("span", { class: "mc-main" },
+            el("span", { class: "mc-title" }, "交通費を申請(月1回)"),
+            el("span", { class: "mc-sub" }, "領収書画像+金額+区間(どこからどこまで)+距離")),
+          icon("chevR", 15)));
     }
 
     function philosophyCard() {
@@ -391,10 +494,8 @@ export default {
     /* ================= サンクス送信モーダル ================= */
     function openThanksModal() {
       const me = store.me();
-      const sent = sentThisMonth();
-      const remaining = Math.max(0, MONTHLY_BUDGET - sent);
       let toId = null;
-      let pts = [...PT_OPTIONS].reverse().find((p) => p <= remaining) ?? 0;
+      let pts = 20;
       let msg = "";
 
       const others = store.get("staff").filter((s) => s.id !== me.id);
@@ -421,7 +522,6 @@ export default {
         for (const p of PT_OPTIONS) {
           ptWrap.appendChild(el("button", {
             class: `tm-pt ${pts === p ? "on" : ""}`,
-            disabled: p > remaining,
             onclick: () => { pts = p; renderPts(); },
           },
             el("span", { class: "tm-pt-emoji" }, p === 10 ? "🌱" : p === 20 ? "🌷" : "💐"),
@@ -443,25 +543,26 @@ export default {
         body: el("div", { class: "page-sns" },
           el("div", { class: "thanks-modal" },
             el("div", { class: "field" }, el("label", {}, "宛先"), staffWrap),
-            el("div", { class: "field" }, el("label", {}, "ギフトポイント"), ptWrap),
+            el("div", { class: "field" }, el("label", {}, "ギフトポイント(相手に貯まります)"), ptWrap),
             el("div", { class: "field" }, el("label", {}, "メッセージ"), ta),
             el("div", { class: "tm-remaining" },
               icon("info", 14),
-              `今月の残りポイント:${fmtNum(remaining)}pt(毎月${MONTHLY_BUDGET}ptまで送れます)`))),
+              `送ると、あなたにも送信ボーナス +${SEND_BONUS}pt が貯まります(送信上限はありません)`))),
         actions: [cancelBtn, sendBtn],
       });
       cancelBtn.addEventListener("click", m.close);
       sendBtn.addEventListener("click", () => {
         if (!toId) { toast("宛先のスタッフを選択してください", "error"); return; }
         if (!msg.trim()) { toast("メッセージを入力してください", "error"); return; }
-        if (!pts || pts > remaining) { toast("今月の残りポイントが足りません", "error"); return; }
         store.addFirst("posts", {
           type: "thanks", authorId: me.id, toId, points: pts,
           date: nowIso(), body: msg.trim(), likes: [], comments: [], pinned: false,
         });
+        // 受け取った側にはギフト分、送った側には送信ボーナスが貯まる
         store.update("staff", toId, (s) => ({ points: (s.points || 0) + pts }));
+        store.update("staff", me.id, (s) => ({ points: (s.points || 0) + SEND_BONUS }));
         m.close();
-        celebrate(`${store.staffName(toId)}さんに ${pts}pt のサンクスを送りました!`);
+        celebrate(`${store.staffName(toId)}さんに ${pts}pt のサンクスを送りました!(あなたに+${SEND_BONUS}pt)`);
         draw();
       });
     }

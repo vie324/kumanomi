@@ -463,7 +463,51 @@ export default {
           drawHead(); toast("ピン留めしました");
         },
       }, icon("pin", 13)));
+      tools.appendChild(el("button", {
+        class: "tool-btn tl-ic", title: "タスクリストに追加", "aria-label": "タスクリストに追加",
+        onclick: () => openTaskFromMessage(m, room),
+      }, icon("clipboard", 13)));
       return tools;
+    }
+
+    /* ---- チャット発言 → タスク化 ---- */
+    function openTaskFromMessage(m, room) {
+      const titleIn = el("input", { class: "input", placeholder: "タスクの内容" });
+      titleIn.value = excerpt(m.text || m.attachment?.name || "", 60);
+      const ownerSel = el("select", { class: "select" },
+        room.memberIds.map((id) => el("option", { value: id, selected: id === meId }, store.staffName(id))));
+      const dueIn = el("input", { class: "input", type: "date", value: addDays(todayStr(), 3) });
+      const noteIn = el("textarea", { class: "textarea", rows: 2 });
+      noteIn.value = `${store.staffName(m.authorId)}さんの発言(${roomTitle(room)})から作成`;
+
+      const okBtn = el("button", { class: "btn primary" }, icon("check", 15), "タスクを作成");
+      const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
+      const md = modal({
+        title: "このメッセージをタスク化",
+        body: el("div", { class: "page-chat chat-modal new-room" },
+          el("div", { class: "field" }, el("label", {}, "タスクの内容"), titleIn),
+          el("div", { class: "field" }, el("label", {}, "担当者"), ownerSel),
+          el("div", { class: "field" }, el("label", {}, "期限"), dueIn),
+          el("div", { class: "field" }, el("label", {}, "メモ"), noteIn)),
+        actions: [cancelBtn, okBtn],
+      });
+      cancelBtn.addEventListener("click", () => md.close());
+      okBtn.addEventListener("click", () => {
+        const t = titleIn.value.trim();
+        if (!t) { toast("タスクの内容を入力してください", "error"); return; }
+        store.add("tasks", {
+          title: t,
+          note: noteIn.value.trim(),
+          ownerId: ownerSel.value,
+          createdBy: meId,
+          due: dueIn.value || null,
+          status: "todo",
+          source: { kind: "chat", refId: room.id, label: roomTitle(room) },
+          createdAt: todayStr(),
+        });
+        md.close();
+        toast(`タスクを作成しました(担当:${store.staffName(ownerSel.value)})。「タスク」ページで確認できます`);
+      });
     }
 
     /* ---------------- 操作 ---------------- */
@@ -760,6 +804,11 @@ export default {
       if (msgQuery) { msgQuery = ""; searchOpen = false; drawSearchBar(); drawHead(); }
       drawReplyBar(); drawAttachBar(); closeMentionPop(); closePop();
       drawMessages(); scrollToBottom(); drawRoomList();
+      // モバイル:送信ボタンにフォーカスが移るとキーボードが閉じて
+      // 画面全体がずれるため、入力欄にフォーカスを戻して連続入力できるようにする
+      if (isMobile()) {
+        try { ta.focus({ preventScroll: true }); } catch (e) { ta.focus(); }
+      }
       if (mentions.length) toast(`${mentions.length}名にメンションを送りました`, "success");
     }
 
@@ -874,18 +923,64 @@ export default {
 
     /* ============================================================
        高さ調整(会話ペインをビューポート内に収める)
+       モバイルではソフトキーボードの開閉で表示領域が変わるため、
+       innerHeight ではなく visualViewport を基準にする。
+       キーボード表示時にブラウザが行う自動スクロールで
+       レイアウトがずれたまま戻らない問題(送信時の画面ズレ)もここで補正する。
        ============================================================ */
+    const vv = window.visualViewport;
+    const viewportH = () => (vv ? vv.height : window.innerHeight);
+    const keyboardOpen = () => !!vv && (window.innerHeight - vv.height) > 140;
+
     function fitHeight() {
-      if (!document.body.contains(shell)) { window.removeEventListener("resize", fitHeight); return; }
+      if (!document.body.contains(shell)) { unbindViewport(); return; }
+      const mobile = isMobile();
+
+      if (mobile && keyboardOpen()) {
+        // キーボード表示中:シェル上端を見えている領域の先頭へ寄せ、
+        // 入力欄が隠れない高さに詰める
+        const panTop = vv?.offsetTop || 0;
+        const rectTop = shell.getBoundingClientRect().top;
+        const target = window.scrollY + rectTop - panTop - 4;
+        if (Math.abs(target - window.scrollY) > 6) window.scrollTo(0, Math.max(0, target));
+        shell.style.height = Math.max(200, Math.round(viewportH() - 8)) + "px";
+        return;
+      }
+
+      // 通常時:キーボードが閉じた後にページが上へずれたままなら戻す
+      if (mobile && showConv) {
+        const t = shell.getBoundingClientRect().top;
+        if (t < -4) window.scrollTo(0, Math.max(0, window.scrollY + t - 8));
+      }
       const main = shell.closest(".main");
       const pad = main ? parseFloat(getComputedStyle(main).paddingBottom) || 0 : 0;
       const mb = parseFloat(getComputedStyle(root).marginBottom) || 0;
       const top = shell.getBoundingClientRect().top;
-      const h = Math.max(360, Math.round(window.innerHeight - top - (pad + mb)));
+      const h = Math.max(mobile ? 280 : 360, Math.round(viewportH() - top - (pad + mb)));
       shell.style.height = h + "px";
     }
+
+    function onViewportChange() {
+      if (!document.body.contains(shell)) { unbindViewport(); return; }
+      fitHeight();
+      // キーボードの開閉後も会話の最下部(最新メッセージ)を維持する
+      requestAnimationFrame(() => { convBody.scrollTop = convBody.scrollHeight; });
+    }
+
+    function unbindViewport() {
+      window.removeEventListener("resize", fitHeight);
+      if (vv) {
+        vv.removeEventListener("resize", onViewportChange);
+        vv.removeEventListener("scroll", onViewportChange);
+      }
+    }
+
     requestAnimationFrame(() => { fitHeight(); setTimeout(fitHeight, 500); });
     window.addEventListener("resize", fitHeight);
+    if (vv) {
+      vv.addEventListener("resize", onViewportChange);
+      vv.addEventListener("scroll", onViewportChange);
+    }
 
     /* ---------------- 初期描画 ---------------- */
     if (activeRoomId && (showConv || !isMobile())) unreadFromId = markRoomRead(activeRoomId);
