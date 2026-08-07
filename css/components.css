@@ -674,3 +674,43 @@
 .perm-gate .pg-title { font-size: var(--fs-lg); font-weight: 800; }
 .perm-gate .pg-desc { font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.8; max-width: 460px; }
 .perm-gate .pg-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+
+/* ---- ボイス入力ボタン ---- */
+.mic-btn { position: relative; }
+.mic-btn.rec {
+  background: var(--critical-soft);
+  color: var(--critical-text);
+  border-color: color-mix(in srgb, var(--critical) 40%, transparent);
+  animation: mic-pulse 1.3s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--critical) 34%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--critical) 0%, transparent); }
+}
+
+/* ---- 画像プレビューモーダル ---- */
+.img-modal-body { display: grid; place-items: center; }
+.img-modal-img {
+  max-width: 100%; max-height: 68vh;
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  background: #fff;
+}
+
+/* ---- 添付画像チップ(経費・タイムライン共通) ---- */
+.attach-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.attach-thumb {
+  position: relative;
+  width: 74px; height: 74px;
+  border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-2);
+}
+.attach-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.attach-thumb .at-del {
+  position: absolute; top: 3px; right: 3px;
+  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55); color: #fff;
+}

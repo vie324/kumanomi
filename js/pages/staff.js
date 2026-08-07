@@ -7,15 +7,28 @@
 import {
   el, clear, icon, badge, avatar, card, sectionHeader, tabs, table, emptyState,
   staffChip, kv, fmtDate, toast, aiButton, aiPanel, meter, modal, chip, segmented, celebrate,
+  micButton,
 } from "../ui.js";
 import { radar } from "../charts.js";
 import { store, todayStr } from "../store.js";
-import { makeTest, testTopics, summarizeInterview } from "../ai.js";
+import { makeTest, testTopics, summarizeInterview, sampleInterviewVoice } from "../ai.js";
+import { can, canSeeStaff, rankLevel } from "../auth.js";
 
 /* ---------------- 共通ヘルパー ---------------- */
 
 const PRACT_ROLES = ["院長", "柔道整復師", "鍼灸師"];
 const practitioners = () => store.get("staff").filter((s) => PRACT_ROLES.includes(s.role));
+
+/** その人の点数(テスト・スキルスコア・評価)を見られるか。
+    一般社員は自分(+メンティー)のみ。院長以上は配下を閲覧できる。 */
+const canViewScore = (staffId) => can("staff.viewScores", { staffId });
+
+/** 点数が非公開のときのプレースホルダ */
+function scoreLockNote(size = "sm") {
+  return el("div", { class: `st-scorelock ${size}` },
+    icon("eye", 14),
+    el("span", {}, "点数は本人と責任者のみ閲覧できます"));
+}
 
 function skillsRadar(s, size = 150) {
   return radar({
@@ -63,6 +76,10 @@ const h4 = (text) => el("h4", { class: "st-h4" }, text);
    ============================================================ */
 
 function membersView(body) {
+  if (rankLevel(store.me()) < 3) {
+    body.appendChild(el("div", { class: "st-note st-note-block" }, icon("eye", 15),
+      el("span", {}, "スキルスコアやテストの点数は、", el("strong", {}, "本人と責任者(院長以上)のみ"), "が閲覧できます。")));
+  }
   const grid = el("div", { class: "st-mgrid" });
   for (const s of store.get("staff")) {
     const open = () => openMemberModal(s);
@@ -80,26 +97,30 @@ function membersView(body) {
         badge(store.storeName(s.storeId), "brand"),
         badge(s.role),
         el("span", { class: "st-pts", title: "サンクスポイント" }, icon("gift", 13), `${s.points}pt`)),
-      el("div", { class: "st-mradar" }, skillsRadar(s, 150))));
+      el("div", { class: "st-mradar" },
+        canViewScore(s.id) ? skillsRadar(s, 150) : scoreLockNote())));
   }
   body.appendChild(grid);
 }
 
 function openMemberModal(s) {
+  const showScore = canViewScore(s.id);
   const history = store.get("tests")
     .flatMap((t) => t.results.filter((r) => r.staffId === s.id).map((r) => ({ test: t, r })))
     .sort((a, b) => (a.r.date < b.r.date ? 1 : -1));
 
-  const historyBody = history.length
-    ? table({
-        columns: [
-          { key: "title", label: "テスト", render: (x) => el("span", { class: "st-cellwrap" }, x.test.title) },
-          { key: "date", label: "受験日", render: (x) => el("span", { class: "mono-num small" }, fmtDate(x.r.date)) },
-          { key: "score", label: "スコア", align: "right", render: (x) => scoreBadge(x.r.score) },
-        ],
-        rows: history,
-      })
-    : el("p", { class: "muted small" }, "テストの受験履歴はまだありません");
+  const historyBody = !showScore
+    ? scoreLockNote()
+    : history.length
+      ? table({
+          columns: [
+            { key: "title", label: "テスト", render: (x) => el("span", { class: "st-cellwrap" }, x.test.title) },
+            { key: "date", label: "受験日", render: (x) => el("span", { class: "mono-num small" }, fmtDate(x.r.date)) },
+            { key: "score", label: "スコア", align: "right", render: (x) => scoreBadge(x.r.score) },
+          ],
+          rows: history,
+        })
+      : el("p", { class: "muted small" }, "テストの受験履歴はまだありません");
 
   const closeBtn = el("button", { class: "btn ghost" }, "閉じる");
   const m = modal({
@@ -115,13 +136,13 @@ function openMemberModal(s) {
               el("div", { class: "st-kana" }, s.kana),
               el("div", { class: "st-mbadges", style: { marginTop: "6px" } },
                 badge(store.storeName(s.storeId), "brand"), badge(s.role)))),
-          skillsRadar(s, 250)),
+          showScore ? skillsRadar(s, 250) : scoreLockNote("lg")),
         el("div", { class: "st-detail-right" },
           h4("基本情報"),
           kv("入社", fmtDate(s.joined, { withYear: true, withDow: false })),
           kv("保有資格", s.licenses?.length ? s.licenses.join("・") : "—"),
           kv("サンクスポイント", `${s.points} pt`),
-          kv("スキル平均", (Object.values(s.skills).reduce((a, v) => a + v, 0) / Object.keys(s.skills).length).toFixed(1) + " / 5.0"),
+          showScore ? kv("スキル平均", (Object.values(s.skills).reduce((a, v) => a + v, 0) / Object.keys(s.skills).length).toFixed(1) + " / 5.0") : null,
           h4("テスト受験履歴"),
           historyBody))),
     actions: [closeBtn],
@@ -134,7 +155,9 @@ function openMemberModal(s) {
    ============================================================ */
 
 function testsView(body, rerender) {
-  const createBtn = aiButton("AIでテストを作成", async () => openCreateTestModal(rerender));
+  const createBtn = can("staff.manageTests")
+    ? aiButton("AIでテストを作成", async () => openCreateTestModal(rerender))
+    : null;
   body.appendChild(el("div", { class: "st-toolrow" },
     el("div", { class: "st-note" }, icon("sparkle", 15),
       el("span", {}, "研修テーマからAIが問題・解説を自動作成します。受験結果は個人評価に自動反映されます。")),
@@ -153,23 +176,33 @@ function testsView(body, rerender) {
 
 function testCard(t, rerender) {
   const me = store.me();
+  const canAllScores = rankLevel(me) >= 3;
   const avg = avgScore(t);
   const taken = takenCount(t);
   const total = t.assignedTo.length || 1;
   const myResult = t.results.find((r) => r.staffId === me.id);
   const assignedToMe = t.assignedTo.includes(me.id);
 
-  const results = [...t.results].sort((a, b) => b.score - a.score);
+  // 一般社員には自分(+メンティー等、canSeeStaff の範囲)の点数だけを見せる
+  const results = [...t.results]
+    .filter((r) => canViewScore(r.staffId))
+    .sort((a, b) => b.score - a.score);
+  const hiddenN = t.results.length - results.length;
   const resultTable = results.length
-    ? table({
-        columns: [
-          { key: "staff", label: "スタッフ", render: (r) => staffChip(r.staffId, { size: 26 }) },
-          { key: "date", label: "受験日", render: (r) => el("span", { class: "mono-num small" }, fmtDate(r.date)) },
-          { key: "score", label: "スコア", align: "right", render: (r) => scoreBadge(r.score) },
-        ],
-        rows: results,
-      })
-    : emptyState({ icon: "🗒", title: "まだ受験者がいません", hint: "「受験する」から回答できます" });
+    ? el("div", {},
+        table({
+          columns: [
+            { key: "staff", label: "スタッフ", render: (r) => staffChip(r.staffId, { size: 26 }) },
+            { key: "date", label: "受験日", render: (r) => el("span", { class: "mono-num small" }, fmtDate(r.date)) },
+            { key: "score", label: "スコア", align: "right", render: (r) => scoreBadge(r.score) },
+          ],
+          rows: results,
+        }),
+        hiddenN > 0 ? el("p", { class: "small muted", style: { marginTop: "6px" } },
+          `他 ${hiddenN}名の点数は非公開です(本人と責任者のみ閲覧できます)`) : null)
+    : t.results.length
+      ? scoreLockNote()
+      : emptyState({ icon: "🗒", title: "まだ受験者がいません", hint: "「受験する」から回答できます" });
 
   const takeBtn = assignedToMe
     ? el("button", {
@@ -189,9 +222,9 @@ function testCard(t, rerender) {
         el("span", { class: "small muted" }, `${t.questions.length}問・作成 ${fmtDate(t.createdAt)}`)),
       el("div", { class: "st-test-stats" },
         el("div", { class: "st-avg" },
-          el("div", { class: "st-avg-val" }, avg == null ? "—" : avg,
-            avg == null ? null : el("span", { class: "st-avg-unit" }, "点")),
-          el("div", { class: "st-avg-label" }, "平均点")),
+          el("div", { class: "st-avg-val" }, !canAllScores || avg == null ? "—" : avg,
+            !canAllScores || avg == null ? null : el("span", { class: "st-avg-unit" }, "点")),
+          el("div", { class: "st-avg-label" }, canAllScores ? "平均点" : "平均点(責任者のみ)")),
         meter({
           label: "受験状況",
           value: taken, max: total,
@@ -452,21 +485,31 @@ function evalsView(body) {
   body.appendChild(el("div", { class: "st-note st-note-block st-note-good" }, icon("sparkle", 15),
     el("span", {},
       el("strong", {}, "評価集計の手作業はなくなりました。"),
-      "日報・契約率・テスト結果から自動集計され、半期評価のドラフトが自動作成されます。")));
+      "日報・テスト結果から自動集計され、半期評価のドラフトが自動作成されます。")));
 
-  const evals = [...store.get("evaluations")].sort((a, b) => evalAvg(b) - evalAvg(a));
+  // 一般社員は自分の評価のみ。責任者は配下の評価を閲覧できる
+  const evals = [...store.get("evaluations")]
+    .filter((ev) => canViewScore(ev.staffId))
+    .sort((a, b) => evalAvg(b) - evalAvg(a));
+  const isLimited = rankLevel(store.me()) < 3;
+
   body.appendChild(card({
-    title: "個人評価", sub: `${evals[0]?.period || ""}・行をクリックで詳細`,
-    body: table({
-      columns: [
-        { key: "staff", label: "スタッフ", render: (ev) => staffChip(ev.staffId, { size: 30 }) },
-        { key: "period", label: "期", render: (ev) => el("span", { class: "small mono-num" }, ev.period) },
-        { key: "grade", label: "総合", align: "center", render: (ev) => badge(`${ev.grade}評価`, GRADE_KIND[ev.grade] || "") },
-        { key: "avg", label: "スコア平均", align: "right", render: (ev) => el("strong", { class: "mono-num" }, evalAvg(ev).toFixed(1)) },
-      ],
-      rows: evals,
-      onRowClick: (ev) => openEvalModal(ev),
-    }),
+    title: "個人評価",
+    sub: isLimited
+      ? `${evals[0]?.period || ""}・自分の評価のみ表示されます(他のスタッフの点数は非公開)`
+      : `${evals[0]?.period || ""}・行をクリックで詳細`,
+    body: evals.length
+      ? table({
+          columns: [
+            { key: "staff", label: "スタッフ", render: (ev) => staffChip(ev.staffId, { size: 30 }) },
+            { key: "period", label: "期", render: (ev) => el("span", { class: "small mono-num" }, ev.period) },
+            { key: "grade", label: "総合", align: "center", render: (ev) => badge(`${ev.grade}評価`, GRADE_KIND[ev.grade] || "") },
+            { key: "avg", label: "スコア平均", align: "right", render: (ev) => el("strong", { class: "mono-num" }, evalAvg(ev).toFixed(1)) },
+          ],
+          rows: evals,
+          onRowClick: (ev) => openEvalModal(ev),
+        })
+      : emptyState({ icon: "🗂", title: "閲覧できる評価はありません", hint: "評価対象は施術者のみです" }),
   }));
 }
 
@@ -506,14 +549,18 @@ function openEvalModal(ev) {
    ============================================================ */
 
 function interviewsView(body, rerender) {
+  const me = store.me();
   const newBtn = el("button", { class: "btn primary", onclick: () => openNewInterviewModal(rerender) },
     icon("plus", 16), "新規面談メモ");
   body.appendChild(el("div", { class: "st-toolrow" },
-    el("div", { class: "st-note" }, icon("sparkle", 15),
-      el("span", {}, "面談中の走り書きメモから、AIが問題点・要因・ネクストアクション・ムードを構造化します。")),
+    el("div", { class: "st-note" }, icon("mic", 15),
+      el("span", {}, "面談の内容は", el("strong", {}, "ボイス入力"), "でそのまま記録し、AIが問題点・要因・ネクストアクション・ムードに整理します。")),
     newBtn));
 
-  const list = [...store.get("interviews")].sort((a, b) => (a.date < b.date ? 1 : -1));
+  // 面談記録は「自分が受けた/自分が面談した/配下・メンティー」のみ閲覧できる
+  const list = [...store.get("interviews")]
+    .filter((iv) => iv.interviewerId === me.id || canSeeStaff(iv.staffId))
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
   body.appendChild(card({
     title: "面談記録", sub: `${list.length}件・クリックで詳細`,
     body: list.length
@@ -578,18 +625,22 @@ function openNewInterviewModal(rerender) {
     others.map((s) => el("option", { value: s.id }, `${s.name}(${store.storeName(s.storeId)}・${s.role})`)));
   const ta = el("textarea", {
     class: "textarea", rows: 7,
-    placeholder: "面談中の走り書きをそのまま入力してください。\n例)テストの点数が伸びず落ち込んでいる様子。勉強の仕方が分からないと話す。シフトが合わず先輩の施術見学ができていない。",
+    placeholder: "「ボイス入力」を押して話すだけでOK。走り書きの入力でもかまいません。\n例)テストの点数が伸びず落ち込んでいる様子。勉強の仕方が分からないと話す。シフトが合わず先輩の施術見学ができていない。",
+  });
+  const mic = micButton(ta, {
+    samples: [sampleInterviewVoice(0), sampleInterviewVoice(1)],
+    label: "ボイス入力",
   });
 
   let summary = null;
   const host = el("div", { class: "mt-12" });
-  const panel = aiPanel("AI面談要約");
+  const panel = aiPanel("AI面談整理");
   const saveBtn = el("button", { class: "btn primary", disabled: true }, icon("check", 15), "保存");
   const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
 
-  const sumBtn = aiButton("AIで要約", async () => {
+  const sumBtn = aiButton("AIで整理", async () => {
     const text = ta.value.trim();
-    if (!text) { toast("メモが空です。走り書きで良いので入力してください", "error"); return; }
+    if (!text) { toast("メモが空です。ボイス入力または走り書きで入力してください", "error"); return; }
     if (!host.contains(panel.el)) host.appendChild(panel.el);
     panel.thinking("面談メモを分析しています");
     summary = await summarizeInterview(text);
@@ -600,11 +651,14 @@ function openNewInterviewModal(rerender) {
   });
 
   const m = modal({
-    title: "新規面談メモ",
+    title: "新規面談メモ(ボイス入力対応)",
     wide: true,
     body: el("div", { class: "page-staff" },
       el("div", { class: "field" }, el("label", {}, "面談したスタッフ"), sel),
-      el("div", { class: "field mt-12" }, el("label", {}, "面談メモ(走り書きでOK)"), ta),
+      el("div", { class: "field mt-12" },
+        el("div", { class: "flex between wrap", style: { gap: "8px" } },
+          el("label", {}, "面談メモ(話すだけでOK)"), mic),
+        ta),
       el("div", { class: "st-ta-actions" }, sumBtn),
       host),
     actions: [cancelBtn, saveBtn],

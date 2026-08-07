@@ -198,3 +198,26 @@
   .page-reserve .rv-datelabel { font-size: var(--fs-sm); }
   .page-reserve .rv-heat { height: 40px; }
 }
+
+/* ---- ベッド基軸グリッド ---- */
+.page-reserve .rv-bedic { font-size: 15px; flex: none; }
+.page-reserve .rv-card .rv-staffline {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 2px;
+  min-width: 0;
+}
+.page-reserve .rv-card .rv-staffname {
+  font-size: 10px; color: var(--ink-3); font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---- ドラッグ&ドロップで枠移動 ---- */
+.page-reserve .rv-card[draggable="true"] { cursor: grab; }
+.page-reserve .rv-card[draggable="true"]:active { cursor: grabbing; }
+.page-reserve .rv-card.dragging { opacity: 0.45; box-shadow: none; }
+.page-reserve .rv-slot.drop-ok {
+  outline: 2px dashed var(--brand);
+  outline-offset: -3px;
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  border-radius: 8px;
+}

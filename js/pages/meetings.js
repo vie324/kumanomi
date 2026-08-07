@@ -4,10 +4,10 @@
    ============================================================ */
 import {
   el, clear, icon, badge, avatar, card, sectionHeader, table, emptyState,
-  staffChip, fmtDate, toast, aiButton, aiPanel,
+  staffChip, fmtDate, toast, aiButton, aiPanel, micButton,
 } from "../ui.js";
 import { store, todayStr } from "../store.js";
-import { summarizeMeeting } from "../ai.js";
+import { summarizeMeeting, sampleMeetingVoice } from "../ai.js";
 
 /* ---------------- 定数・ヘルパー ---------------- */
 
@@ -90,8 +90,31 @@ function statusBtn(meetingId, item, onChanged) {
     STATUS_LABEL[item.status] || item.status);
 }
 
-/** アクションアイテム 1 行(担当・期限・期限超過つき) */
-function actionRow(meetingId, it, onChanged) {
+/** 議事録のアクションアイテムをタスクリストへ送る(重複は追加しない)。追加できたら true */
+function sendActionToTasks(meeting, it, { silent = false } = {}) {
+  const dup = store.get("tasks").some((t) =>
+    t.source?.kind === "meeting" && t.source?.refId === meeting.id && t.title === it.title);
+  if (dup) {
+    if (!silent) toast("このアクションはすでにタスクリストにあります", "info");
+    return false;
+  }
+  store.add("tasks", {
+    title: it.title,
+    note: `議事録「${meeting.title}(${fmtDate(meeting.date)})」から作成`,
+    ownerId: it.ownerId,
+    createdBy: store.me().id,
+    due: it.due || null,
+    status: it.status === "done" ? "done" : it.status === "doing" ? "doing" : "todo",
+    source: { kind: "meeting", refId: meeting.id, label: meeting.title },
+    createdAt: todayStr(),
+  });
+  if (!silent) toast(`「${it.title}」をタスクリストへ送りました(担当:${store.staffName(it.ownerId)})`);
+  return true;
+}
+
+/** アクションアイテム 1 行(担当・期限・期限超過つき)
+    meeting を渡すと「タスクへ」ボタン(タスクリスト連携)が付く */
+function actionRow(meetingId, it, onChanged, meeting = null) {
   return el("div", { class: "pm-ai-row" },
     statusBtn(meetingId, it, onChanged),
     el("div", { class: "pm-ai-main" },
@@ -99,7 +122,12 @@ function actionRow(meetingId, it, onChanged) {
       el("div", { class: "pm-ai-meta" },
         staffChip(it.ownerId, { size: 22, withRole: false }),
         el("span", { class: "pm-due" }, icon("calendar", 12), `期限 ${fmtDate(it.due)}`),
-        isOverdue(it) ? badge("期限超過", "critical") : null)));
+        isOverdue(it) ? badge("期限超過", "critical") : null)),
+    meeting ? el("button", {
+      class: "btn ghost sm pm-totask",
+      title: "タスクリストへ送る",
+      onclick: (e) => { e.stopPropagation(); sendActionToTasks(meeting, it); },
+    }, icon("clipboard", 13), "タスクへ") : null);
 }
 
 /* ============================================================
@@ -288,8 +316,13 @@ function minutesCard(meeting, rerender) {
   const ta = el("textarea", {
     class: "textarea pm-minutes",
     rows: 9,
-    placeholder: "会議中の走り書きメモをそのまま入力してください。\n例)\n・全店で前月比+4.2%。成増店の回数券成約が好調\n・川越店の夕方枠対策としてLINE配信を8月第1週に実施\n・次回までに離反リスク患者リストの声かけ結果を確認",
+    placeholder: "「ボイス入力」を押して会議の内容を話すだけでOK。走り書きの入力でもかまいません。\n例)\n・全店で前月比+4.2%。成増店の回数券成約が好調\n・川越店の夕方枠対策としてLINE配信を8月第1週に実施\n・次回までに離反リスク患者リストの声かけ結果を確認",
   }, meeting.minutes || "");
+
+  const mic = micButton(ta, {
+    samples: [sampleMeetingVoice(0), sampleMeetingVoice(1)],
+    label: "ボイス入力",
+  });
 
   const saveBtn = el("button", {
     class: "btn ghost",
@@ -305,7 +338,7 @@ function minutesCard(meeting, rerender) {
   const aiBtn = aiButton("AIで議事録に整形", async () => {
     const text = ta.value.trim();
     if (!text) {
-      toast("メモが空です。走り書きで良いので入力してください", "error");
+      toast("メモが空です。ボイス入力または走り書きで入力してください", "error");
       return;
     }
     if (!panel.el.isConnected) host.appendChild(panel.el);
@@ -316,11 +349,11 @@ function minutesCard(meeting, rerender) {
 
   return card({
     title: "議事録",
-    sub: "走り書きのメモをAIが要点・決定事項・アクションに整形します",
+    sub: "ボイス入力→AIが要点・決定事項・アクションに整形します",
     class: "mt-16",
     body: el("div", {},
       ta,
-      el("div", { class: "pm-ta-actions" }, saveBtn, aiBtn),
+      el("div", { class: "pm-ta-actions" }, mic, saveBtn, aiBtn),
       meeting.aiSummary
         ? el("div", { class: "pm-aisum mt-12" },
             el("div", { class: "pm-aisum-head" }, icon("sparkle", 14), "AI要約(保存済み)"),
@@ -375,10 +408,24 @@ function decisionsCard(meeting) {
 function ownActionsCard(meeting, rerender) {
   const items = meeting.actionItems || [];
   const openCnt = items.filter((x) => x.status !== "done").length;
+  const sendAllBtn = items.length
+    ? el("button", {
+        class: "btn soft sm",
+        onclick: () => {
+          const added = items.filter((it) => sendActionToTasks(meeting, it, { silent: true })).length;
+          toast(added ? `${added}件のアクションをタスクリストへ送りました` : "すべて送信済みです", added ? "success" : "info");
+        },
+      }, icon("clipboard", 13), "すべてタスクへ")
+    : null;
   const body = items.length
-    ? el("div", { class: "pm-ai-list" }, items.map((it) => actionRow(meeting.id, it, rerender)))
+    ? el("div", { class: "pm-ai-list" }, items.map((it) => actionRow(meeting.id, it, rerender, meeting)))
     : emptyState({ icon: "🎯", title: "アクションアイテムはまだありません", hint: "議事録のAI整形から追加できます" });
-  return card({ title: "この会議のアクションアイテム", sub: `未完了 ${openCnt}/${items.length}件`, body });
+  return card({
+    title: "この会議のアクションアイテム",
+    sub: `未完了 ${openCnt}/${items.length}件・「タスクへ」でタスクリストに送れます`,
+    actions: sendAllBtn,
+    body,
+  });
 }
 
 /* ============================================================

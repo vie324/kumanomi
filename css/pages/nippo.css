@@ -483,6 +483,9 @@
   gap: 8px;
   align-content: start;
 }
+/* 詳細モーダル単独表示(契約率ヒーローなし・4項目) */
+.nippo-modal .nippo-dnums.solo { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.nippo-modal .nippo-dnums.solo .nippo-dnum { padding: 12px 14px; }
 .nippo-modal .nippo-dnum.grow { grid-column: span 2; }
 .nippo-modal .nippo-dnum {
   display: flex; flex-direction: column; gap: 2px;

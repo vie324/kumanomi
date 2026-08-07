@@ -7,7 +7,7 @@ import {
   el, clear, icon, card, sectionHeader, statTile, badge, statusBadge,
   avatar, table, chip, toast, modal, fmtDate,
 } from "../ui.js";
-import { barChart } from "../charts.js";
+import { can } from "../auth.js";
 
 /* ---------------- helpers ---------------- */
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -39,6 +39,8 @@ export default {
     const me = store.me();
     const today = todayStr();
     const myStoreName = store.storeName(me.storeId);
+    // 承認キューは責任者(院長以上・本部人事)のみ。一般社員には表示しない
+    const canApprove = can("kintai.approve", { storeId: me.storeId });
 
     /* ---- GPSシミュレーター状態(このページ表示中のみ) ---- */
     const sim = { dist: 140, located: false };
@@ -384,7 +386,6 @@ export default {
       queueBody.appendChild(list);
     }
 
-    const queueSub = el("span", {});
     const queueCard = card({
       title: "承認キュー",
       sub: `責任者向け・${myStoreName}`,
@@ -394,6 +395,7 @@ export default {
 
     /* ============================================================
        4. 月次サマリー(自分)
+       ※ 総労働時間・平均稼働・直近の労働時間グラフは表示しない(現場要望)
        ============================================================ */
     const monthlyWrap = el("div", {});
 
@@ -403,33 +405,12 @@ export default {
       const mNum = Number(month.slice(5));
       const mine = att().filter((a) => a.staffId === me.id && monthOf(a.date) === month);
       const days = mine.filter((a) => a.clockIn).length;
-      const totalH = mine.reduce((sum, a) => sum + workedH(a), 0);
       const lateN = mine.filter((a) => a.status === "late").length;
-      const avgH = days ? totalH / days : 0;
 
-      monthlyWrap.appendChild(el("div", { class: "kpi-row" },
+      monthlyWrap.appendChild(el("div", { class: "kpi-row kintai-kpi2" },
         statTile({ label: "出勤日数", value: `${days}日`, icon: "calendar", sub: `${mNum}月実績`, tone: "brand" }),
-        statTile({ label: "総労働時間", value: `${totalH.toFixed(1)}h`, icon: "clock", sub: "休憩60分を控除", tone: "accent" }),
-        statTile({ label: "遅刻回数", value: `${lateN}回`, icon: "alert", sub: lateN ? "承認キューで確認" : "順調です", tone: lateN ? "warn" : "good" }),
-        statTile({ label: "平均実働 / 日", value: `${avgH.toFixed(1)}h`, icon: "trend", sub: "出勤日ベース", tone: "violet" }),
+        statTile({ label: "遅刻回数", value: `${lateN}回`, icon: "alert", sub: lateN ? "気をつけましょう" : "順調です", tone: lateN ? "warn" : "good" }),
       ));
-
-      const labels = [], values = [];
-      for (let i = 13; i >= 0; i--) {
-        const d = addDays(today, -i);
-        labels.push(fmtDate(d, { withDow: false }));
-        const a = att().find((x) => x.staffId === me.id && x.date === d);
-        values.push(Math.round(workedH(a) * 10) / 10);
-      }
-      monthlyWrap.appendChild(card({
-        title: "直近14日の労働時間",
-        sub: `${me.name}・実働(休憩控除後)`,
-        body: barChart({
-          series: [{ name: "実働時間", values }],
-          labels, height: 210,
-          yFmt: (v) => `${Math.round(v * 10) / 10}h`,
-        }),
-      }));
     }
 
     /* ============================================================
@@ -489,7 +470,7 @@ export default {
     function refreshAll() {
       renderPunchRight();
       renderTeam();
-      renderQueue();
+      if (canApprove) renderQueue();
       renderMonthly();
       renderTable();
     }
@@ -498,18 +479,20 @@ export default {
     root.append(
       sectionHeader(
         "勤怠管理",
-        "GPSで店舗200m圏内にいるときだけ打刻できます。打刻漏れは承認フローへ — 責任者は最終確認のみ。",
+        "GPSで店舗200m圏内にいるときだけ打刻できます。打刻漏れは責任者の承認フローで処理されます。",
         badge("ジンジャー代替・成増店 先行導入", "accent"),
       ),
       punchCard,
-      el("div", { class: "grid cols-2 mt-16" }, teamCard, queueCard),
+      canApprove
+        ? el("div", { class: "grid cols-2 mt-16" }, teamCard, queueCard)
+        : el("div", { class: "mt-16" }, teamCard),
       el("h2", { class: "kintai-sec" }, "月次サマリー(自分)"),
       monthlyWrap,
       el("div", { class: "mt-16" }, tableCard),
     );
 
     renderTeam();
-    renderQueue();
+    if (canApprove) renderQueue();
     renderMonthly();
     renderTable();
   },

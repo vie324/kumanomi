@@ -1,0 +1,80 @@
+/* タスクリスト ページ固有スタイル(.page-tasks 配下にスコープ) */
+
+.page-tasks .tk-filters {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin: 2px 0 14px;
+}
+
+.page-tasks .tk-list { display: flex; flex-direction: column; }
+
+.page-tasks .tk-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--hairline);
+}
+.page-tasks .tk-row:last-child { border-bottom: none; }
+.page-tasks .tk-row.done { opacity: 0.62; }
+
+/* 状態切替ボタン(会議ページの pm-st と同じ見た目) */
+.page-tasks .tk-st {
+  flex: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 26px; padding: 0 11px;
+  margin-top: 2px;
+  border-radius: var(--r-full);
+  font-size: 11px; font-weight: 800;
+  border: 1.5px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  transition: all var(--dur) var(--ease);
+  white-space: nowrap;
+}
+.page-tasks .tk-st:hover { transform: translateY(-1px); }
+.page-tasks .tk-st.doing { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-ink); }
+.page-tasks .tk-st.done { border-color: var(--good); background: var(--good-soft); color: var(--good-text); }
+
+.page-tasks .tk-main { flex: 1; min-width: 0; }
+.page-tasks .tk-title { font-size: var(--fs-sm); font-weight: 700; line-height: 1.5; }
+.page-tasks .tk-row.done .tk-title { text-decoration: line-through; }
+.page-tasks .tk-note { font-size: var(--fs-xs); color: var(--ink-3); margin-top: 2px; line-height: 1.6; }
+.page-tasks .tk-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 6px;
+}
+.page-tasks .tk-due {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-xs); color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.page-tasks .tk-source {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 22px; padding: 0 9px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  font-size: 10.5px; font-weight: 700; color: var(--ink-2);
+  white-space: nowrap; max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.page-tasks .tk-source.link { cursor: pointer; transition: all var(--dur) var(--ease); }
+.page-tasks .tk-source.link:hover { border-color: var(--brand); color: var(--brand-ink); background: var(--brand-soft); }
+
+.page-tasks .tk-ops { flex: none; display: flex; gap: 2px; }
+.page-tasks .icon-btn.sm { width: 30px; height: 30px; }
+
+.page-tasks .tk-hint {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  font-size: var(--fs-xs); color: var(--ink-2); line-height: 1.8;
+}
+.page-tasks .tk-hint-ic { flex: none; display: flex; color: var(--brand); margin-top: 2px; }
+
+/* モーダル */
+.page-tasks.tk-modal { display: flex; flex-direction: column; gap: 12px; }
+
+@media (max-width: 640px) {
+  .page-tasks .tk-row { flex-wrap: wrap; }
+  .page-tasks .tk-ops { margin-left: auto; }
+}

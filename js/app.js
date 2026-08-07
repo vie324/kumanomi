@@ -18,6 +18,7 @@ import patients from "./pages/patients.js";
 import staffPage from "./pages/staff.js";
 import roleplay from "./pages/roleplay.js";
 import meetings from "./pages/meetings.js";
+import tasksPage from "./pages/tasks.js";
 import backoffice from "./pages/backoffice.js";
 import hr from "./pages/hr.js";
 import org from "./pages/org.js";
@@ -26,7 +27,7 @@ import assistant from "./pages/assistant.js";
 /* ---- ナビゲーション構成 ---- */
 const NAV_GROUPS = [
   { label: "ホーム", pages: [dashboard] },
-  { label: "コミュニケーション", pages: [chat, sns, meetings] },
+  { label: "コミュニケーション", pages: [chat, sns, meetings, tasksPage] },
   { label: "毎日の業務", pages: [nippo, kintai, shift] },
   { label: "患者様", pages: [reserve, patients] },
   { label: "組織運営", pages: [org, staffPage, roleplay, backoffice, hr] },
@@ -56,14 +57,18 @@ function buildShell() {
     if (!visible.length) continue;
     nav.appendChild(el("div", { class: "nav-group-label" }, group.label));
     for (const p of visible) {
-      const badgeCount = p.id === "chat" ? store.unreadChatCount() : 0;
+      const badgeCount = p.id === "chat"
+        ? store.unreadChatCount()
+        : p.id === "tasks"
+          ? (store.get("tasks") || []).filter((t) => t.ownerId === me.id && t.status !== "done").length
+          : 0;
       const item = el("button", {
         class: "nav-item", dataset: { page: p.id },
         onclick: () => { router.navigate(p.id); closeMobileNav(); },
       },
         el("span", { class: "nav-ic" }, icon(p.icon, 19)),
         el("span", { class: "nav-label" }, p.title),
-        badgeCount > 0 ? el("span", { class: "nav-badge", dataset: { role: "chat-badge" } }, String(badgeCount)) : null,
+        badgeCount > 0 ? el("span", { class: "nav-badge", dataset: { role: p.id === "chat" ? "chat-badge" : `${p.id}-badge` } }, String(badgeCount)) : null,
       );
       nav.appendChild(item);
     }

@@ -1,20 +1,22 @@
 /* ============================================================
    シフト管理 — 週間 / 月間(カレンダー型・スタッフ×日 一覧型)
-   セルタップで種別変更 / AIによる翌週シフト自動作成 / 希望提出 /
-   必要人数と充足判定 / 全店舗閲覧 / 権限による編集ロック
+   セルタップで種別変更 / AIによる翌週シフト自動作成 /
+   希望休の月単位申請(希望休・有給・特別・誕生日休暇) /
+   必要人数と充足判定(責任者のみ) / 全店舗閲覧 / 権限による編集ロック
    ============================================================ */
 import {
   el, icon, avatar, badge, card, kv, sectionHeader, segmented,
-  modal, toast, aiButton, fmtDate, clear,
+  modal, toast, aiButton, fmtDate, clear, emptyState,
 } from "../ui.js";
-import { store, todayStr, addDays, dow, mondayOf, monthOf, SHIFT_TYPES } from "../store.js";
+import { store, todayStr, addDays, dow, mondayOf, monthOf, SHIFT_TYPES, LEAVE_TYPES } from "../store.js";
 import { can, rankLabel, scopeLabel } from "../auth.js";
 import { generateShift, shiftRationale } from "../ai.js";
 
 const CYCLE = ["early", "late", "full", "off"];          // セルタップの循環順
-const TYPE_ORDER = ["early", "late", "full", "training", "off"]; // 凡例の表示順
+const TYPE_ORDER = ["early", "late", "full", "training", "off", "paid", "special", "birthday"]; // 凡例の表示順
 const DOW_JA = ["日", "月", "火", "水", "木", "金", "土"];
-const SHORT = { early: "早", late: "遅", full: "通", training: "研", off: "休" };
+const SHORT = { early: "早", late: "遅", full: "通", training: "研", off: "休", paid: "有", special: "特", birthday: "誕" };
+const LEAVE_CYCLE = ["", "off", "paid", "special", "birthday"]; // 希望休申請のタップ循環順
 const ALL = "__all__";   // 店舗フィルタ「全店」
 
 export default {
@@ -66,6 +68,8 @@ export default {
     const me = () => store.me();
     const canEdit = (storeId) => storeId !== ALL && can("shift.edit", { storeId });
     const canAI = (storeId) => storeId !== ALL && can("shift.generateAI", { storeId });
+    // 必要人数ルール・充足判定・他スタッフの希望休は責任者(院長以上)と本部人事のみ
+    const canStaffing = () => can("shift.viewStaffing");
     const isMyStore = (storeId) => me()?.storeId === storeId;
     const editableStores = () => allStores().filter((s) => canEdit(s.id));
     /** 表示対象の店舗一覧(全店なら全部) */
@@ -172,30 +176,32 @@ export default {
         g.appendChild(row);
       }
 
-      // 充足判定行(早番・遅番の人数 vs 必要人数)
-      const rules = rulesFor(storeId || state.storeId);
-      const cov = el("div", { class: "sg-row sg-cov" },
-        el("div", { class: "sg-cell sg-name sg-covlabel" }, "充足判定"));
-      for (const d of dates) {
-        const w = dow(d);
-        const today = d === todayStr() ? "is-today" : "";
-        if (w === (rules.closedDow ?? 3)) {
-          cov.appendChild(el("div", { class: `sg-cell sg-covcell ${today}` }, badge("定休")));
-          continue;
+      // 充足判定行(早番・遅番の人数 vs 必要人数)— 責任者のみ表示
+      if (canStaffing()) {
+        const rules = rulesFor(storeId || state.storeId);
+        const cov = el("div", { class: "sg-row sg-cov" },
+          el("div", { class: "sg-cell sg-name sg-covlabel" }, "充足判定"));
+        for (const d of dates) {
+          const w = dow(d);
+          const today = d === todayStr() ? "is-today" : "";
+          if (w === (rules.closedDow ?? 3)) {
+            cov.appendChild(el("div", { class: `sg-cell sg-covcell ${today}` }, badge("定休")));
+            continue;
+          }
+          const need = (w === 0 || w === 6) ? rules.weekend : rules.weekday;
+          let early = 0, late = 0;
+          for (const s of staffList) {
+            const t = typeOf(s.id, d);
+            if (t === "early" || t === "full") early++;
+            if (t === "late" || t === "full") late++;
+          }
+          const ok = early >= need.early && late >= need.late;
+          cov.appendChild(el("div", { class: `sg-cell sg-covcell ${today}` },
+            badge(ok ? "充足" : "不足", ok ? "good" : "critical"),
+            el("span", { class: "sg-covnum" }, `早${early}/${need.early}・遅${late}/${need.late}`)));
         }
-        const need = (w === 0 || w === 6) ? rules.weekend : rules.weekday;
-        let early = 0, late = 0;
-        for (const s of staffList) {
-          const t = typeOf(s.id, d);
-          if (t === "early" || t === "full") early++;
-          if (t === "late" || t === "full") late++;
-        }
-        const ok = early >= need.early && late >= need.late;
-        cov.appendChild(el("div", { class: `sg-cell sg-covcell ${today}` },
-          badge(ok ? "充足" : "不足", ok ? "good" : "critical"),
-          el("span", { class: "sg-covnum" }, `早${early}/${need.early}・遅${late}/${need.late}`)));
+        g.appendChild(cov);
       }
-      g.appendChild(cov);
 
       wrap.appendChild(g);
       return wrap;
@@ -211,9 +217,10 @@ export default {
     }
 
     function calLegendNode(editable) {
+      const staffing = canStaffing();
       return el("div", { class: "shift-legend" },
-        el("span", { class: "shift-legend-item" }, el("span", { class: "sc-cov ok" }, "充足"), el("span", { class: "small muted" }, "必要人数を満たしています")),
-        el("span", { class: "shift-legend-item" }, el("span", { class: "sc-cov ng" }, "不足"), el("span", { class: "small muted" }, "早番/遅番が足りません")),
+        staffing ? el("span", { class: "shift-legend-item" }, el("span", { class: "sc-cov ok" }, "充足"), el("span", { class: "small muted" }, "必要人数を満たしています")) : null,
+        staffing ? el("span", { class: "shift-legend-item" }, el("span", { class: "sc-cov ng" }, "不足"), el("span", { class: "small muted" }, "早番/遅番が足りません")) : null,
         el("span", { class: "shift-legend-item" }, el("span", { class: "sc-cov" }, "未作成"), el("span", { class: "small muted" }, "まだシフト未登録")),
         el("span", { class: "shift-legend-item" }, el("span", { class: "sc-train" }, "研 1"), el("span", { class: "small muted" }, "研修予定あり")),
         el("span", { class: "shift-legend-item small muted" },
@@ -234,6 +241,7 @@ export default {
       const lead = dow(dates[0]);
       for (let i = 0; i < lead; i++) wrap.appendChild(el("div", { class: "sc-cell blank" }));
 
+      const staffing = canStaffing();
       for (const d of dates) {
         const w = dow(d);
         const isToday = d === todayStr();
@@ -245,16 +253,19 @@ export default {
           isToday ? "today" : "",
         ].filter(Boolean).join(" ");
 
+        // 充足/不足の判定は責任者のみ。一般スタッフには出勤人数だけを見せる
         const covEl = st.closed
           ? el("span", { class: "sc-cov" }, "定休")
           : st.planned === 0
             ? el("span", { class: "sc-cov" }, "未作成")
-            : el("span", { class: `sc-cov ${st.ok ? "ok" : "ng"}` }, st.ok ? "充足" : "不足");
+            : staffing
+              ? el("span", { class: `sc-cov ${st.ok ? "ok" : "ng"}` }, st.ok ? "充足" : "不足")
+              : null;
 
         // 出勤するスタッフのアバター(広い画面のみ表示)
         const working = staffList.filter((s) => {
           const t = typeOfRec(s.id, d);
-          return t && t !== "off";
+          return t && !["off", "paid", "special", "birthday"].includes(t);
         });
         const stack = working.length
           ? el("span", { class: "sc-people avatar-stack" },
@@ -268,9 +279,12 @@ export default {
             st.training ? el("span", { class: "sc-train" }, `研${st.training}`) : null),
           st.closed || st.planned === 0
             ? null
-            : el("div", { class: "sc-counts" },
-                el("span", { class: `sc-cnt e ${st.early < st.need.early ? "low" : ""}` }, `早${st.early}`),
-                el("span", { class: `sc-cnt l ${st.late < st.need.late ? "low" : ""}` }, `遅${st.late}`)),
+            : staffing
+              ? el("div", { class: "sc-counts" },
+                  el("span", { class: `sc-cnt e ${st.early < st.need.early ? "low" : ""}` }, `早${st.early}`),
+                  el("span", { class: `sc-cnt l ${st.late < st.need.late ? "low" : ""}` }, `遅${st.late}`))
+              : el("div", { class: "sc-counts" },
+                  el("span", { class: "sc-cnt e" }, `出${working.length}`)),
           el("div", { class: "sc-foot" }, covEl, stack),
         ];
 
@@ -319,12 +333,22 @@ export default {
         }
         const st = dayStatus(storeId, date, staffList);
         clear(summary);
+        const staffing = canStaffing();
+        const workingN = staffList.filter((s) => {
+          const t = typeOfRec(s.id, date);
+          return t && !["off", "paid", "special", "birthday"].includes(t);
+        }).length;
         summary.append(...[
-          st.closed ? badge("定休日") : badge(st.planned === 0 ? "未作成" : st.ok ? "充足" : "不足",
-            st.planned === 0 ? "" : st.ok ? "good" : "critical"),
+          st.closed ? badge("定休日")
+            : staffing
+              ? badge(st.planned === 0 ? "未作成" : st.ok ? "充足" : "不足",
+                  st.planned === 0 ? "" : st.ok ? "good" : "critical")
+              : badge(st.planned === 0 ? "未作成" : `出勤 ${workingN}名`, st.planned === 0 ? "" : "brand"),
           el("span", { class: "small muted" },
             st.closed ? "水曜日は定休日です"
-              : `早番 ${st.early}/${st.need.early}名・遅番 ${st.late}/${st.need.late}名`),
+              : staffing
+                ? `早番 ${st.early}/${st.need.early}名・遅番 ${st.late}/${st.need.late}名`
+                : "この日の割当メンバーです"),
           st.training ? badge(`研修 ${st.training}名`, "accent") : null,
         ].filter(Boolean));
       }
@@ -413,23 +437,25 @@ export default {
         g.appendChild(row);
       }
 
-      // 充足判定行
-      const covRow = el("div", { class: "mg-row mg-covrow" },
-        el("div", { class: "mg-cell mg-name mg-covlabel" }, "充足判定"));
-      let short = 0;
-      for (const d of dates) {
-        const st = dayStatus(storeId, d, staffList);
-        let mark, kind;
-        if (st.closed) { mark = "休"; kind = "closed"; }
-        else if (st.planned === 0) { mark = "·"; kind = "none"; }
-        else if (st.ok) { mark = "○"; kind = "ok"; }
-        else { mark = "!"; kind = "ng"; short++; }
-        covRow.appendChild(el("div", { class: `mg-cell ${dayCls(d)}`, title: st.closed ? "定休日" : `早${st.early}/${st.need.early}・遅${st.late}/${st.need.late}` },
-          el("span", { class: `mg-mark ${kind}` }, mark)));
+      // 充足判定行(責任者のみ)
+      if (canStaffing()) {
+        const covRow = el("div", { class: "mg-row mg-covrow" },
+          el("div", { class: "mg-cell mg-name mg-covlabel" }, "充足判定"));
+        let short = 0;
+        for (const d of dates) {
+          const st = dayStatus(storeId, d, staffList);
+          let mark, kind;
+          if (st.closed) { mark = "休"; kind = "closed"; }
+          else if (st.planned === 0) { mark = "·"; kind = "none"; }
+          else if (st.ok) { mark = "○"; kind = "ok"; }
+          else { mark = "!"; kind = "ng"; short++; }
+          covRow.appendChild(el("div", { class: `mg-cell ${dayCls(d)}`, title: st.closed ? "定休日" : `早${st.early}/${st.need.early}・遅${st.late}/${st.need.late}` },
+            el("span", { class: `mg-mark ${kind}` }, mark)));
+        }
+        covRow.appendChild(el("div", { class: "mg-cell mg-sum" },
+          el("span", { class: "mg-sumv" }, "不足"), el("span", { class: "mg-sumv off" }, `${short}日`)));
+        g.appendChild(covRow);
       }
-      covRow.appendChild(el("div", { class: "mg-cell mg-sum" },
-        el("span", { class: "mg-sumv" }, "不足"), el("span", { class: "mg-sumv off" }, `${short}日`)));
-      g.appendChild(covRow);
 
       wrap.appendChild(g);
       return el("div", {}, wrap,
@@ -437,9 +463,9 @@ export default {
           TYPE_ORDER.map((t) => el("span", { class: "shift-legend-item" },
             el("span", { class: `sh-chip mini t-${t}` }, SHORT[t]),
             el("span", { class: "small muted" }, SHIFT_TYPES[t].label))),
-          el("span", { class: "shift-legend-item" },
+          canStaffing() ? el("span", { class: "shift-legend-item" },
             el("span", { class: "mg-mark ok" }, "○"), el("span", { class: "small muted" }, "充足"),
-            el("span", { class: "mg-mark ng" }, "!"), el("span", { class: "small muted" }, "不足"))));
+            el("span", { class: "mg-mark ng" }, "!"), el("span", { class: "small muted" }, "不足")) : null));
     }
 
     /* ---------------- AIシフト作成(プレビュー→確定) ---------------- */
@@ -499,65 +525,118 @@ export default {
       }, btn, el("span", { class: "shift-ailock-ic" }, icon("eye", 13)));
     }
 
-    /* ---------------- 希望提出モーダル ---------------- */
+    /* ---------------- 希望休の申請(月単位) ---------------- */
+    /** 対象月=翌月。日付をタップすると 希望休→有給→特休→誕生日休→解除 の順に切り替わる */
     function openRequestModal() {
       const meNow = me();
-      const weekOf = nextMonday();
-      const existing = store.get("shiftRequests").find((r) => r.staffId === meNow.id && r.weekOf === weekOf);
+      const minMonth = addMonths(monthOf(todayStr()), 1);
+      const maxMonth = addMonths(monthOf(todayStr()), 3);
+      let month = minMonth;
+      let wishes = {};
 
-      const selects = [];
-      const dayRows = [];
-      for (let i = 0; i < 7; i++) {
-        const d = addDays(weekOf, i);
-        const w = dow(d);
-        const sel = el("select", { class: "select" },
-          el("option", { value: "" }, "指定なし"),
-          el("option", { value: "off" }, "休み"),
-          el("option", { value: "early" }, "早番"),
-          el("option", { value: "late" }, "遅番"));
-        const cur = existing?.wishes?.[d];
-        if (cur && ["off", "early", "late"].includes(cur)) sel.value = cur;
-        selects.push([d, sel]);
-        dayRows.push(el("div", { class: "shift-wish-row" },
-          el("span", { class: `shift-wish-day ${w === 0 ? "sun" : w === 6 ? "sat" : ""}` }, fmtDate(d)),
-          sel));
-      }
-      const noteEl = el("textarea", { class: "textarea", rows: "2", placeholder: "備考(例:土曜は早番希望です)" });
-      noteEl.value = existing?.note || "";
-
-      const submitBtn = el("button", { class: "btn primary" }, icon("send", 15), existing ? "希望を更新する" : "希望を提出する");
+      const noteEl = el("textarea", { class: "textarea", rows: "2", placeholder: "備考(例:5日は子どもの行事のためお願いします)" });
+      const submitBtn = el("button", { class: "btn primary" }, icon("send", 15), "希望休を申請する");
       const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
+      const countEl = el("span", { class: "wish-count" });
+      const monthLabelEl = el("span", { class: "shift-range" });
+      const calWrap = el("div", { class: "wish-cal" });
+
+      const loadExisting = () => {
+        const ex = store.get("shiftRequests").find((r) => r.staffId === meNow.id && r.month === month);
+        wishes = { ...(ex?.wishes || {}) };
+        noteEl.value = ex?.note || "";
+        clear(submitBtn).append(icon("send", 15), ex ? "希望休を更新する" : "希望休を申請する");
+      };
+
+      const cycleDay = (d) => {
+        const cur = wishes[d] || "";
+        const next = LEAVE_CYCLE[(LEAVE_CYCLE.indexOf(cur) + 1) % LEAVE_CYCLE.length];
+        if (next) wishes[d] = next; else delete wishes[d];
+        paintCal();
+      };
+
+      const paintCal = () => {
+        clear(calWrap);
+        for (let w = 0; w < 7; w++) {
+          calWrap.appendChild(el("div", { class: `wc-h ${w === 0 ? "sun" : w === 6 ? "sat" : ""}` }, DOW_JA[w]));
+        }
+        const dates = monthDates(month);
+        const lead = dow(dates[0]);
+        for (let i = 0; i < lead; i++) calWrap.appendChild(el("div", { class: "wc-cell blank" }));
+        for (const d of dates) {
+          const w = dow(d);
+          const closed = w === 3; // 水曜定休
+          const wish = wishes[d];
+          const lt = wish ? LEAVE_TYPES[wish] : null;
+          calWrap.appendChild(el("button", {
+            class: `wc-cell ${w === 0 ? "sun" : w === 6 ? "sat" : ""} ${closed ? "closed" : ""} ${wish ? `on t-${wish}` : ""}`,
+            disabled: closed,
+            onclick: () => cycleDay(d),
+            "aria-label": `${fmtDate(d)} の希望を変更`,
+            title: closed ? "定休日" : (lt ? lt.label : "タップで希望休を選択"),
+          },
+            el("span", { class: "wc-day" }, Number(d.slice(8, 10))),
+            el("span", { class: "wc-mark" }, closed ? "定休" : (lt ? `${lt.emoji} ${lt.short}` : ""))));
+        }
+        const tail = (7 - ((lead + dates.length) % 7)) % 7;
+        for (let i = 0; i < tail; i++) calWrap.appendChild(el("div", { class: "wc-cell blank" }));
+
+        const n = Object.keys(wishes).length;
+        countEl.textContent = n ? `${n}日分の希望を選択中` : "日付をタップして休みたい日を選びます";
+        clear(monthLabelEl).append(monthLabel(month), monthTag(month));
+      };
+
+      const goMonth = (delta) => {
+        const next = addMonths(month, delta);
+        if (next < minMonth || next > maxMonth) return;
+        month = next;
+        loadExisting();
+        paintCal();
+      };
+
+      const legend = el("div", { class: "wish-legend" },
+        LEAVE_CYCLE.slice(1).map((t) => el("span", { class: `wish-lg t-${t}` },
+          el("span", { class: "wish-lg-emoji" }, LEAVE_TYPES[t].emoji), LEAVE_TYPES[t].label)),
+        el("span", { class: "small muted" }, "タップするたびに切り替わります(もう一度で解除)"));
 
       const body = el("div", { class: "page-shift" },
         el("div", { class: "stack", style: { gap: "12px" } },
           el("div", { class: "shift-deadline" }, icon("clock", 15),
-            `対象週:${fmtDate(weekOf, { withYear: true })}〜${fmtDate(addDays(weekOf, 6))}/締切は毎週金曜21時です`),
-          el("div", { class: "stack", style: { gap: "7px" } }, dayRows),
+            "希望休は月単位でまとめて申請します。締切は前月20日 21:00です"),
+          el("div", { class: "wish-monthnav" },
+            el("button", { class: "icon-btn", "aria-label": "前月", onclick: () => goMonth(-1) }, icon("chevL", 18)),
+            monthLabelEl,
+            el("button", { class: "icon-btn", "aria-label": "翌月", onclick: () => goMonth(1) }, icon("chevR", 18)),
+            countEl),
+          legend,
+          calWrap,
           el("div", { class: "field" }, el("label", {}, "備考"), noteEl)));
 
-      const m = modal({ title: "シフト希望の提出", body, actions: [cancelBtn, submitBtn] });
+      const m = modal({ title: "希望休の申請(月単位)", body, wide: true, actions: [cancelBtn, submitBtn] });
       cancelBtn.addEventListener("click", () => m.close());
       submitBtn.addEventListener("click", () => {
-        const wishes = {};
-        for (const [d, sel] of selects) if (sel.value) wishes[d] = sel.value;
+        const existing = store.get("shiftRequests").find((r) => r.staffId === meNow.id && r.month === month);
         if (existing) {
-          store.update("shiftRequests", existing.id, { wishes, note: noteEl.value.trim(), submittedAt: todayStr() });
+          store.update("shiftRequests", existing.id, { wishes: { ...wishes }, note: noteEl.value.trim(), submittedAt: todayStr() });
         } else {
-          store.add("shiftRequests", { staffId: meNow.id, weekOf, wishes, note: noteEl.value.trim(), submittedAt: todayStr() });
+          store.add("shiftRequests", { staffId: meNow.id, month, wishes: { ...wishes }, note: noteEl.value.trim(), submittedAt: todayStr() });
         }
         m.close();
-        toast("シフト希望を提出しました。AI作成時に反映されます");
+        toast(`${monthLabel(month)}の希望休を申請しました。シフト作成時に反映されます`);
         draw();
       });
+
+      loadExisting();
+      paintCal();
     }
 
     /* ---------------- 画面の組み立て ---------------- */
     function buildHead() {
       const desc = state.view === "week"
-        ? "必要人数と希望を入れるだけで、AIが翌週のシフト案を作成します"
+        ? "希望休(月単位)と研修予定をもとに、AIが翌週のシフト案を作成します"
         : "1ヶ月分をまとめて確認できます。全店舗のシフトはどなたでも閲覧できます";
       const actions = [
-        el("button", { class: "btn ghost", onclick: openRequestModal }, icon("edit", 16), "希望を提出"),
+        el("button", { class: "btn ghost", onclick: openRequestModal }, icon("edit", 16), "希望休を申請(月単位)"),
       ];
       if (state.storeId !== ALL) actions.push(makeAiButton(state.storeId));
       return sectionHeader("シフト管理", desc, actions);
@@ -694,7 +773,9 @@ export default {
         if (st.planned === 0) blankDays++;
         else if (!st.ok) shortDays++;
       }
-      const hint = `${monthLabel(state.month)}・不足 ${shortDays}日 / 未作成 ${blankDays}日`;
+      const hint = canStaffing()
+        ? `${monthLabel(state.month)}・不足 ${shortDays}日 / 未作成 ${blankDays}日`
+        : monthLabel(state.month);
 
       return card({
         title: state.monthMode === "cal" ? "月間カレンダー" : "月間シフト表(スタッフ×日)",
@@ -730,8 +811,8 @@ export default {
             el("span", { class: "row-sub" }, `${list.length}名・延べ出勤 ${manDays}人日`)),
           isMyStore(st.id) ? badge("自店舗", "brand") : null,
           canEdit(st.id) ? badge("編集可", "good") : badge("閲覧のみ"),
-          badge(shortDays ? `不足 ${shortDays}日` : "不足なし", shortDays ? "critical" : "good"),
-          blankDays ? badge(`未作成 ${blankDays}日`, "warn") : null));
+          canStaffing() ? badge(shortDays ? `不足 ${shortDays}日` : "不足なし", shortDays ? "critical" : "good") : null,
+          canStaffing() && blankDays ? badge(`未作成 ${blankDays}日`, "warn") : null));
       }
 
       return card({
@@ -777,32 +858,68 @@ export default {
       });
     }
 
+    /** 対象月(翌月)の希望休 提出状況 — 責任者・本部人事のみ */
     function buildRequestsCard() {
-      const weekOf = nextMonday();
-      const reqs = store.get("shiftRequests").filter((r) => r.weekOf === weekOf);
+      const targetMonth = addMonths(monthOf(todayStr()), 1);
+      const reqs = store.get("shiftRequests").filter((r) => r.month === targetMonth);
       const staffList = staffOf(state.storeId);
       const submitted = staffList.filter((s) => reqs.some((r) => r.staffId === s.id)).length;
+
+      const wishSummary = (rq) => {
+        const counts = {};
+        for (const t of Object.values(rq.wishes || {})) counts[t] = (counts[t] || 0) + 1;
+        const parts = Object.entries(counts).map(([t, n]) => `${LEAVE_TYPES[t]?.label || t} ${n}日`);
+        return parts.join("・") || "希望日なし";
+      };
 
       const rows = el("div", { class: "row-list" });
       for (const s of staffList) {
         const rq = reqs.find((r) => r.staffId === s.id);
-        const wishCount = rq ? Object.keys(rq.wishes || {}).length : 0;
         rows.appendChild(el("div", { class: "row-item" },
           avatar(s, 30),
           el("span", { class: "row-main" },
             el("span", { class: "row-title" }, s.name),
             el("span", { class: "row-sub" },
               (state.storeId === ALL ? `${store.storeName(s.storeId)}・` : "")
-              + (rq ? (rq.note || `${wishCount}件の希望を提出`) : "提出待ち"))),
+              + (rq ? `${wishSummary(rq)}${rq.note ? `/${rq.note}` : ""}` : "提出待ち"))),
           rq ? badge("提出済", "good") : badge("未提出", "warn")));
       }
 
       return card({
-        title: "来週の希望提出状況",
-        sub: `${state.storeId === ALL ? "全店舗" : store.storeName(state.storeId)}・${fmtDate(weekOf)}週・${submitted}/${staffList.length}名 提出済`,
+        title: "希望休の提出状況(月単位)",
+        sub: `${state.storeId === ALL ? "全店舗" : store.storeName(state.storeId)}・対象 ${monthLabel(targetMonth)}・${submitted}/${staffList.length}名 提出済`,
         body: el("div", {},
-          el("div", { class: "shift-deadline mb-12" }, icon("clock", 15), "締切は毎週金曜21時です。希望の提出はどなたでもできます"),
+          el("div", { class: "shift-deadline mb-12" }, icon("clock", 15), "締切は前月20日 21:00です。希望休・有給・特別・誕生日休暇を日ごとに選べます"),
           rows),
+      });
+    }
+
+    /** 一般スタッフ向け:自分の希望休だけを表示するカード */
+    function buildMyRequestCard() {
+      const targetMonth = addMonths(monthOf(todayStr()), 1);
+      const rq = store.get("shiftRequests").find((r) => r.staffId === me()?.id && r.month === targetMonth);
+      const entries = rq ? Object.entries(rq.wishes || {}).sort((a, b) => (a[0] < b[0] ? -1 : 1)) : [];
+
+      const body = el("div", {},
+        el("div", { class: "shift-deadline mb-12" }, icon("clock", 15),
+          `対象 ${monthLabel(targetMonth)}・締切は前月20日 21:00です`),
+        entries.length
+          ? el("div", { class: "row-list" }, entries.map(([d, t]) => el("div", { class: "row-item" },
+              el("span", { class: "wish-lg-emoji" }, LEAVE_TYPES[t]?.emoji || "🙌"),
+              el("span", { class: "row-main" },
+                el("span", { class: "row-title" }, fmtDate(d, { withYear: true })),
+                el("span", { class: "row-sub" }, LEAVE_TYPES[t]?.label || t)),
+              badge("申請済", "good"))))
+          : emptyState({ icon: "🗓", title: "まだ希望休を申請していません", hint: "「希望休を申請(月単位)」から提出できます" }),
+        rq?.note ? el("p", { class: "small muted", style: { marginTop: "8px" } }, `備考:${rq.note}`) : null,
+        el("div", { class: "mt-12" },
+          el("button", { class: "btn primary", onclick: openRequestModal }, icon("edit", 15),
+            rq ? "希望休を修正する" : "希望休を申請する")));
+
+      return card({
+        title: "自分の希望休(月単位)",
+        sub: `${me()?.name}・他のスタッフの提出状況は表示されません`,
+        body,
       });
     }
 
@@ -816,9 +933,13 @@ export default {
       root.append(buildHead(), buildPermBar(), buildToolbar());
       if (state.storeId === ALL) root.append(buildAllSummaryCard());
       for (const s of shownStores()) root.append(buildStoreCard(s.id));
+      // 必要人数ルール・全員の希望休提出状況は責任者と本部人事のみ。
+      // 一般スタッフには自分の希望休カードだけを表示する。
       root.append(
         buildLinkCard(),
-        el("div", { class: "grid cols-2 mt-16" }, buildRulesCard(), buildRequestsCard()),
+        canStaffing()
+          ? el("div", { class: "grid cols-2 mt-16" }, buildRulesCard(), buildRequestsCard())
+          : el("div", { class: "mt-16" }, buildMyRequestCard()),
       );
 
       root.querySelectorAll(".shift-scroll").forEach((n, i) => {

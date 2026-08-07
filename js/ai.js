@@ -18,7 +18,7 @@ export async function generateShift({ weekStart, storeId }) {
   await delay(1400);
   const staff = store.get("staff").filter((s) => s.storeId === storeId);
   const rules = store.get("staffingRules").find((r) => r.storeId === storeId);
-  const requests = store.get("shiftRequests").filter((r) => r.weekOf === weekStart);
+  const requests = store.get("shiftRequests"); // 月単位の希望休申請(wishes: 日付→休暇種別)
   const trainings = store.get("trainings");
   const out = [];
   for (let d = 0; d < 7; d++) {
@@ -29,10 +29,11 @@ export async function generateShift({ weekStart, storeId }) {
       continue;
     }
     const need = (wd === 0 || wd === 6) ? (rules?.weekend || { early: 3, late: 2 }) : (rules?.weekday || { early: 2, late: 2 });
-    // 希望を優先しつつ、必要人数を埋める
+    // 希望休(希望休/有給/特休/誕生日休)を優先しつつ、必要人数を埋める
     const wishes = {};
     for (const rq of requests) {
-      if (rq.wishes[date] && staff.some((s) => s.id === rq.staffId)) wishes[rq.staffId] = rq.wishes[date];
+      const w = rq.wishes?.[date];
+      if (w && staff.some((s) => s.id === rq.staffId)) wishes[rq.staffId] = w;
     }
     const training = trainings.find((t) => t.date === date);
     const assigned = {};
@@ -58,7 +59,7 @@ export async function generateShift({ weekStart, storeId }) {
 /** シフト案の説明文 */
 export function shiftRationale(storeId) {
   const st = store.storeName(storeId);
-  return `【AI作成メモ】${st}の必要人数(平日:早番2・遅番2/土日:早番3・遅番2)と提出済みの希望、研修予定を制約条件として自動割当しました。水曜は定休です。希望はすべて反映済み。承認前にドラッグ感覚で個別調整できます。`;
+  return `【AI作成メモ】${st}の必要人数(平日:早番2・遅番2/土日:早番3・遅番2)と月単位で提出された希望休(希望休・有給休暇・特別休暇・誕生日休暇)、研修予定を制約条件として自動割当しました。水曜は定休です。希望休はすべて反映済み。確定後もセルタップで個別調整できます。`;
 }
 
 /* ---------------- ボイス入力 → SOAP ---------------- */
@@ -98,6 +99,24 @@ export async function kartePatientMessage(patient, karte) {
   const ticket = patient.tickets?.[0];
   const ticketLine = ticket ? `\n■ 回数券の残り:${ticket.total - ticket.used}回(${ticket.name})` : "";
   return `${patient.name}様\n\n本日もご来院ありがとうございました。${staffName}です😊\n\n■ 本日の施術\n${karte.assessment}\n\n■ おうちでのセルフケア\n${karte.plan}\n\n■ 姿勢分析の結果\n${karte.posture ? `姿勢スコア ${karte.posture.score}点。前回より肩の高さの左右差が改善しています。写真を添付しますのでご確認ください📷` : "次回、最新の姿勢写真を撮影させていただきます。"}${ticketLine}\n\n気になることがあれば、このLINEにいつでもご返信ください。\n次回のご来院をお待ちしております!`;
+}
+
+/** 面談ボイス入力のサンプル(非対応ブラウザ用のデモ再生) */
+const INTERVIEW_VOICE_SAMPLES = [
+  "えー、本人は最近、新規の方への提案がうまくいって自信がついてきたと話しています。ただ施術が長引いて次の予約に食い込むことが週に2回ほどあって、時間配分に課題を感じているようです。勉強会には参加したいけれど、家庭の事情で20時以降は難しいとのこと。テストの点数はまだ伸び悩んでいて、勉強の仕方が分からないと話していました。",
+  "今日の面談メモです。指名が増えて手応えを感じている様子。一方で数値目標の立て方が分からず、日報のコメントに何を書けばいいか迷うことがあるそうです。先輩の施術見学の時間を取りたいが、シフトが合わないという相談もありました。",
+];
+export function sampleInterviewVoice(i = 0) {
+  return INTERVIEW_VOICE_SAMPLES[i % INTERVIEW_VOICE_SAMPLES.length];
+}
+
+/** 会議メモボイス入力のサンプル */
+const MEETING_VOICE_SAMPLES = [
+  "えー、全店で前月比プラス4.2パーセント。成増店は回数券の成約が好調です。川越店は夕方枠の稼働が下がっているので、LINEリマインド配信を8月第1週に実施することに決定。打刻漏れが先月11件あったので、GPS打刻への移行を徹底します。次回までに各店、離反リスク患者リストへの声かけ結果を確認してください。",
+  "朝礼メモです。本日の予約18件、14時に紹介の新規の方がご来院予定。今週の理念テーマは仲間への感謝を言葉にする、です。退勤前にサンクスカードを1枚以上送りましょう。",
+];
+export function sampleMeetingVoice(i = 0) {
+  return MEETING_VOICE_SAMPLES[i % MEETING_VOICE_SAMPLES.length];
 }
 
 /* ---------------- 面談メモ → 要約 ---------------- */

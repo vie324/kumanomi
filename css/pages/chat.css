@@ -580,6 +580,11 @@
   .page-chat .tool-btn { width: 24px; height: 24px; font-size: 12.5px; opacity: 0.85; }
 
   .page-chat .cv-send { padding: 0 12px; }
+  /* iOS はフォントが16px未満の入力欄にフォーカスすると自動ズームし、
+     送信後も拡大・ずれたままになるため、モバイルは16pxに固定する */
+  .page-chat .cv-input,
+  .page-chat .cr-search,
+  .page-chat .cv-search .input { font-size: 16px; }
   /* 候補リストは入力欄より広く出す(入力欄がボタンで狭いため) */
   .page-chat .mention-pop { left: -102px; right: -46px; width: auto; }
   .page-chat .mp-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

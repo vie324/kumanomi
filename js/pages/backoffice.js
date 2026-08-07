@@ -7,9 +7,12 @@ import { store, todayStr, addDays, monthOf } from "../store.js";
 import {
   el, clear, icon, card, sectionHeader, statTile, badge, statusBadge,
   staffChip, table, tabs, chip, toast, modal, emptyState,
-  fmtYen, fmtNum, fmtDate,
+  fmtYen, fmtNum, fmtDate, fileToDataURL, openImageModal,
 } from "../ui.js";
+import { can, rankLabel } from "../auth.js";
 import { donut, barChart } from "../charts.js";
+
+const SURVEY_URL = "https://forms.gle/xjRUN51dF7Rj8vqs9";
 
 const CASH_STORE_ID = "st-narimasu";
 const INV_CATS = ["備品", "消耗品", "施術材料", "衛生", "物販", "事務"];
@@ -127,6 +130,8 @@ export default {
       const inv = store.get("inventory");
       const low = lowStockItems();
       const totalValue = inv.reduce((a, it) => a + it.stock * it.price, 0);
+      // 発注・入荷の操作は院長以上のみ。一般社員は閲覧のみ
+      const canOrder = can("inventory.order");
 
       // サマリータイル
       body.appendChild(el("div", { class: "grid cols-3 bo-tiles" },
@@ -134,6 +139,14 @@ export default {
         statTile({ label: "発注点割れ", value: `${low.length}品目`, icon: "alert", sub: low.length ? "早めの発注をおすすめします" : "すべて充足しています", tone: low.length ? "warn" : "good" }),
         statTile({ label: "在庫評価額", value: fmtYen(totalValue), icon: "cash", sub: "単価×在庫数の合計", tone: "accent" }),
       ));
+
+      if (!canOrder) {
+        body.appendChild(el("div", { class: "bo-viewonly" },
+          icon("eye", 15),
+          el("span", {},
+            el("strong", {}, "閲覧のみ:"),
+            `在庫の発注・入荷は院長以上が行います(現在の権限:${rankLabel(me)})。必要な品があれば責任者へ連絡してください。`)));
+      }
 
       // 発注点割れアラート
       if (low.length) {
@@ -148,8 +161,10 @@ export default {
                 `不足 ${fmtNum(it.min - it.stock)}${it.unit}`,
                 el("span", { class: "bo-alert-detail" }, `(在庫 ${fmtNum(it.stock)} / 発注点 ${fmtNum(it.min)})`)),
               el("span", { class: "spacer" }),
-              el("button", { class: "btn danger sm", onclick: () => openOrderModal(it) },
-                icon("send", 13), "発注する"))))));
+              canOrder
+                ? el("button", { class: "btn danger sm", onclick: () => openOrderModal(it) },
+                    icon("send", 13), "発注する")
+                : badge("発注は院長以上", "warn"))))));
       }
 
       // カテゴリフィルタ + テーブル
@@ -173,17 +188,19 @@ export default {
         { key: "price", label: "単価", align: "right", render: (it) => el("span", { class: "mono-num" }, fmtYen(it.price)) },
         { key: "supplier", label: "仕入先" },
         { key: "lastOrder", label: "最終発注", render: (it) => el("span", { class: it.lastOrder === today ? "bo-today" : "" }, fmtDate(it.lastOrder)) },
-        {
+      ];
+      if (canOrder) {
+        columns.push({
           key: "ops", label: "操作", align: "center",
           render: (it) => el("span", { class: "bo-ops" },
             el("button", { class: "btn soft sm", onclick: () => openOrderModal(it) }, icon("send", 13), "発注"),
             el("button", { class: "btn ghost sm", onclick: () => openReceiveModal(it) }, icon("download", 13), "入荷")),
-        },
-      ];
+        });
+      }
 
       body.appendChild(card({
         title: "在庫一覧",
-        sub: `成増店・${state.invCat === "全て" ? "全カテゴリ" : state.invCat}(${rows.length}品目)`,
+        sub: `成増店・${state.invCat === "全て" ? "全カテゴリ" : state.invCat}(${rows.length}品目)${canOrder ? "" : "・閲覧のみ"}`,
         body: el("div", {}, chipsRow, table({ columns, rows, empty: "該当する品目がありません" })),
       }));
     }
@@ -296,33 +313,119 @@ export default {
     /* ============================================================
        経費申請タブ
        ============================================================ */
+
+    /** 領収書画像の添付フィールド(プレビュー・差し替え可) */
+    function receiptField(label = "領収書画像") {
+      const state2 = { image: null };
+      const fileIn = el("input", { type: "file", accept: "image/*", style: { display: "none" } });
+      const thumbs = el("div", { class: "attach-thumbs" });
+      const pickBtn = el("button", { class: "btn ghost sm", type: "button", onclick: () => fileIn.click() },
+        "📷 ", "画像を選ぶ・撮影する");
+      const paint = () => {
+        clear(thumbs);
+        if (state2.image) {
+          thumbs.appendChild(el("span", { class: "attach-thumb" },
+            el("img", { src: state2.image, alt: "領収書" }),
+            el("button", {
+              class: "at-del", type: "button", "aria-label": "画像を外す",
+              onclick: () => { state2.image = null; paint(); },
+            }, "×")));
+        }
+      };
+      fileIn.addEventListener("change", async () => {
+        const f = fileIn.files?.[0];
+        fileIn.value = "";
+        if (!f) return;
+        try { state2.image = await fileToDataURL(f); paint(); }
+        catch (e) { toast("画像を読み込めませんでした", "error"); }
+      });
+      const node = el("div", { class: "field" },
+        el("label", {}, label),
+        el("div", { class: "flex wrap", style: { gap: "8px", alignItems: "center" } }, pickBtn, fileIn),
+        thumbs,
+        el("span", { class: "hint" }, "レシート・領収書をスマホで撮影してそのまま添付できます"));
+      return { node, state: state2 };
+    }
+
     function openExpenseModal() {
       const amount = numInput(null, "例)1280");
-      const cat = selectInput(EXP_CATS);
-      const memo = el("input", { class: "input", type: "text", placeholder: "例)研修会場までの往復交通費" });
+      const cat = selectInput(EXP_CATS.filter((c) => c !== "交通費"));
+      const memo = el("input", { class: "input", type: "text", placeholder: "例)研修用の書籍代" });
+      const receipt = receiptField();
       const okBtn = el("button", { class: "btn primary" }, icon("send", 15), "申請する");
       const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
       const m = modal({
         title: "経費を申請",
         body: el("div", { class: "stack", style: { gap: "12px" } },
           el("p", { class: "muted", style: { fontSize: "var(--fs-sm)", lineHeight: "1.7" } },
-            "承認されると給与と合わせて精算されます。申請状況はこの画面で確認できます。"),
+            "領収書の画像を添付して申請します。承認されると給与と合わせて精算されます。交通費は「交通費を申請」からお願いします。"),
           field("金額(円)", amount),
           field("カテゴリ", cat),
-          field("メモ", memo, "用途がわかるように記入してください")),
+          field("メモ", memo, "用途がわかるように記入してください"),
+          receipt.node),
         actions: [cancelBtn, okBtn],
       });
       cancelBtn.addEventListener("click", m.close);
       okBtn.addEventListener("click", () => {
         const amt = Math.floor(Number(amount.value));
         if (!amt || amt <= 0) { toast("1円以上の金額を入力してください", "error"); return; }
+        if (!receipt.state.image) { toast("領収書の画像を添付してください", "error"); return; }
         store.add("expenses", {
           staffId: me.id, date: today,
           amount: amt, category: cat.value, memo: memo.value.trim(),
+          receiptImage: receipt.state.image,
           status: "pending",
         });
         m.close();
         toast(`経費を申請しました(${fmtYen(amt)}・承認待ち)`);
+        renderAll();
+      });
+    }
+
+    /** 交通費の申請(画像+金額+区間+距離)。月1回まとめて申請する運用 */
+    function openTransportModal() {
+      const amount = numInput(null, "例)1280");
+      const fromIn = el("input", { class: "input", type: "text", placeholder: "例)成増駅" });
+      const toIn = el("input", { class: "input", type: "text", placeholder: "例)大宮駅" });
+      const distIn = el("input", { class: "input", type: "number", min: "0", step: "0.1", inputmode: "decimal", placeholder: "例)28.4" });
+      const memo = el("input", { class: "input", type: "text", placeholder: "例)8月分の研修移動まとめ(任意)" });
+      const receipt = receiptField("領収書・経路の画像");
+      const okBtn = el("button", { class: "btn primary" }, icon("send", 15), "交通費を申請する");
+      const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
+      const m = modal({
+        title: "交通費を申請(月1回)",
+        body: el("div", { class: "stack", style: { gap: "12px" } },
+          el("p", { class: "muted", style: { fontSize: "var(--fs-sm)", lineHeight: "1.7" } },
+            "交通費は月1回まとめて申請します。区間(どこからどこまで)・距離・金額と、領収書または経路の画像を添付してください。"),
+          field("金額(円)", amount),
+          el("div", { class: "form-row" },
+            field("出発地(どこから)", fromIn),
+            field("到着地(どこまで)", toIn)),
+          field("距離(km)", distIn, "往復の場合は往復分の距離を入力してください"),
+          field("メモ", memo),
+          receipt.node),
+        actions: [cancelBtn, okBtn],
+      });
+      cancelBtn.addEventListener("click", m.close);
+      okBtn.addEventListener("click", () => {
+        const amt = Math.floor(Number(amount.value));
+        const from = fromIn.value.trim();
+        const to = toIn.value.trim();
+        const dist = Number(distIn.value);
+        if (!amt || amt <= 0) { toast("1円以上の金額を入力してください", "error"); return; }
+        if (!from || !to) { toast("区間(どこからどこまで)を入力してください", "error"); return; }
+        if (!dist || dist <= 0) { toast("距離(km)を入力してください", "error"); return; }
+        if (!receipt.state.image) { toast("領収書または経路の画像を添付してください", "error"); return; }
+        store.add("expenses", {
+          staffId: me.id, date: today,
+          amount: amt, category: "交通費",
+          memo: memo.value.trim(),
+          routeFrom: from, routeTo: to, distanceKm: dist,
+          receiptImage: receipt.state.image,
+          status: "pending",
+        });
+        m.close();
+        toast(`交通費を申請しました(${from}→${to}・${dist}km・${fmtYen(amt)})`);
         renderAll();
       });
     }
@@ -362,9 +465,27 @@ export default {
       const monthAll = exps.filter((e) => monthOf(e.date) === month);
       const monthTotal = monthAll.reduce((a, e) => a + e.amount, 0);
       const monthApproved = monthAll.filter((e) => e.status === "approved").reduce((a, e) => a + e.amount, 0);
+      const canApprove = can("backoffice.approve");
+      const myTransportThisMonth = monthAll.some((e) => e.staffId === me.id && e.category === "交通費");
+
+      // 毎月のお願い(交通費の月1申請+1minuteアンケート)
+      body.appendChild(el("div", { class: "bo-monthly" },
+        el("span", { class: "bo-monthly-ic" }, "📌"),
+        el("div", { class: "bo-monthly-main" },
+          el("div", { class: "bo-monthly-title" }, `毎月のお願い(${Number(month.slice(5))}月分)`),
+          el("div", { class: "bo-monthly-desc" },
+            myTransportThisMonth
+              ? "今月の交通費申請は提出済みです。"
+              : "交通費は月1回、画像・金額・区間(どこからどこまで)・距離を付けてまとめて申請してください。",
+            " あわせて月1回の1minuteアンケート(所要1分)にもご協力ください。")),
+        el("div", { class: "bo-monthly-actions" },
+          myTransportThisMonth ? badge("交通費 提出済", "good", true)
+            : el("button", { class: "btn accent sm", onclick: openTransportModal }, "🚃 ", "交通費を申請"),
+          el("a", { class: "btn ghost sm", href: SURVEY_URL, target: "_blank", rel: "noopener noreferrer" },
+            "📝 ", "アンケートを開く"))));
 
       body.appendChild(el("div", { class: "grid cols-3 bo-tiles" },
-        statTile({ label: "承認待ち", value: `${pending.length}件`, icon: "clipboard", sub: pending.length ? "承認・却下の対応をお願いします" : "すべて処理済みです", tone: pending.length ? "warn" : "good" }),
+        statTile({ label: "承認待ち", value: `${pending.length}件`, icon: "clipboard", sub: canApprove ? (pending.length ? "承認・却下の対応をお願いします" : "すべて処理済みです") : "承認は院長以上が行います", tone: pending.length ? "warn" : "good" }),
         statTile({ label: "今月の申請額", value: fmtYen(monthTotal), icon: "report", sub: `${monthAll.length}件の申請`, tone: "brand" }),
         statTile({ label: "今月の承認済額", value: fmtYen(monthApproved), icon: "check", sub: "給与と合わせて精算", tone: "accent" }),
       ));
@@ -379,14 +500,31 @@ export default {
       const columns = [
         { key: "staff", label: "申請者", render: (e) => staffChip(e.staffId) },
         { key: "date", label: "日付", render: (e) => fmtDate(e.date) },
-        { key: "category", label: "カテゴリ", render: (e) => badge(e.category) },
-        { key: "memo", label: "メモ", render: (e) => el("span", { class: "bo-memo" }, e.memo || "—") },
+        { key: "category", label: "カテゴリ", render: (e) => badge(e.category, e.category === "交通費" ? "accent" : "") },
+        {
+          key: "memo", label: "内容", render: (e) => el("span", { class: "bo-memo" },
+            e.routeFrom ? el("span", { class: "bo-route" },
+              `${e.routeFrom} → ${e.routeTo}`,
+              e.distanceKm ? el("span", { class: "bo-route-km" }, `(${e.distanceKm}km)`) : null) : null,
+            e.memo ? el("span", { class: "bo-memo-text" }, e.memo) : (e.routeFrom ? null : "—")),
+        },
+        {
+          key: "receipt", label: "領収書", align: "center",
+          render: (e) => e.receiptImage
+            ? el("button", {
+                class: "bo-receipt", title: "領収書画像を見る",
+                "aria-label": "領収書画像を見る",
+                onclick: (ev) => { ev.stopPropagation(); openImageModal(e.receiptImage, `領収書 — ${store.staffName(e.staffId)}(${fmtDate(e.date)})`); },
+              }, el("img", { src: e.receiptImage, alt: "領収書" }))
+            : el("span", { class: "muted small" }, "なし"),
+        },
         { key: "amount", label: "金額", align: "right", render: (e) => el("span", { class: "mono-num", style: { fontWeight: "700" } }, fmtYen(e.amount)) },
         { key: "status", label: "ステータス", align: "center", render: (e) => statusBadge(e.status) },
         {
-          key: "ops", label: "操作", align: "center",
+          key: "ops", label: canApprove ? "操作" : "", align: "center",
           render: (e) => {
             if (e.status === "pending") {
+              if (!canApprove) return el("span", { class: "small muted" }, "承認待ち");
               return el("span", { class: "bo-ops" },
                 el("button", { class: "btn primary sm", onclick: () => approveExpense(e) }, icon("check", 13), "承認"),
                 el("button", { class: "btn danger sm", onclick: () => openRejectModal(e) }, icon("x", 13), "却下"));
@@ -400,8 +538,10 @@ export default {
 
       body.appendChild(card({
         title: "申請一覧",
-        sub: "承認待ちを先頭に表示",
-        actions: el("button", { class: "btn primary sm", onclick: openExpenseModal }, icon("plus", 14), "経費を申請"),
+        sub: "承認待ちを先頭に表示・領収書サムネイルをクリックで拡大",
+        actions: el("span", { class: "bo-ops" },
+          el("button", { class: "btn accent sm", onclick: openTransportModal }, "🚃 ", "交通費を申請"),
+          el("button", { class: "btn primary sm", onclick: openExpenseModal }, icon("plus", 14), "経費を申請")),
         body: table({ columns, rows, empty: "経費申請はまだありません" }),
       }));
     }

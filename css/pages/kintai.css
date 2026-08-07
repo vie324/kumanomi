@@ -172,3 +172,7 @@
   .page-kintai .punch-times { grid-template-columns: 1fr; }
   .page-kintai .q-actions { margin-left: 0; width: 100%; }
 }
+
+/* 月次サマリー(出勤日数・遅刻のみの2タイル) */
+.page-kintai .kintai-kpi2 { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 620px; }
+@media (max-width: 560px) { .page-kintai .kintai-kpi2 { grid-template-columns: 1fr; max-width: none; } }
