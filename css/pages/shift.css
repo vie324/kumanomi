@@ -509,3 +509,26 @@
   .page-shift .wc-day { font-size: var(--fs-xs); }
   .page-shift .wc-mark { font-size: 9.5px; }
 }
+
+/* ============================================================
+   希望休:日ごとの理由入力と申請内容の確認
+   ============================================================ */
+.page-shift .wish-reasons {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.page-shift .wish-reason-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+@media (max-width: 640px) { .page-shift .wish-reason-row { grid-template-columns: 1fr; gap: 4px; } }
+.page-shift .wish-reason-day {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}

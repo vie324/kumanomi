@@ -330,3 +330,79 @@
 .page-sns .mc-main { flex: 1; min-width: 0; line-height: 1.4; }
 .page-sns .mc-title { display: block; font-size: var(--fs-sm); font-weight: 700; }
 .page-sns .mc-sub { display: block; font-size: var(--fs-xs); color: var(--ink-3); }
+
+/* ============================================================
+   タイムライン4分割(連絡事項/チャンネル/売上報告/社内SNS)
+   ============================================================ */
+.page-sns .tl-lead {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  line-height: 1.7;
+}
+.page-sns .tl-lead-ic { font-size: 16px; flex: none; }
+
+/* チャンネルタイムラインの絞り込みチップ */
+.page-sns .channel-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 14px;
+}
+.page-sns .composer-chsel { max-width: 220px; height: 34px; font-size: var(--fs-sm); }
+
+/* 売上報告タイムラインのアクションバー */
+.page-sns .uriage-actionbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 13px 16px;
+  margin-bottom: 14px;
+}
+.page-sns .uriage-actionbar .ua-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* 売上報告カード(タイムライン内) */
+.page-sns .uriage-post {
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--hairline));
+}
+.page-sns .ur-cells {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+@media (max-width: 640px) { .page-sns .ur-cells { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.page-sns .ur-cell {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 8px 11px;
+  display: flex; flex-direction: column; gap: 1px;
+  min-width: 0;
+}
+.page-sns .ur-cell.big {
+  background: var(--brand-soft);
+  border-color: color-mix(in srgb, var(--brand) 25%, var(--hairline));
+}
+.page-sns .ur-cell-label { font-size: var(--fs-xs); color: var(--ink-3); font-weight: 700; }
+.page-sns .ur-cell-value { font-size: var(--fs-md); font-weight: 800; font-variant-numeric: tabular-nums; }
+.page-sns .ur-cell.big .ur-cell-value { color: var(--brand-ink); font-size: var(--fs-lg); }
+.page-sns .ur-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+.page-sns .ur-photo-note { margin-top: 6px; font-size: var(--fs-xs); color: var(--ink-3); font-weight: 700; }
+.page-sns .ur-horenso-tag {
+  display: inline-block;
+  margin-right: 7px;
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}

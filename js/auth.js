@@ -19,6 +19,7 @@ export const RANKS = {
   mentor: { level: 2, label: "メンター", desc: "担当メンティーの日報も確認できます" },
   staff: { level: 1, label: "スタッフ", desc: "自分の情報と担当患者様を扱えます" },
   hr: { level: 3, label: "本部人事", desc: "全店舗の勤怠・シフトを管理します(日報は対象外)" },
+  clerk: { level: 1, label: "事務職員", desc: "給与に直結する勤怠・経費・交通費・発注を最終確認します" },
 };
 
 export function rankOf(staff) { return staff?.rank || "staff"; }
@@ -108,8 +109,8 @@ const RULES = {
   "patients.edit": (me) => rankOf(me) !== "hr" && (isClockedInToday(me.id) || rankLevel(me) >= 3),
 
   /* --- 日報 --- */
-  "nippo.submit": (me) => rankOf(me) !== "hr",
-  "nippo.view": (me) => rankOf(me) !== "hr", // 人事は日報を見ない
+  "nippo.submit": (me) => !["hr", "clerk"].includes(rankOf(me)),
+  "nippo.view": (me) => !["hr", "clerk"].includes(rankOf(me)), // 人事・事務は日報を見ない
   "nippo.viewAll": (me) => rankLevel(me) >= 6 && rankOf(me) !== "hr",
   "nippo.summarize": (me) => rankLevel(me) >= 2 && rankOf(me) !== "hr",
 
@@ -135,6 +136,9 @@ const RULES = {
 
   /* --- 人事管理ページ --- */
   "hr.view": (me) => rankOf(me) === "hr" || rankLevel(me) >= 6,
+
+  /* --- 給与確認(事務職員向け):勤怠・経費・交通費・発注の最終確認とCSV出力 --- */
+  "payroll.view": (me) => ["clerk", "hr"].includes(rankOf(me)) || rankLevel(me) >= 6,
 
   /* --- 組織図 --- */
   "org.view": () => true,
@@ -208,6 +212,7 @@ export function scopeLabel(me = null) {
   const viewer = me || store.me();
   if (!viewer) return "";
   if (rankOf(viewer) === "hr") return "全店舗の勤怠・シフト(日報は対象外)";
+  if (rankOf(viewer) === "clerk") return "給与関連の最終確認(勤怠・経費・交通費・発注)";
   const sub = subtreeIds(viewer.id).length;
   const mentees = (viewer.menteeIds || []).length;
   if (rankOf(viewer) === "ceo") return "全社(社長)";
@@ -250,6 +255,7 @@ export function myMentees(me = null) {
 const PAGE_GUARDS = {
   hr: "hr.view",
   nippo: "nippo.view",
+  payroll: "payroll.view",
 };
 
 export function canSeePage(pageId, me = null) {

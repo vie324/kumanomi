@@ -1,0 +1,49 @@
+/* 給与確認(事務職員向け)ページ固有スタイル(.page-payroll 配下にスコープ) */
+
+.page-payroll .pr-filters {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.page-payroll .pr-monthnav { display: flex; align-items: center; gap: 6px; }
+.page-payroll .pr-month { font-size: var(--fs-lg); font-weight: 800; min-width: 108px; text-align: center; }
+
+.page-payroll .pr-copy {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 13px;
+  margin-bottom: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  line-height: 1.7;
+}
+.page-payroll .pr-copy svg { flex: none; margin-top: 2px; color: var(--accent); }
+
+.page-payroll .pr-bad { color: var(--critical-text); font-weight: 800; }
+.page-payroll .pr-warn { color: var(--warn-text); font-weight: 700; }
+.page-payroll .pr-route { font-weight: 700; font-size: var(--fs-sm); white-space: nowrap; }
+.page-payroll .pr-item { font-weight: 700; font-size: var(--fs-sm); }
+.page-payroll .pr-memo {
+  display: inline-block;
+  max-width: 240px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: bottom;
+}
+.page-payroll .pr-receipt {
+  width: 44px; height: 44px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  padding: 0;
+  cursor: zoom-in;
+  vertical-align: middle;
+}
+.page-payroll .pr-receipt img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.page-payroll .pr-footnote {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 16px;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}

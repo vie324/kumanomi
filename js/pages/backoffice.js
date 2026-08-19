@@ -6,7 +6,7 @@
 import { store, todayStr, addDays, monthOf } from "../store.js";
 import {
   el, clear, icon, card, sectionHeader, statTile, badge, statusBadge,
-  staffChip, table, tabs, chip, toast, modal, emptyState,
+  staffChip, table, tabs, chip, toast, modal, confirmDialog, emptyState,
   fmtYen, fmtNum, fmtDate, fileToDataURL, openImageModal,
 } from "../ui.js";
 import { can, rankLabel } from "../auth.js";
@@ -82,6 +82,7 @@ export default {
     function openOrderModal(item) {
       const suggested = Math.max(item.min * 2 - item.stock, 1);
       const qty = numInput(suggested);
+      const noteIn = el("input", { class: "input", type: "text", placeholder: "例)発注点割れのため補充(任意)" });
       const okBtn = el("button", { class: "btn primary" }, icon("send", 15), "発注する");
       const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
       const m = modal({
@@ -89,16 +90,24 @@ export default {
         body: el("div", { class: "stack", style: { gap: "12px" } },
           el("p", { class: "muted", style: { fontSize: "var(--fs-sm)", lineHeight: "1.7" } },
             `現在庫 ${fmtNum(item.stock)}${item.unit} / 発注点 ${fmtNum(item.min)}${item.unit}・発注先:${item.supplier}(単価 ${fmtYen(item.price)})`),
-          field(`発注数量(${item.unit})`, qty, "推奨:発注点の2倍まで補充する数量を初期表示しています")),
+          field(`発注数量(${item.unit})`, qty, "推奨:発注点の2倍まで補充する数量を初期表示しています"),
+          field("メモ", noteIn)),
         actions: [cancelBtn, okBtn],
       });
       cancelBtn.addEventListener("click", m.close);
       okBtn.addEventListener("click", () => {
         const n = Math.floor(Number(qty.value));
         if (!n || n <= 0) { toast("1以上の数量を入力してください", "error"); return; }
+        // 発注履歴に記録する(給与確認ページの「発注」タブとCSV出力の元データになる)
+        store.add("orders", {
+          itemId: item.id, itemName: item.name,
+          qty: n, unit: item.unit, unitPrice: item.price, amount: n * item.price,
+          supplier: item.supplier, storeId: me.storeId, staffId: me.id,
+          date: today, status: "ordered", note: noteIn.value.trim(),
+        });
         store.update("inventory", item.id, { lastOrder: today });
         m.close();
-        toast(`「${item.name}」を ${fmtNum(n)}${item.unit} 発注しました(発注先:${item.supplier})`);
+        toast(`「${item.name}」を ${fmtNum(n)}${item.unit} 発注しました(発注先:${item.supplier}・${fmtYen(n * item.price)})`);
         renderAll();
       });
     }
@@ -120,8 +129,87 @@ export default {
         const n = Math.floor(Number(qty.value));
         if (!n || n <= 0) { toast("1以上の数量を入力してください", "error"); return; }
         store.update("inventory", item.id, { stock: item.stock + n });
+        // 入荷待ちの発注があれば「入荷済」にする(古い順に1件)
+        const open = store.get("orders")
+          .filter((o) => o.itemId === item.id && o.status === "ordered")
+          .sort((a, b) => (a.date < b.date ? -1 : 1))[0];
+        if (open) store.update("orders", open.id, { status: "received", receivedAt: today });
         m.close();
         toast(`「${item.name}」を ${fmtNum(n)}${item.unit} 入荷しました(在庫 ${fmtNum(item.stock)}${item.unit})`);
+        renderAll();
+      });
+    }
+
+    /* ---- 品目の追加・編集(発注するものは今後も増えるため、ここで自由に登録できる) ---- */
+    function openItemModal(item = null) {
+      const isNew = !item;
+      const nameIn = el("input", { class: "input", type: "text", placeholder: "例)フェイスタオル", value: item?.name || "" });
+      const catSel = selectInput(INV_CATS, item?.category || INV_CATS[0]);
+      const unitIn = el("input", { class: "input", type: "text", placeholder: "例)枚・箱・本", value: item?.unit || "" });
+      const zeroNum = (v, ph) => el("input", {
+        class: "input", type: "number", min: "0", step: "1", inputmode: "numeric",
+        value: v != null ? String(v) : "", placeholder: ph,
+      });
+      const stockIn = zeroNum(item?.stock, "例)20");
+      const minIn = zeroNum(item?.min, "例)10");
+      const priceIn = zeroNum(item?.price, "例)380");
+      const supplierIn = el("input", { class: "input", type: "text", placeholder: "例)白洋リネン", value: item?.supplier || "" });
+
+      const okBtn = el("button", { class: "btn primary" }, icon("check", 15), isNew ? "品目を追加" : "保存する");
+      const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
+      const delBtn = isNew ? null : el("button", { class: "btn danger" }, icon("trash", 14), "削除");
+
+      const m = modal({
+        title: isNew ? "発注品目を追加" : `品目を編集 — ${item.name}`,
+        body: el("div", { class: "stack", style: { gap: "12px" } },
+          el("p", { class: "muted", style: { fontSize: "var(--fs-sm)", lineHeight: "1.7" } },
+            "発注するものは今後増えても、ここから自由に追加・編集できます。登録した品目は在庫一覧と発注アラートの対象になります。"),
+          field("品名", nameIn),
+          el("div", { class: "form-row" },
+            field("カテゴリ", catSel),
+            field("単位", unitIn, "枚・箱・本など数える単位")),
+          el("div", { class: "form-row" },
+            field("現在庫", stockIn),
+            field("発注点", minIn, "在庫がこの数を下回るとアラートが出ます")),
+          el("div", { class: "form-row" },
+            field("単価(円)", priceIn),
+            field("仕入先", supplierIn))),
+        actions: [delBtn, cancelBtn, okBtn].filter(Boolean),
+      });
+      cancelBtn.addEventListener("click", m.close);
+      okBtn.addEventListener("click", () => {
+        const name = nameIn.value.trim();
+        const unit = unitIn.value.trim();
+        const supplier = supplierIn.value.trim();
+        const stock = Math.floor(Number(stockIn.value));
+        const min = Math.floor(Number(minIn.value));
+        const price = Math.floor(Number(priceIn.value));
+        if (!name) { toast("品名を入力してください", "error"); return; }
+        if (!unit) { toast("単位を入力してください(枚・箱など)", "error"); return; }
+        if (!Number.isFinite(stock) || stock < 0) { toast("現在庫は0以上で入力してください", "error"); return; }
+        if (!Number.isFinite(min) || min < 0) { toast("発注点は0以上で入力してください", "error"); return; }
+        if (!Number.isFinite(price) || price < 0) { toast("単価は0以上で入力してください", "error"); return; }
+        const patch = { name, category: catSel.value, unit, stock, min, price, supplier: supplier || "未設定" };
+        if (isNew) {
+          store.add("inventory", { ...patch, lastOrder: null });
+          toast(`品目「${name}」を追加しました`);
+        } else {
+          store.update("inventory", item.id, patch);
+          toast(`品目「${name}」を更新しました`);
+        }
+        m.close();
+        renderAll();
+      });
+      delBtn?.addEventListener("click", async () => {
+        const ok = await confirmDialog({
+          title: "品目の削除",
+          message: `「${item.name}」を在庫一覧から削除します。発注履歴は残ります。よろしいですか?`,
+          okLabel: "削除する", danger: true,
+        });
+        if (!ok) return;
+        store.remove("inventory", item.id);
+        m.close();
+        toast(`品目「${item.name}」を削除しました`, "info");
         renderAll();
       });
     }
@@ -194,14 +282,40 @@ export default {
           key: "ops", label: "操作", align: "center",
           render: (it) => el("span", { class: "bo-ops" },
             el("button", { class: "btn soft sm", onclick: () => openOrderModal(it) }, icon("send", 13), "発注"),
-            el("button", { class: "btn ghost sm", onclick: () => openReceiveModal(it) }, icon("download", 13), "入荷")),
+            el("button", { class: "btn ghost sm", onclick: () => openReceiveModal(it) }, icon("download", 13), "入荷"),
+            el("button", { class: "icon-btn sm", title: "品目を編集", "aria-label": `${it.name} を編集`, onclick: () => openItemModal(it) }, icon("edit", 14))),
         });
       }
 
       body.appendChild(card({
         title: "在庫一覧",
-        sub: `成増店・${state.invCat === "全て" ? "全カテゴリ" : state.invCat}(${rows.length}品目)${canOrder ? "" : "・閲覧のみ"}`,
+        sub: `成増店・${state.invCat === "全て" ? "全カテゴリ" : state.invCat}(${rows.length}品目)${canOrder ? "・品目は追加・編集できます" : "・閲覧のみ"}`,
+        actions: canOrder
+          ? el("button", { class: "btn primary sm", onclick: () => openItemModal() }, icon("plus", 14), "品目を追加")
+          : null,
         body: el("div", {}, chipsRow, table({ columns, rows, empty: "該当する品目がありません" })),
+      }));
+
+      // --- 発注履歴(発注操作が自動で記録される) ---
+      const orders = [...store.get("orders")].sort((a, b) => (a.date < b.date ? 1 : -1));
+      const orderCols = [
+        { key: "date", label: "発注日", render: (o) => fmtDate(o.date) },
+        { key: "item", label: "品目", render: (o) => el("span", { class: "bo-name" }, o.itemName) },
+        { key: "qty", label: "数量", align: "right", render: (o) => `${fmtNum(o.qty)}${o.unit || ""}` },
+        { key: "amount", label: "金額", align: "right", render: (o) => el("span", { class: "mono-num", style: { fontWeight: "700" } }, fmtYen(o.amount)) },
+        { key: "supplier", label: "仕入先", render: (o) => o.supplier || "—" },
+        { key: "staff", label: "発注者", render: (o) => staffChip(o.staffId, { size: 24, withRole: false }) },
+        {
+          key: "status", label: "状態", align: "center",
+          render: (o) => o.status === "received" ? badge("入荷済", "good") : badge("入荷待ち", "warn"),
+        },
+      ];
+      body.appendChild(card({
+        title: "発注履歴",
+        sub: `全${orders.length}件・「発注」ボタンの操作が自動で記録されます(給与確認ページからCSVで書き出せます)`,
+        body: orders.length
+          ? table({ columns: orderCols, rows: orders.slice(0, 12) })
+          : emptyState({ icon: "📦", title: "発注履歴はまだありません" }),
       }));
     }
 

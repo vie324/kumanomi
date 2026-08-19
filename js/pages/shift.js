@@ -526,24 +526,28 @@ export default {
     }
 
     /* ---------------- 希望休の申請(月単位) ---------------- */
-    /** 対象月=翌月。日付をタップすると 希望休→有給→特休→誕生日休→解除 の順に切り替わる */
+    /** 対象月=翌月。日付をタップすると 希望休→有給→特休→誕生日休→解除 の順に切り替わる。
+        選んだ日ごとに「理由」も一緒に提出できる */
     function openRequestModal() {
       const meNow = me();
       const minMonth = addMonths(monthOf(todayStr()), 1);
       const maxMonth = addMonths(monthOf(todayStr()), 3);
       let month = minMonth;
       let wishes = {};
+      let reasons = {};   // { "YYYY-MM-DD": "理由" }
 
-      const noteEl = el("textarea", { class: "textarea", rows: "2", placeholder: "備考(例:5日は子どもの行事のためお願いします)" });
+      const noteEl = el("textarea", { class: "textarea", rows: "2", placeholder: "備考(月全体の補足があれば)" });
       const submitBtn = el("button", { class: "btn primary" }, icon("send", 15), "希望休を申請する");
       const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
       const countEl = el("span", { class: "wish-count" });
       const monthLabelEl = el("span", { class: "shift-range" });
       const calWrap = el("div", { class: "wish-cal" });
+      const reasonWrap = el("div", { class: "wish-reasons" });
 
       const loadExisting = () => {
         const ex = store.get("shiftRequests").find((r) => r.staffId === meNow.id && r.month === month);
         wishes = { ...(ex?.wishes || {}) };
+        reasons = { ...(ex?.reasons || {}) };
         noteEl.value = ex?.note || "";
         clear(submitBtn).append(icon("send", 15), ex ? "希望休を更新する" : "希望休を申請する");
       };
@@ -551,8 +555,39 @@ export default {
       const cycleDay = (d) => {
         const cur = wishes[d] || "";
         const next = LEAVE_CYCLE[(LEAVE_CYCLE.indexOf(cur) + 1) % LEAVE_CYCLE.length];
-        if (next) wishes[d] = next; else delete wishes[d];
+        if (next) wishes[d] = next; else { delete wishes[d]; delete reasons[d]; }
         paintCal();
+      };
+
+      /* 選択した日ごとの理由入力欄 */
+      const paintReasons = () => {
+        clear(reasonWrap);
+        const days = Object.keys(wishes).sort();
+        if (!days.length) {
+          reasonWrap.appendChild(el("p", { class: "small muted", style: { margin: "0" } },
+            "カレンダーで日付を選ぶと、日ごとの理由を入力できます"));
+          return;
+        }
+        for (const d of days) {
+          const lt = LEAVE_TYPES[wishes[d]];
+          const input = el("input", {
+            class: "input", type: "text",
+            placeholder: "理由(例:子どもの行事のため)",
+            "aria-label": `${fmtDate(d)} の理由`,
+            oninput: (e) => {
+              const v = e.target.value;
+              if (v.trim()) reasons[d] = v; else delete reasons[d];
+            },
+          });
+          input.value = reasons[d] || "";
+          reasonWrap.appendChild(el("div", { class: "wish-reason-row" },
+            el("span", { class: "wish-reason-day" },
+              el("span", { class: "wish-lg-emoji" }, lt?.emoji || "🙌"),
+              el("span", {},
+                el("b", {}, fmtDate(d)),
+                el("span", { class: "small muted", style: { display: "block" } }, lt?.label || ""))),
+            input));
+        }
       };
 
       const paintCal = () => {
@@ -584,6 +619,7 @@ export default {
         const n = Object.keys(wishes).length;
         countEl.textContent = n ? `${n}日分の希望を選択中` : "日付をタップして休みたい日を選びます";
         clear(monthLabelEl).append(monthLabel(month), monthTag(month));
+        paintReasons();
       };
 
       const goMonth = (delta) => {
@@ -610,16 +646,27 @@ export default {
             countEl),
           legend,
           calWrap,
+          el("div", { class: "field" },
+            el("label", {}, "日ごとの理由(希望休と一緒に提出されます)"),
+            reasonWrap,
+            el("span", { class: "hint" }, "理由を書いておくと、責任者がシフトを組むときに配慮しやすくなります")),
           el("div", { class: "field" }, el("label", {}, "備考"), noteEl)));
 
       const m = modal({ title: "希望休の申請(月単位)", body, wide: true, actions: [cancelBtn, submitBtn] });
       cancelBtn.addEventListener("click", () => m.close());
       submitBtn.addEventListener("click", () => {
+        // 理由は選択中の日付分だけを保存する(解除した日の残骸を持ち込まない)
+        const cleanReasons = {};
+        for (const d of Object.keys(wishes)) {
+          const r = (reasons[d] || "").trim();
+          if (r) cleanReasons[d] = r;
+        }
+        const payload = { wishes: { ...wishes }, reasons: cleanReasons, note: noteEl.value.trim(), submittedAt: todayStr() };
         const existing = store.get("shiftRequests").find((r) => r.staffId === meNow.id && r.month === month);
         if (existing) {
-          store.update("shiftRequests", existing.id, { wishes: { ...wishes }, note: noteEl.value.trim(), submittedAt: todayStr() });
+          store.update("shiftRequests", existing.id, payload);
         } else {
-          store.add("shiftRequests", { staffId: meNow.id, month, wishes: { ...wishes }, note: noteEl.value.trim(), submittedAt: todayStr() });
+          store.add("shiftRequests", { staffId: meNow.id, month, ...payload });
         }
         m.close();
         toast(`${monthLabel(month)}の希望休を申請しました。シフト作成時に反映されます`);
@@ -858,6 +905,44 @@ export default {
       });
     }
 
+    /** 申請内容の詳細モーダル(責任者が日付・種別・理由を確認できる) */
+    function openRequestDetail(rq, s) {
+      const entries = Object.entries(rq.wishes || {}).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+      const reasons = rq.reasons || {};
+
+      const rows = entries.length
+        ? el("div", { class: "row-list" }, entries.map(([d, t]) => {
+            const lt = LEAVE_TYPES[t];
+            return el("div", { class: "row-item" },
+              el("span", { class: "wish-lg-emoji", style: { fontSize: "18px" } }, lt?.emoji || "🙌"),
+              el("span", { class: "row-main" },
+                el("span", { class: "row-title" }, fmtDate(d, { withYear: true }),
+                  el("span", { class: `wish-lg t-${t}`, style: { marginLeft: "8px" } }, lt?.label || t)),
+                el("span", { class: "row-sub", style: { whiteSpace: "normal" } },
+                  reasons[d] ? `理由:${reasons[d]}` : "理由の記入なし")));
+          }))
+        : emptyState({ icon: "🗓", title: "希望日はありません" });
+
+      const closeBtn = el("button", { class: "btn primary" }, "閉じる");
+      const m = modal({
+        title: `希望休の申請内容 — ${s.name}`,
+        body: el("div", { class: "page-shift" },
+          el("div", { class: "stack", style: { gap: "12px" } },
+            el("div", { class: "flex", style: { gap: "10px", alignItems: "center" } },
+              avatar(s, 38),
+              el("span", {},
+                el("span", { style: { display: "block", fontWeight: "800", fontSize: "var(--fs-md)" } }, s.name),
+                el("span", { class: "small muted" }, `${store.storeName(s.storeId)}・${s.role}`)),
+              el("span", { class: "spacer" }),
+              badge(`対象 ${monthLabel(rq.month)}`, "brand")),
+            el("div", { class: "small muted" }, `提出日:${fmtDate(rq.submittedAt, { withYear: true })}・${entries.length}日分の希望`),
+            rows,
+            rq.note ? el("div", { class: "shift-deadline" }, icon("info", 15), `備考:${rq.note}`) : null)),
+        actions: [closeBtn],
+      });
+      closeBtn.addEventListener("click", () => m.close());
+    }
+
     /** 対象月(翌月)の希望休 提出状況 — 責任者・本部人事のみ */
     function buildRequestsCard() {
       const targetMonth = addMonths(monthOf(todayStr()), 1);
@@ -875,21 +960,31 @@ export default {
       const rows = el("div", { class: "row-list" });
       for (const s of staffList) {
         const rq = reqs.find((r) => r.staffId === s.id);
-        rows.appendChild(el("div", { class: "row-item" },
+        const reasonN = rq ? Object.keys(rq.reasons || {}).length : 0;
+        const inner = [
           avatar(s, 30),
           el("span", { class: "row-main" },
             el("span", { class: "row-title" }, s.name),
             el("span", { class: "row-sub" },
               (state.storeId === ALL ? `${store.storeName(s.storeId)}・` : "")
-              + (rq ? `${wishSummary(rq)}${rq.note ? `/${rq.note}` : ""}` : "提出待ち"))),
-          rq ? badge("提出済", "good") : badge("未提出", "warn")));
+              + (rq ? `${wishSummary(rq)}${reasonN ? `・理由 ${reasonN}件` : ""}${rq.note ? `/${rq.note}` : ""}` : "提出待ち"))),
+          rq ? badge("提出済", "good") : badge("未提出", "warn"),
+        ];
+        // 提出済みの行はタップで申請内容(日付・種別・理由)を確認できる
+        rows.appendChild(rq
+          ? el("button", {
+              class: "row-item clickable",
+              "aria-label": `${s.name}さんの希望休の内容を確認`,
+              onclick: () => openRequestDetail(rq, s),
+            }, ...inner, icon("chevR", 15))
+          : el("div", { class: "row-item" }, ...inner));
       }
 
       return card({
         title: "希望休の提出状況(月単位)",
         sub: `${state.storeId === ALL ? "全店舗" : store.storeName(state.storeId)}・対象 ${monthLabel(targetMonth)}・${submitted}/${staffList.length}名 提出済`,
         body: el("div", {},
-          el("div", { class: "shift-deadline mb-12" }, icon("clock", 15), "締切は前月20日 21:00です。希望休・有給・特別・誕生日休暇を日ごとに選べます"),
+          el("div", { class: "shift-deadline mb-12" }, icon("clock", 15), "提出済みの行をタップすると、申請内容(日付・種別・理由)を確認できます"),
           rows),
       });
     }
@@ -908,7 +1003,9 @@ export default {
               el("span", { class: "wish-lg-emoji" }, LEAVE_TYPES[t]?.emoji || "🙌"),
               el("span", { class: "row-main" },
                 el("span", { class: "row-title" }, fmtDate(d, { withYear: true })),
-                el("span", { class: "row-sub" }, LEAVE_TYPES[t]?.label || t)),
+                el("span", { class: "row-sub", style: { whiteSpace: "normal" } },
+                  (LEAVE_TYPES[t]?.label || t)
+                  + ((rq?.reasons || {})[d] ? `・理由:${rq.reasons[d]}` : ""))),
               badge("申請済", "good"))))
           : emptyState({ icon: "🗓", title: "まだ希望休を申請していません", hint: "「希望休を申請(月単位)」から提出できます" }),
         rq?.note ? el("p", { class: "small muted", style: { marginTop: "8px" } }, `備考:${rq.note}`) : null,

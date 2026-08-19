@@ -19,6 +19,7 @@ const SOURCE_META = {
   chat: { emoji: "💬", label: "チャット" },
   meeting: { emoji: "📋", label: "議事録" },
   manual: { emoji: "✍️", label: "手動" },
+  nippo: { emoji: "📓", label: "日報(毎日)" },
 };
 
 const isOverdue = (t) => !!t.due && t.due < todayStr() && t.status !== "done";
@@ -69,6 +70,7 @@ export default {
       if (!t.source) return;
       if (t.source.kind === "chat") router.navigate(`chat/${t.source.refId}`);
       else if (t.source.kind === "meeting") router.navigate(`meetings/${t.source.refId}`);
+      else if (t.source.kind === "nippo") router.navigate("nippo");
     }
 
     /* ---------------- 新規・編集モーダル ---------------- */
@@ -137,10 +139,11 @@ export default {
 
     function sourceChip(t) {
       const meta = SOURCE_META[t.source?.kind] || SOURCE_META.manual;
-      const clickable = t.source?.kind === "chat" || t.source?.kind === "meeting";
+      const clickable = ["chat", "meeting", "nippo"].includes(t.source?.kind);
       return el(clickable ? "button" : "span", {
         class: `tk-source ${clickable ? "link" : ""}`,
-        title: clickable ? `${meta.label}「${t.source?.label || ""}」を開く` : meta.label,
+        title: t.source?.kind === "nippo" ? "日報ページを開く"
+          : clickable ? `${meta.label}「${t.source?.label || ""}」を開く` : meta.label,
         onclick: clickable ? (e) => { e.stopPropagation(); openSource(t); } : null,
       }, `${meta.emoji} ${t.source?.label || meta.label}`);
     }

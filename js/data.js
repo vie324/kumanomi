@@ -96,6 +96,7 @@ const staff = [
   { id: "s16", name: "高木 純", kana: "たかぎ じゅん", role: "マネージャー", storeId: "st-kawagoe", color: "#4d5fb3", points: 205, joined: "2018-10-01", licenses: ["柔道整復師"], skills: { 技術: 4.0, 接客: 4.4, 数値: 4.6, 理念: 4.1, 協調: 4.4 }, rank: "area", reportsTo: "s09" },
   { id: "s17", name: "白鳥 結衣", kana: "しらとり ゆい", role: "店長", storeId: "st-biyou", color: "#c25a86", points: 264, joined: "2020-10-01", licenses: ["エステティシャン"], skills: { 技術: 4.3, 接客: 4.8, 数値: 4.0, 理念: 4.2, 協調: 4.5 }, rank: "manager", reportsTo: "s16", menteeIds: ["s18"] },
   { id: "s18", name: "井村 心春", kana: "いむら こはる", role: "エステティシャン", storeId: "st-biyou", color: "#7a9e3f", points: 142, joined: "2024-10-01", licenses: ["エステティシャン"], skills: { 技術: 3.1, 接客: 4.5, 数値: 2.9, 理念: 3.8, 協調: 4.3 }, rank: "staff", reportsTo: "s17", mentorId: "s17" },
+  { id: "s19", name: "青木 若菜", kana: "あおき わかな", role: "事務職員", storeId: "st-narimasu", color: "#6b7f3f", points: 96, joined: "2022-10-01", licenses: [], skills: { 技術: 2.0, 接客: 4.2, 数値: 4.8, 理念: 4.3, 協調: 4.6 }, rank: "clerk", reportsTo: "s13" },
 ];
 
 /** 現場の担当者(受付・本部職を除く=日報/予約/評価の対象) */
@@ -408,21 +409,42 @@ function makeAttendance(shifts) {
   return att;
 }
 
-/** 希望休は月単位で申請する(翌月分)。wishes: { "YYYY-MM-DD": off|paid|special|birthday } */
+/**
+ * 希望休は月単位で申請する(翌月分)。
+ * wishes:  { "YYYY-MM-DD": off|paid|special|birthday }
+ * reasons: { "YYYY-MM-DD": "理由テキスト" } … 日ごとの理由も一緒に提出できる
+ */
 function makeShiftRequests() {
   const [ty, tm] = TODAY.split("-").map(Number);
   const nm = new Date(ty, tm, 1); // 翌月1日
   const month = `${nm.getFullYear()}-${pad(nm.getMonth() + 1)}`;
+  const reasonBank = ["子どもの学校行事のため", "通院のため", "家族の予定に合わせるため", "資格試験の受験日です", "友人の結婚式に出席します", ""];
+  // 定休日(水曜)は希望休の対象外なので避ける
+  const pickDay = (lo, hi) => {
+    let d = `${month}-${pad(ri(lo, hi))}`;
+    while (dow(d) === 3) d = `${month}-${pad(ri(lo, hi))}`;
+    return d;
+  };
   return staff.slice(0, 8).map((sf, i) => {
     const wishes = {};
-    wishes[`${month}-${pad(ri(2, 14))}`] = pick(["off", "off", "off", "paid"]);
-    wishes[`${month}-${pad(ri(15, 27))}`] = pick(["off", "off", "paid", "special"]);
-    if (i === 2) wishes[`${month}-${pad(ri(2, 27))}`] = "birthday";
+    const reasons = {};
+    const d1 = pickDay(2, 14);
+    const d2 = pickDay(15, 27);
+    wishes[d1] = pick(["off", "off", "off", "paid"]);
+    wishes[d2] = pick(["off", "off", "paid", "special"]);
+    const r1 = pick(reasonBank); if (r1) reasons[d1] = r1;
+    const r2 = pick(reasonBank); if (r2) reasons[d2] = r2;
+    if (i === 2) {
+      const bd = pickDay(2, 27);
+      wishes[bd] = "birthday";
+      reasons[bd] = "誕生日休暇を取得します";
+    }
     return {
       id: `sr${i + 1}`,
       staffId: sf.id,
       month,
       wishes,
+      reasons,
       note: pick(["", "", "子どもの行事のためお願いします", "通院のため", ""]),
       submittedAt: addDays(TODAY, -ri(0, 3)),
     };
@@ -565,7 +587,74 @@ function makePosts() {
   P({ type: "notice", channelId: "ch-all", authorId: "s09", date: iso(addDays(TODAY, -9), "10:00"),
     title: "8月の研修日程",
     body: "技術研修 8/5(火)・鍼研修 8/19(火)・接遇座学 8/26(火)。技術研修と鍼研修は該当職種は必須参加です。シフトは研修枠で自動確保されます。", likes: ["s02", "s06", "s08", "s11"] });
+  // --- 社内SNS(スタッフの自由投稿) ---
+  P({ type: "free", authorId: "s06", date: iso(addDays(TODAY, -1), "21:02"),
+    body: "大宮店の近くに新しくできたお弁当屋さん、ボリューム満点でおすすめです🍱 午後の施術も力が入ります!", likes: ["s02", "s04", "s11"] });
+  P({ type: "free", authorId: "s11", date: iso(addDays(TODAY, -2), "12:40"),
+    body: "休憩中にストレッチ講座の動画で勉強しています。おすすめの教材があったらコメントで教えてください🙏", likes: ["s02"],
+    comments: [{ id: "cf1", authorId: "s02", body: "解剖学アプリの3D表示が分かりやすいですよ!今度見せますね", date: iso(addDays(TODAY, -2), "13:05") }] });
+  P({ type: "free", authorId: "s04", date: iso(addDays(TODAY, -3), "18:22"),
+    body: "受付の飾り付けを秋仕様に変えました🍁 患者様から「かわいいね」と好評です!", likes: ["s01", "s02", "s03", "s09"] });
   return posts;
+}
+
+/** デモ用の消化率写真(SVGをdata URLにしたもの)。売上報告の必須添付を再現する */
+function digestionSvg(storeName, pct, date) {
+  const barW = Math.round(240 * Math.min(100, Math.max(0, pct)) / 100);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="300" viewBox="0 0 420 300"><rect width="420" height="300" fill="#f5f1ea"/><rect x="18" y="18" width="384" height="264" rx="12" fill="#ffffff" stroke="#ddd3c4"/><text x="40" y="58" font-size="18" fill="#584a33" font-family="sans-serif" font-weight="bold">回数券 消化率ボード</text><text x="40" y="82" font-size="13" fill="#8a7c62" font-family="sans-serif">${storeName}・${date}</text><text x="210" y="170" font-size="56" text-anchor="middle" fill="#c9500a" font-family="sans-serif" font-weight="bold">${pct}%</text><rect x="80" y="200" width="240" height="18" rx="9" fill="#efe8db"/><rect x="80" y="200" width="${barW}" height="18" rx="9" fill="#e2621a"/><text x="210" y="248" font-size="12" text-anchor="middle" fill="#8a7c62" font-family="sans-serif">本日締め時点の消化率(店内掲示の写真)</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * 売上報告(毎日の業務)。店舗の代表者が締め後に投稿し、
+ * 全スタッフの「売上報告」タイムラインに表示される。
+ * uriage: { sales(売上), patients(来患数), newPatients(新患数), cancels(キャンセル数) }
+ * images[0] は消化率の写真(必須添付)
+ */
+function makeUriagePosts() {
+  const arr = [];
+  let n = 1;
+  const reps = { "st-narimasu": "s01", "st-omiya": "s05", "st-kawagoe": "s07", "st-urawa": "s12", "st-biyou": "s17" };
+  const horenso = [
+    "回数券のご提案が2件成約しました。夕方枠に空きが出たため、明日のLINE配信で埋めにいきます。",
+    "新患様1名がご紹介経由でした。紹介カードのお声がけが効いています。",
+    "キャンセル1件は体調不良によるもの。振替のご予約を取得済みです。",
+    "物販(骨盤ベルト)が1件。施術後のセルフケア説明からの流れが良い形でした。",
+    "",
+  ];
+  const times = ["19:45", "20:05", "20:15", "20:30"];
+  for (const dOff of [-2, -1]) {
+    const date = addDays(TODAY, dOff);
+    if (dow(date) === 3) continue; // 水曜定休
+    for (const st of stores) {
+      const pct = ri(62, 93);
+      arr.push({
+        id: `ur${String(n++).padStart(3, "0")}`,
+        type: "uriage",
+        authorId: reps[st.id],
+        storeId: st.id,
+        date: iso(date, pick(times)),
+        uriage: { sales: ri(120, 260) * 1000, patients: ri(14, 32), newPatients: ri(0, 4), cancels: ri(0, 3) },
+        images: [digestionSvg(st.name, pct, date)],
+        body: pick(horenso),
+        likes: [], comments: [], pinned: false,
+      });
+    }
+  }
+  // 本日分は成増店だけ提出済みにして「本日の提出状況」を体験できるようにする
+  const pctToday = ri(62, 93);
+  arr.push({
+    id: `ur${String(n++).padStart(3, "0")}`,
+    type: "uriage",
+    authorId: "s01",
+    storeId: "st-narimasu",
+    date: iso(TODAY, "12:30"),
+    uriage: { sales: 128000, patients: 11, newPatients: 1, cancels: 0 },
+    images: [digestionSvg("成増店", pctToday, TODAY)],
+    body: "午前締め時点の中間報告です。午後の予約は7件、新規の方が1名ご来院予定です。",
+    likes: ["s09"], comments: [], pinned: false,
+  });
+  return arr;
 }
 
 // ============================================================
@@ -863,6 +952,12 @@ const faq = [
   { id: "f14", q: "デモデータを最初の状態に戻したい", keywords: ["リセット", "初期化", "デモ", "データ"], a: "トップバーの設定(歯車)から「デモデータをリセット」を選ぶと、初期状態に戻ります。" },
   { id: "f15", q: "タスクリストの使い方は?", keywords: ["タスク", "TODO", "議事録", "チャット"], a: "「タスク」ページで自分のタスクを管理できます。チャットのメッセージは吹き出し横の📋ボタン、議事録のアクションアイテムは「タスクへ」ボタンからタスクリストに送れます。担当者と期限を付けて、未着手→進行中→完了で管理します。" },
   { id: "f16", q: "予約のベッド(枠)を変更したい", keywords: ["予約", "ベッド", "枠", "変更", "移動"], a: "「予約管理」はベッド基軸のタイムテーブルです。PCでは予約カードをドラッグして別のベッド・時間帯へ移動できます。予約カードをクリックすると詳細からベッド・開始時間を選び直すこともできます。" },
+  { id: "f17", q: "売上報告はどこから投稿しますか?", keywords: ["売上報告", "売上", "報告", "消化率", "来患", "キャンセル"], a: "「毎日の業務 > 売上報告」の「売上報告を投稿」から、店舗・売上・来患数・新患数・キャンセル数(すべて必須)と消化率の写真(必須)、報連相(自由)を投稿します。店舗の代表者(締め担当)が締め後に投稿してください。投稿は全スタッフの社内SNS「売上報告」タイムラインに表示されます。" },
+  { id: "f18", q: "タイムラインの4つの違いは?", keywords: ["タイムライン", "連絡事項", "チャンネル", "社内SNS", "投稿"], a: "社内SNSのタイムラインは用途別に4つに分かれています。①連絡事項=全体の業務連絡・朝礼メモ ②チャンネル=委員会などチャンネルへの投稿だけ ③売上報告=各店舗の売上報告だけ ④社内SNS=サンクスとスタッフの自由投稿。投稿の種類に合わせてタブを選んでください。" },
+  { id: "f19", q: "希望休の理由はどこに書きますか?", keywords: ["希望休", "理由", "申請", "備考"], a: "「シフト管理」の「希望休を申請(月単位)」でカレンダーの日付を選ぶと、その下に日ごとの理由入力欄が表示されます。理由も一緒に提出でき、責任者は「希望休の提出状況」から申請内容(日付・種別・理由)を確認できます。" },
+  { id: "f20", q: "給与の締め前に勤怠や経費をまとめて確認したい", keywords: ["給与", "確認", "勤怠", "経費", "交通費", "発注", "CSV", "エクセル", "書き出し"], a: "「組織運営 > 給与確認」(事務職員・本部人事・統括以上)で、勤怠サマリー(出勤数・勤務時間・有給・特別休暇・欠勤・残業・遅刻・早退)、経費申請、交通費申請、発注を月ごとに1欄で確認できます。各表は右上のボタンからCSV(Excelでそのまま開けます)で書き出せます。" },
+  { id: "f21", q: "発注する品目を追加・編集したい", keywords: ["発注", "品目", "追加", "編集", "在庫", "登録"], a: "「在庫・経費 > 在庫」タブの「品目を追加」から新しい品目を登録できます(院長以上)。既存品目は操作列の鉛筆ボタンから編集・削除できます。発注するものが今後増えても、ここからいつでも追加できます。" },
+  { id: "f22", q: "日報の出し忘れを防ぎたい", keywords: ["日報", "忘れ", "タスク", "リマインド", "毎日"], a: "「日報を提出する(本日分)」タスクが毎日自動でタスクリストに追加されます。日報を提出すると自動で完了になります。未提出のままだとナビの未完了バッジに残るので、退勤前にタスクを確認する習慣がおすすめです。" },
 ];
 
 // ============================================================
@@ -1053,15 +1148,50 @@ function makeRoleplaySessions() {
 // ============================================================
 
 /**
- * source.kind: chat(チャット発) / meeting(議事録発) / manual(手動)
+ * source.kind: chat(チャット発) / meeting(議事録発) / manual(手動) / nippo(日報の毎日タスク)
  * status: todo | doing | done
  */
-function makeTasks() {
-  return [
+function makeTasks(dailyReports = []) {
+  const tasks = [
     { id: "tk01", title: "離反リスク患者リストへの声かけ結果を集計", note: "マネージャー会議の宿題。金曜までに各店分をまとめる。", ownerId: "s01", createdBy: "s09", due: addDays(TODAY, 2), status: "doing", source: { kind: "meeting", refId: "mt01", label: "マネージャー会議" }, createdAt: addDays(TODAY, -6) },
     { id: "tk02", title: "鍼(セイリン J15)の発注を院長に依頼", note: "在庫が残り8箱。チャットの報告から起票。", ownerId: "s01", createdBy: "s03", due: addDays(TODAY, 1), status: "todo", source: { kind: "chat", refId: "cr-narimasu", label: "成増店ルーム" }, createdAt: addDays(TODAY, -1) },
     { id: "tk03", title: "受付メンバーへのボイス入力レクチャー", note: "", ownerId: "s01", createdBy: "s01", due: addDays(TODAY, 3), status: "todo", source: { kind: "meeting", refId: "mt05", label: "導入キックオフ" }, createdAt: addDays(TODAY, -7) },
     { id: "tk04", title: "夕方枠のLINEリマインド配信文面を確認", note: "マーケ委員会のドラフトにコメントを返す。", ownerId: "s07", createdBy: "s10", due: addDays(TODAY, -1), status: "todo", source: { kind: "chat", refId: "cr-managers", label: "院長・マネージャー" }, createdAt: addDays(TODAY, -2) },
+  ];
+
+  // 「日報を提出する」デイリータスク:毎日全スタッフに自動で追加される(忘れ防止)。
+  // 日報の対象外(本部人事・事務職員)には作らない。提出済みなら完了状態で入れる。
+  for (const s of staff) {
+    if (["hr", "clerk"].includes(s.rank)) continue;
+    const submitted = dailyReports.some((r) => r.staffId === s.id && r.date === TODAY && r.status === "submitted");
+    tasks.push({
+      id: `tk-nippo-${s.id}`,
+      title: "日報を提出する(本日分)",
+      note: "退勤打刻の前に「日報」ページから提出しましょう。このタスクは毎日自動で追加されます。",
+      ownerId: s.id,
+      createdBy: s.id,
+      due: TODAY,
+      status: submitted ? "done" : "todo",
+      source: { kind: "nippo", refId: null, label: "毎日の業務" },
+      createdAt: TODAY,
+      auto: true,
+    });
+  }
+  return tasks;
+}
+
+// ============================================================
+// 発注履歴(在庫画面の「発注する」で追記される)
+// ============================================================
+
+/** status: ordered(発注済・入荷待ち) | received(入荷済) */
+function makeOrders() {
+  return [
+    { id: "od01", itemId: "in01", itemName: "フェイスタオル", qty: 42, unit: "枚", unitPrice: 380, amount: 15960, supplier: "白洋リネン", storeId: "st-narimasu", staffId: "s01", date: addDays(TODAY, -2), status: "ordered", note: "発注点割れのため補充" },
+    { id: "od02", itemId: "in07", itemName: "キネシオテープ 50mm", qty: 24, unit: "巻", unitPrice: 480, amount: 11520, supplier: "スポーツメディクス", storeId: "st-narimasu", staffId: "s01", date: addDays(TODAY, -9), status: "received", note: "" },
+    { id: "od03", itemId: "in02", itemName: "ペーパーシーツ(新規格)", qty: 30, unit: "本", unitPrice: 990, amount: 29700, supplier: "メディカル商事", storeId: "st-narimasu", staffId: "s09", date: addDays(TODAY, -12), status: "received", note: "全店統一の新規格へ切替" },
+    { id: "od04", itemId: "in09", itemName: "骨盤ベルト(物販)", qty: 10, unit: "個", unitPrice: 4980, amount: 49800, supplier: "スポーツメディクス", storeId: "st-omiya", staffId: "s05", date: addDays(TODAY, -15), status: "received", note: "" },
+    { id: "od05", itemId: "in10", itemName: "プロテイン(物販)", qty: 12, unit: "袋", unitPrice: 3980, amount: 47760, supplier: "ヘルスサプライ", storeId: "st-narimasu", staffId: "s01", date: addDays(TODAY, -1), status: "ordered", note: "" },
   ];
 }
 
@@ -1075,11 +1205,12 @@ const orgChangeLog = [
   { id: "og02", date: addDays(TODAY, -32), staffId: "s12", fromId: "s15", toId: "s16", by: "s09", note: "浦和店をエリアBへ移管" },
 ];
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export function createSeed() {
   const patients = makePatients();
   const shifts = makeShifts();
+  const dailyReports = makeDailyReports();
   return {
     schemaVersion: SCHEMA_VERSION,
     generatedAt: TODAY,
@@ -1092,9 +1223,9 @@ export function createSeed() {
     shifts,
     attendance: makeAttendance(shifts),
     shiftRequests: makeShiftRequests(),
-    dailyReports: makeDailyReports(),
+    dailyReports,
     kpiMonthly: makeKpiMonthly(),
-    posts: makePosts(),
+    posts: [...makeUriagePosts(), ...makePosts()],
     meetings: makeMeetings(),
     trainings: makeTrainings(),
     tests: makeTests(),
@@ -1103,9 +1234,10 @@ export function createSeed() {
     inventory: makeInventory(),
     cashbook: makeCashbook(),
     expenses: makeExpenses(),
+    orders: makeOrders(),
     registerSales: makeRegisterSales(),
     notifications: makeNotifications(),
-    tasks: makeTasks(),
+    tasks: makeTasks(dailyReports),
     faq,
     chatRooms,
     chatMessages: makeChatMessages(),
