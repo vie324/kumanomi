@@ -22,6 +22,7 @@ import tasksPage from "./pages/tasks.js";
 import backoffice from "./pages/backoffice.js";
 import hr from "./pages/hr.js";
 import org from "./pages/org.js";
+import orgimport from "./pages/orgimport.js";
 import assistant from "./pages/assistant.js";
 
 /* ---- ナビゲーション構成 ---- */
@@ -30,7 +31,7 @@ const NAV_GROUPS = [
   { label: "コミュニケーション", pages: [chat, sns, meetings, tasksPage] },
   { label: "毎日の業務", pages: [nippo, kintai, shift] },
   { label: "患者様", pages: [reserve, patients] },
-  { label: "組織運営", pages: [org, staffPage, roleplay, backoffice, hr] },
+  { label: "組織運営", pages: [org, orgimport, staffPage, roleplay, backoffice, hr] },
   { label: "サポート", pages: [assistant] },
 ];
 

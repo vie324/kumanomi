@@ -250,6 +250,7 @@ export function myMentees(me = null) {
 const PAGE_GUARDS = {
   hr: "hr.view",
   nippo: "nippo.view",
+  orgimport: "org.edit",
 };
 
 export function canSeePage(pageId, me = null) {
