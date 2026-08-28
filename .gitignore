@@ -1,0 +1,13 @@
+# Supabase の接続設定(キーを含むためコミットしない)
+config.js
+
+# OS / エディタ
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# ローカル作業用
+node_modules/
+*.log

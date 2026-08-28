@@ -256,6 +256,7 @@ const PAGE_GUARDS = {
   hr: "hr.view",
   nippo: "nippo.view",
   payroll: "payroll.view",
+  orgimport: "org.edit",
 };
 
 export function canSeePage(pageId, me = null) {
