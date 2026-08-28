@@ -565,15 +565,15 @@ export default {
         const days = Object.keys(wishes).sort();
         if (!days.length) {
           reasonWrap.appendChild(el("p", { class: "small muted", style: { margin: "0" } },
-            "カレンダーで日付を選ぶと、日ごとの理由を入力できます"));
+            "カレンダーで日付を選ぶと、日ごとの理由(任意)を入力できます"));
           return;
         }
         for (const d of days) {
           const lt = LEAVE_TYPES[wishes[d]];
           const input = el("input", {
             class: "input", type: "text",
-            placeholder: "理由(例:子どもの行事のため)",
-            "aria-label": `${fmtDate(d)} の理由`,
+            placeholder: "理由(任意・例:子どもの行事のため)",
+            "aria-label": `${fmtDate(d)} の理由(任意)`,
             oninput: (e) => {
               const v = e.target.value;
               if (v.trim()) reasons[d] = v; else delete reasons[d];
@@ -647,9 +647,10 @@ export default {
           legend,
           calWrap,
           el("div", { class: "field" },
-            el("label", {}, "日ごとの理由(希望休と一緒に提出されます)"),
+            el("label", {}, "日ごとの理由", el("span", { class: "wish-optional" }, "任意")),
             reasonWrap,
-            el("span", { class: "hint" }, "理由を書いておくと、責任者がシフトを組むときに配慮しやすくなります")),
+            el("span", { class: "hint" },
+              "空欄のままでも提出できます。書いておくと、責任者がシフトを組むときに配慮しやすくなります")),
           el("div", { class: "field" }, el("label", {}, "備考"), noteEl)));
 
       const m = modal({ title: "希望休の申請(月単位)", body, wide: true, actions: [cancelBtn, submitBtn] });

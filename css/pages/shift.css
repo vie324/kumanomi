@@ -532,3 +532,13 @@
   font-size: var(--fs-sm);
   white-space: nowrap;
 }
+.page-shift .wish-optional {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}

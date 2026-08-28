@@ -406,3 +406,87 @@
   font-size: var(--fs-xs);
   font-weight: 800;
 }
+
+/* ============================================================
+   タイムラインの可読性(検索・日付区切り・新着・折りたたみ)
+   ============================================================ */
+.page-sns .feed-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.page-sns .feed-search {
+  flex: 1; min-width: 220px;
+  height: 34px;
+  font-size: var(--fs-sm);
+}
+.page-sns .feed-count {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: var(--fs-xs); color: var(--ink-3); font-weight: 700;
+  white-space: nowrap;
+}
+.page-sns .feed-newcount {
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 800;
+}
+
+/* ---- 日付の区切り ---- */
+.page-sns .feed-sep {
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 2px 2px;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+}
+.page-sns .feed-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+}
+.page-sns .feed-sep:first-child { margin-top: 0; }
+.page-sns .feed-sep.pinned { color: var(--accent-ink); }
+
+/* ---- 新着 ---- */
+.page-sns .post-card.is-new {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--hairline));
+}
+.page-sns .post-new {
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+/* ---- 長文の折りたたみ ---- */
+.page-sns .post-bodywrap { position: relative; }
+.page-sns .post-body.foldable {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.page-sns .post-body.foldable.open {
+  display: block;
+  overflow: visible;
+}
+.page-sns .post-more {
+  margin-top: 4px;
+  padding: 0;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--brand-ink);
+  background: none;
+  border: none;
+}
+.page-sns .post-more:hover { text-decoration: underline; }
+
+/* ---- もっと見る ---- */
+.page-sns .feed-more { margin-top: 14px; text-align: center; }
