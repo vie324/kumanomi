@@ -20,6 +20,34 @@ let beforeRender = null;
 let loader = null;
 let renderSeq = 0;
 
+/* ---------------- スクロール位置の記憶 ----------------
+   一覧から1件開いて戻ったとき、また先頭から探し直すのは面倒なので、
+   ルートごとに位置を覚えておいて戻ったら復元する。
+   別のページへ「進む」ときは先頭から見せる。 */
+const scrollMemory = new Map();
+let currentKey = null;
+let scrollTicking = false;
+
+if (typeof window !== "undefined") {
+  window.addEventListener("scroll", () => {
+    if (!currentKey || scrollTicking) return;
+    scrollTicking = true;
+    requestAnimationFrame(() => {
+      scrollMemory.set(currentKey, window.scrollY);
+      scrollTicking = false;
+    });
+  }, { passive: true });
+}
+
+/** 描画が終わってから位置を戻す(内容が入る前に動かしても意味がないため) */
+function restoreScroll(key) {
+  const saved = scrollMemory.get(key) || 0;
+  const go = () => window.scrollTo({ top: saved, behavior: "auto" });
+  go();
+  // 画像やチャートで高さが伸びたあとにもう一度合わせる
+  if (saved > 0) requestAnimationFrame(go);
+}
+
 /** 読み込みが長引いたときだけ出す骨組み表示 */
 function loadingCard() {
   const wrap = document.createElement("div");
@@ -116,6 +144,8 @@ export const router = {
     // タイトル・ナビの選択状態は待たずに更新する
     onNavigate?.(page, params);
     outlet.scrollTop = 0;
+    // 位置の復元は描画が終わってから。ここでは先頭に置いておく
+    currentKey = location.hash || "#/";
     window.scrollTo({ top: 0 });
 
     if (pending?.then) {
@@ -146,5 +176,13 @@ export const router = {
       root.innerHTML = "";
       root.appendChild(errorCard(String(err?.message || err)));
     }
+
+    restoreScroll(currentKey);
+  },
+
+  /** そのルートの記憶している位置を捨てる(一覧を作り直したときなど) */
+  forgetScroll(path) {
+    if (path) scrollMemory.delete(`#/${String(path).replace(/^#?\/?/, "")}`);
+    else scrollMemory.clear();
   },
 };

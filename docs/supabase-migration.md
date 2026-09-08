@@ -12,6 +12,7 @@
 
 ```
 supabase/
+  setup.sql               ← ふつうはこれ1つを流せばよい(下の migrations から自動生成)
   migrations/
     0001_core_schema.sql    店舗・メンバー・所属・メンター・変更履歴
     0002_org_views.sql      組織ツリーのビューと判定関数(配下・可視範囲・管轄店舗)
@@ -42,20 +43,47 @@ scripts/
 
 ## 2. セットアップ
 
-### 2-1. マイグレーションを流す
+### 2-1. スキーマを作る
 
-Supabase ダッシュボードの **SQL Editor** に `0001` から順に貼って実行するか、
-CLI があれば次のとおりです。
+**`supabase/setup.sql` を1回流すだけです。**
+店舗・メンバー・組織図・権限・勤怠・シフト・希望休・日報がまとめて出来上がります。
+
+Supabase ダッシュボードの **SQL Editor** を開き、`supabase/setup.sql` の中身を
+全部貼り付けて **Run**。これで完了です。
+
+psql を使う場合:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/setup.sql
+```
+
+- **何度実行しても壊れません。** 作成済みのものは飛ばします
+- 途中で失敗しても中途半端な状態にはなりません(全体が1つのトランザクション)
+- スキーマだけを作ります。組織図データの取り込みは次の 2-2 で行います
+
+<details>
+<summary>すでに動いている DB に、差分だけ当てたい場合</summary>
+
+`supabase/migrations/` に分割したものも置いてあります。中身は `setup.sql` と同じです。
 
 ```bash
 # Supabase CLI の場合
 supabase db push
 
-# 直接つなぐ場合(Settings → Database → Connection string)
+# 直接つなぐ場合
 for f in supabase/migrations/*.sql; do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
 done
 ```
+
+`setup.sql` は `migrations/` から自動生成しています。
+マイグレーションを直したら作り直してください。
+
+```bash
+node scripts/build-setup-sql.js          # 作り直す
+node scripts/build-setup-sql.js --check  # ずれていないか確認するだけ
+```
+</details>
 
 ### 2-2. 組織図を登録する
 
@@ -107,7 +135,7 @@ select full_name, store_name, role_title, license, gender
 ### 2-4. テスト
 
 ```bash
-# 空のDBに 0001〜0007 を適用してから
+# 空のDBに setup.sql を流してから
 psql "$TEST_DATABASE_URL" -f supabase/tests/roster_import_test.sql
 psql "$TEST_DATABASE_URL" -f supabase/tests/daily_operations_test.sql
 ```

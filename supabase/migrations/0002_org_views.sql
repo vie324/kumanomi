@@ -302,7 +302,13 @@ left join public.stores s on s.id = m.primary_store_id;
 comment on view public.v_org_tree is '組織図の全ノード。depth と id_path で階層描画・部分木抽出ができる';
 
 -- メンバー名簿(画面・CSV出力向けの読みやすい形)
-create or replace view public.v_member_directory as
+-- ※ 0006 でこのビューに列を足している。
+--    create or replace view は「列を減らす」ことができないため、
+--    2 回目以降の実行で失敗しないよう、いったん落としてから作り直す。
+--    (このビューに依存している別のビューは無い)
+drop view if exists public.v_member_directory;
+
+create view public.v_member_directory as
 select
   m.id,
   m.name_key,

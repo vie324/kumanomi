@@ -116,9 +116,11 @@ js/
   pages/*.js        … 各機能モジュール(needs で必要なデータを宣言する)
 scripts/
   gen-config.js     … 環境変数から config.js を作る(Vercel のビルドコマンド)
+  build-setup-sql.js… migrations をまとめて setup.sql を作る
 vercel.json         … Vercel の設定(ビルドコマンド・キャッシュ制御)
 supabase/
-  migrations/*.sql  … 本番スキーマ(店舗・メンバー・組織・RLS・アカウント・勤怠/シフト/日報)
+  setup.sql         … これ1つを流せばスキーマが揃う(migrations から自動生成)
+  migrations/*.sql  … 分割版(既存DBに差分を当てる用)
   seed/             … 組織図シート(TSV)と、それを流し込む実行用SQL
   tests/            … 取込と権限(RLS)の回帰テスト
 docs/
@@ -147,8 +149,8 @@ docs/
 詳しい手順は [`docs/supabase-migration.md`](docs/supabase-migration.md) を参照してください。
 
 ```bash
-# 1) スキーマを流す
-for f in supabase/migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done
+# 1) スキーマを作る — Supabase の SQL Editor に setup.sql を貼って Run するだけ
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/setup.sql
 
 # 2) 組織図を登録する(全店舗・全メンバー・傘が一度に入る)
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed/0001_roster.sql

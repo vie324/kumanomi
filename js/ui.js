@@ -347,10 +347,22 @@ export function segmented(items, activeId, onChange) {
 /**
  * table({columns:[{key,label,align:"right"|"center",render:(row)=>Node}], rows, onRowClick})
  */
-export function table({ columns, rows, onRowClick, empty = "データがありません" }) {
+/**
+ * 表を作る。
+ *
+ * スマホでは横スクロールにせず、1行を1枚のカードに積み替える
+ * (CSS 側の .table-wrap.stack が担当)。
+ * 列名は各セルの data-label に持たせてあるので、
+ * 「数量」「状態」といった右側の列が画面外に消えてしまわない。
+ *
+ * 列が多い表(既定で 8 列以上)は、積むとかえって長くなるので
+ * 横スクロールのままにする。stack: true / false で明示もできる。
+ */
+export function table({ columns, rows, onRowClick, empty = "データがありません", stack = null }) {
   if (!rows.length) return emptyState({ icon: "🗂", title: empty });
+  const alignOf = (c) => (c.align === "right" ? "num" : c.align === "center" ? "center" : "");
   const thead = el("thead", {}, el("tr", {},
-    columns.map((c) => el("th", { class: c.align === "right" ? "num" : c.align === "center" ? "center" : "" }, c.label))));
+    columns.map((c) => el("th", { class: alignOf(c) }, c.label))));
   const tbody = el("tbody", {});
   for (const row of rows) {
     const tr = el("tr", {
@@ -359,11 +371,17 @@ export function table({ columns, rows, onRowClick, empty = "データがあり�
     });
     for (const c of columns) {
       const val = c.render ? c.render(row) : row[c.key];
-      tr.appendChild(el("td", { class: c.align === "right" ? "num" : c.align === "center" ? "center" : "" }, val));
+      tr.appendChild(el("td", {
+        class: alignOf(c),
+        // スマホでカードに積み替えたとき、この値が何の列かを示す
+        "data-label": typeof c.label === "string" ? c.label : "",
+      }, val));
     }
     tbody.appendChild(tr);
   }
-  return el("div", { class: "table-wrap" }, el("table", { class: "table" }, thead, tbody));
+  const stacked = stack === null ? columns.length <= 8 : stack;
+  return el("div", { class: `table-wrap${stacked ? " stack" : ""}` },
+    el("table", { class: "table" }, thead, tbody));
 }
 
 /* ---------------- Empty state ---------------- */

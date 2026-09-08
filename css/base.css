@@ -279,6 +279,10 @@ strong { font-weight: 700; }
   position: relative;
   flex: 1 1 0; min-width: 0; max-width: 420px; margin-inline: auto;
 }
+/* 虫めがねボタンと閉じるボタンは、狭い画面でだけ出す。
+   .icon-btn の display: grid に負けないよう、2つ重ねた指定にしている */
+.topbar-actions .search-toggle,
+.topbar-search .search-close { display: none; }
 .topbar-search input {
   width: 100%; height: 38px;
   padding: 0 14px 0 38px;
@@ -418,9 +422,22 @@ strong { font-weight: 700; }
   .app.nav-open .mobile-scrim { opacity: 1; pointer-events: auto; }
   .mobile-nav-btn { display: grid; }
   .topbar { padding: 0 12px; }
-  .topbar-search { max-width: none; }
   .topbar-user .user-meta { display: none; }
   .topbar-date { display: none; }
+
+  /* 検索:ふだんは虫めがねだけ。押すとトップバーの上に広がる。
+     以前はここで入力欄が潰れて、事実上使えなかった。 */
+  .topbar-actions .search-toggle { display: grid; }
+  .topbar-search {
+    position: absolute; inset: 0 10px; z-index: 6;
+    max-width: none; margin: 0;
+    display: none; align-items: center; gap: 6px;
+    background: var(--surface);
+  }
+  .app.search-open .topbar-search { display: flex; }
+  .app.search-open .topbar-search input { flex: 1 1 auto; }
+  .topbar-search .search-close { display: grid; flex: none; }
+  .topbar-search .search-results { top: calc(100% + 6px); }
   .main { padding: 16px 14px 80px; }
   .app.sidebar-slim .nav-group-label,
   .app.sidebar-slim .nav-item .nav-label,

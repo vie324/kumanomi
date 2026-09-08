@@ -192,6 +192,9 @@ left join public.members mgr on mgr.id = m.reports_to_id;
 comment on view public.v_member_directory is
   'メンバー名簿。ランク・部門・上司・配下人数をラベル付きで返す。store_code / manager_employee_no はアプリ側の安定キー';
 
+-- 0002 が作り直したときに権限が落ちるので、ここで渡し直す
+grant select on public.v_member_directory to authenticated;
+
 -- ------------------------------------------------------------
 -- 店舗ビュー(アプリの stores コレクションに対応)
 --   RLS で stores を直接読ませているが、

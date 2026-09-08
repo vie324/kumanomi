@@ -538,7 +538,9 @@ function submitTab(renderAll) {
     class: "input", type: "number", min: "0", step: "1", inputmode: "numeric",
     placeholder: "0", "aria-label": name,
   });
-  const fDate = el("input", { class: "input", type: "date", value: todayStr(), max: todayStr() });
+  const fDate = el("input", {
+    class: "input", type: "date", value: todayStr(), max: todayStr(), "aria-label": "日報の対象日",
+  });
   const inRevenue = numInput("個人売上");
   const inTreat = numInput("施術数(新患込み)");
   const inNew = numInput("新患数");

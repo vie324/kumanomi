@@ -136,7 +136,27 @@ function buildShell() {
     searchWrap.appendChild(resultsEl);
   });
   document.addEventListener("click", (e) => { if (!searchWrap.contains(e.target)) closeResults(); });
-  searchWrap.append(searchIc, searchInput);
+
+  /* 画面が狭いときは、検索を虫めがねに畳んで、押したら上に広げる。
+     以前はトップバーに押し込まれて、入力できない幅まで潰れていた。 */
+  const closeSearch = () => {
+    app.classList.remove("search-open");
+    searchInput.value = "";
+    closeResults();
+  };
+  const searchClose = el("button", {
+    class: "icon-btn search-close", "aria-label": "検索を閉じる", onclick: closeSearch,
+  }, icon("x", 18));
+  const searchToggle = el("button", {
+    class: "icon-btn search-toggle", "aria-label": "検索", "aria-expanded": "false",
+    onclick: () => {
+      app.classList.add("search-open");
+      searchToggle.setAttribute("aria-expanded", "true");
+      searchInput.focus();
+    },
+  }, icon("search", 19));
+  searchInput.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSearch(); });
+  searchWrap.append(searchIc, searchInput, searchClose);
 
   // --- 通知 ---
   const bellBtn = el("button", { class: "icon-btn", "aria-label": "通知", onclick: openNotifications },
@@ -175,7 +195,7 @@ function buildShell() {
     mobileBtn,
     el("span", {}, titleEl, el("br"), dateEl),
     searchWrap,
-    el("div", { class: "topbar-actions" }, syncChip, bellBtn, themeBtn, settingsBtn, userBtn));
+    el("div", { class: "topbar-actions" }, syncChip, searchToggle, bellBtn, themeBtn, settingsBtn, userBtn));
 
   const main = el("div", { class: "main", id: "outlet" });
   const scrim = el("div", { class: "mobile-scrim", onclick: closeMobileNav });
