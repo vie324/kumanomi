@@ -195,6 +195,8 @@ export default {
   title: "売上報告",
   icon: "trend",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["posts", "staff", "stores"],
   render(root) {
     const state = { storeId: "all" };
 

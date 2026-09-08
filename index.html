@@ -30,6 +30,7 @@
 <link rel="stylesheet" href="css/pages/hr.css">
 <link rel="stylesheet" href="css/pages/payroll.css">
 <link rel="stylesheet" href="css/pages/assistant.css">
+<link rel="stylesheet" href="css/pages/login.css">
 </head>
 <body>
 <div id="app" class="app">
@@ -44,6 +45,9 @@
   </div>
 </div>
 <noscript>このアプリの表示には JavaScript が必要です。</noscript>
+<!-- Supabase の接続先。Vercel のビルド時に scripts/gen-config.js が生成する。
+     ローカルで未生成でも 404 を握りつぶしてデモモードで動く。 -->
+<script src="config.js" onerror="window.KUMANOMI_CONFIG = window.KUMANOMI_CONFIG || null;"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

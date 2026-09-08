@@ -124,6 +124,8 @@ export default {
   title: "メンバー・組織図の一括登録",
   icon: "users",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["staff", "stores"],
   render(root) {
     const me = store.me();
     const editable = can("org.edit");

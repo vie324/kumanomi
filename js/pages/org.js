@@ -56,6 +56,8 @@ export default {
   title: "組織図",
   icon: "org",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["orgChangeLog", "staff", "stores"],
   render(root) {
     const me = store.me();
     const editable = can("org.edit");

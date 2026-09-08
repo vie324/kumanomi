@@ -36,6 +36,8 @@ export default {
   title: "タスク",
   icon: "check",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["staff", "stores", "tasks"],
   render(root) {
     const me = store.me();
     const state = { tab: "mine", filter: "open" };

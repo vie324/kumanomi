@@ -43,6 +43,9 @@ export default {
   id: "reserve",
   title: "予約管理",
   icon: "book",
+
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["menus", "patients", "reservations", "staff", "stores", "waitlist"],
   render(root) {
     const state = {
       view: "day", // day | week | list

@@ -436,6 +436,9 @@ export default {
   id: "meetings",
   title: "会議・議事録",
   icon: "clipboard",
+
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["meetings", "staff", "stores", "tasks"],
   render(root, params) {
     const meetingId = params?.[0];
     if (meetingId) {

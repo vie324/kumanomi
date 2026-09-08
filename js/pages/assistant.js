@@ -20,6 +20,9 @@ export default {
   id: "assistant",
   title: "AIアシスタント",
   icon: "sparkle",
+
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["faq", "staff", "stores"],
   render(root) {
 
     /* ================= チャット(左カラム) ================= */

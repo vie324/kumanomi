@@ -1,9 +1,28 @@
 /* ============================================================
-   KUMANOMI Store — アプリ全体の状態管理
-   シードデータ + localStorage 永続化 + 変更通知(pub/sub)
+   KUMANOMI Store — アプリ全体のデータ入口
+
+   構成は「案B:ローカルキャッシュ + 背面同期」。
+   画面はこのファイルだけを見ていればよく、localStorage も
+   Supabase も直接は触らない。差し替えるのはここの中身だけ。
+
+   ┌ 画面 ─────────────────────────────┐
+   │  await store.load("attendance")   ← 非同期の入口(1本)   │
+   │  store.get("attendance")          ← キャッシュ読み(同期) │
+   │  store.update(...)                ← 即座に反映 + 送信予約 │
+   └───────────────────────────────────┘
+            ↓ キャッシュ(メモリ)+ localStorage
+            ↓ js/sync.js が裏でサーバーと往復
+
+   ◎ あとから案A(全面非同期)へ移すとき
+     画面は 1 行も変えなくてよい。store.load() の中身を
+     「キャッシュがあれば即返す」から「毎回サーバーから取る」に
+     変え、js/sync.js を外すだけで案Aになる。
+     そのために、画面から同期的に取れるのは load() 済みの
+     コレクションだけ、という約束を守ること。
    ============================================================ */
 
 import { createSeed, SCHEMA_VERSION, todayStr, addDays, monthOf, dow, mondayOf, SHIFT_TYPES, LEAVE_TYPES, bedsOf } from "./data.js";
+import { sync } from "./sync.js";
 
 const LS_KEY = "kumanomi.state.v1";
 
@@ -36,8 +55,89 @@ function persist() {
 
 let uidCounter = 1000;
 
+/* ---------------- 非同期の入口 ----------------
+   案B では端末内のキャッシュがそのまま答えなので、
+   load() は初回だけサーバーを待ち、以降は即座に解決する。 */
+
+/** このセッションで一度でもサーバーから取り込んだコレクション */
+const pulledOnce = new Set();
+/** 取り込み中の約束(同じコレクションを二重に取りに行かないため) */
+const inflight = new Map();
+
+/** サーバーから届いた行をキャッシュへ流し込む */
+function applyRemote(coll, rows) {
+  if (!Array.isArray(rows) || !rows.length) return;
+  state[coll] = rows;
+
+  // まだ送れていない自分の変更は、取り込みで消えないよう載せ直す
+  for (const op of sync.pendingFor(coll)) {
+    const i = state[coll].findIndex((x) => x.id === op.id);
+    if (op.type === "insert" && i < 0) state[coll].push(op.data);
+    else if (op.type === "update" && i >= 0) Object.assign(state[coll][i], op.data);
+    else if (op.type === "delete" && i >= 0) state[coll].splice(i, 1);
+  }
+
+  // 本番データを取り込むとデモ用の s01 が居なくなる。ログイン中の人を貼り直す
+  if (coll === "staff" && !state.staff.some((s) => s.id === state.currentUserId)) {
+    state.currentUserId = state.staff[0]?.id || state.currentUserId;
+  }
+
+  persist();
+  listeners.forEach((fn) => fn(coll));
+}
+
+sync.attach(applyRemote);
+
+/**
+ * 画面が必要とするコレクションをそろえる。
+ * 案B:キャッシュがあるので実質待ち時間ゼロ(初回のみサーバーを待つ)。
+ * 案A:ここが毎回サーバー取得になる。呼び出し側は変えなくてよい。
+ */
+async function loadColls(...colls) {
+  const list = colls.flat().filter(Boolean);
+  const waits = [];
+  for (const coll of list) {
+    if (!sync.isRemote(coll)) continue;           // まだ端末内だけのコレクション
+    if (pulledOnce.has(coll)) { sync.refresh(coll); continue; } // 2回目以降は裏で更新
+    if (!inflight.has(coll)) {
+      inflight.set(coll, sync.pull(coll).finally(() => {
+        pulledOnce.add(coll);
+        inflight.delete(coll);
+      }));
+    }
+    waits.push(inflight.get(coll));
+  }
+  if (waits.length) await Promise.all(waits);
+}
+
 export const store = {
   get state() { return state; },
+
+  /* ---- 非同期の入口(画面はまずこれを await する) ---- */
+
+  /** 必要なコレクションをそろえる。await してから get() を使う */
+  load(...colls) { return loadColls(...colls); },
+
+  /** 初期化の完了。起動時に一度だけ待てばよい */
+  ready() { return Promise.resolve(); },
+
+  /** サーバーから取り直す(引っぱって更新するUI用) */
+  refresh(...colls) {
+    const list = colls.flat().filter(Boolean);
+    const targets = list.length ? list : [...pulledOnce];
+    return Promise.all(targets.map((c) => sync.pull(c)));
+  },
+
+  /* ---- 同期の状態(ヘッダー表示用) ---- */
+
+  syncState() { return sync.state(); },
+  onSync(fn) { return sync.subscribe(fn); },
+  /** 送れなかった変更(権限エラーなど)。ユーザーに知らせる */
+  syncRejected() { return sync.rejected(); },
+  clearSyncRejected() { sync.clearRejected(); },
+  flushSync() { return sync.flush(); },
+
+  /* ---- 読み取り(load 済みのキャッシュから同期で返す) ---- */
 
   /** コレクション(配列)を取得 */
   get(coll) { return state[coll]; },
@@ -45,11 +145,14 @@ export const store = {
   /** ID で 1 件取得 */
   byId(coll, id) { return (state[coll] || []).find((x) => x.id === id) || null; },
 
+  /* ---- 書き込み(端末に即反映 → 裏で送信) ---- */
+
   /** 追加(id が無ければ自動採番)。追加したオブジェクトを返す */
   add(coll, obj) {
     if (!obj.id) obj.id = store.uid(coll.slice(0, 2));
     state[coll].push(obj);
     persist();
+    sync.enqueue({ type: "insert", coll, id: obj.id, data: obj });
     store.notify(coll);
     return obj;
   },
@@ -59,6 +162,7 @@ export const store = {
     if (!obj.id) obj.id = store.uid(coll.slice(0, 2));
     state[coll].unshift(obj);
     persist();
+    sync.enqueue({ type: "insert", coll, id: obj.id, data: obj });
     store.notify(coll);
     return obj;
   },
@@ -67,8 +171,11 @@ export const store = {
   update(coll, id, patch) {
     const item = store.byId(coll, id);
     if (item) {
-      Object.assign(item, typeof patch === "function" ? patch(item) : patch);
+      const resolved = typeof patch === "function" ? patch(item) : patch;
+      Object.assign(item, resolved);
       persist();
+      // 変えた項目だけを送る(同じレコードを別の人が別項目で直しても衝突しない)
+      sync.enqueue({ type: "update", coll, id, data: { ...resolved } });
       store.notify(coll);
     }
     return item;
@@ -77,7 +184,12 @@ export const store = {
   remove(coll, id) {
     const arr = state[coll];
     const i = arr.findIndex((x) => x.id === id);
-    if (i >= 0) { arr.splice(i, 1); persist(); store.notify(coll); }
+    if (i >= 0) {
+      arr.splice(i, 1);
+      persist();
+      sync.enqueue({ type: "delete", coll, id });
+      store.notify(coll);
+    }
   },
 
   /** スカラー設定値 */
@@ -95,6 +207,9 @@ export const store = {
   /** デモデータを初期状態に戻す */
   reset() {
     localStorage.removeItem(LS_KEY);
+    sync.clearQueue();
+    sync.clearRejected();
+    pulledOnce.clear();
     state = load();
     listeners.forEach((fn) => fn("*"));
   },

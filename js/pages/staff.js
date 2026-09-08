@@ -715,6 +715,9 @@ export default {
   id: "staff",
   title: "スタッフ管理",
   icon: "grad",
+
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["evaluations", "interviews", "staff", "stores", "tests", "trainings"],
   render(root, params) {
     const tab = VIEWS[params?.[0]] ? params[0] : "members";
     renderPage(root, tab);
