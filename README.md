@@ -216,6 +216,14 @@ Vercel → Settings → Environment Variables に 2 つ入れるだけです。
 
 接続先が設定されているときだけ、起動時にログイン画面が出ます(未設定のあいだはログイン不要のまま)。
 
+**最初の1人**は、Supabase の Authentication でユーザーを作ったあと、SQL Editor で次を実行します
+(名簿を登録できる人自身が、最初は名簿に居ないため)。
+
+```sql
+select public.bootstrap_admin('admin@example.co.jp', '管理 太郎');
+select * from public.v_login_status;   -- 紐付き状況の確認
+```
+
 - メールアドレスとパスワードでログインし、`public.me()` で自分が名簿のどの行かを社員番号で特定します
 - 名簿と紐付いていないアカウントは、**別人として入らせず**にその旨を表示してログアウトします
 - アクセストークンは期限が近づくと自動更新されるので、業務中に勝手にログアウトされません
