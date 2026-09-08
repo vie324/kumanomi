@@ -35,6 +35,8 @@ export default {
   title: "勤怠管理",
   icon: "clock",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["attendance", "shifts", "staff", "stores"],
   render(root) {
     const me = store.me();
     const today = todayStr();

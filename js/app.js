@@ -7,6 +7,8 @@ import { router } from "./router.js";
 import { el, icon, avatar, badge, toast, relTime, fmtDate, confirmDialog, drawer, clear } from "./ui.js";
 import { canSeePage, rankLabel, scopeLabel, RANKS, rankOf } from "./auth.js";
 import { syncAutoTasks } from "./autotasks.js";
+import { supabase } from "./supabase.js";
+import { migrationProgress, remoteCollections } from "./remote.js";
 
 import dashboard from "./pages/dashboard.js";
 import sns from "./pages/sns.js";
@@ -148,15 +150,16 @@ function buildShell() {
     router.render(); // チャート色をテーマに追従させる
   } }, icon(savedTheme === "dark" ? "sun" : "moon", 19));
 
+  // --- 同期状態(言うことがあるときだけ出る) ---
+  const syncChip = el("button", {
+    class: "sync-chip", hidden: true, "aria-label": "同期の状態", onclick: openSyncPanel,
+  });
+  paintSyncChip(syncChip);
+  store.onSync(() => paintSyncChip(syncChip));
+
   // --- 設定 ---
-  const settingsBtn = el("button", { class: "icon-btn", "aria-label": "設定", onclick: async () => {
-    const ok = await confirmDialog({
-      title: "デモデータのリセット",
-      message: "このデモで加えた変更(投稿・打刻・予約など)をすべて破棄して、初期状態に戻します。よろしいですか?",
-      okLabel: "リセットする", danger: true,
-    });
-    if (ok) { store.reset(); location.reload(); }
-  } }, icon("settings", 19));
+  const settingsBtn = el("button", { class: "icon-btn", "aria-label": "設定", onclick: openSyncPanel },
+    icon("settings", 19));
 
   const userBtn = el("button", { class: "topbar-user", "aria-label": "ログインユーザーの切替", onclick: openUserSwitcher },
     avatar(me, 34),
@@ -171,7 +174,7 @@ function buildShell() {
     mobileBtn,
     el("span", {}, titleEl, el("br"), dateEl),
     searchWrap,
-    el("div", { class: "topbar-actions" }, bellBtn, themeBtn, settingsBtn, userBtn));
+    el("div", { class: "topbar-actions" }, syncChip, bellBtn, themeBtn, settingsBtn, userBtn));
 
   const main = el("div", { class: "main", id: "outlet" });
   const scrim = el("div", { class: "mobile-scrim", onclick: closeMobileNav });
@@ -182,6 +185,101 @@ function buildShell() {
 }
 
 function closeMobileNav() { app.classList.remove("nav-open"); }
+
+/* ---- 同期の状態表示 ----
+   ふだんは何も出さない。伝えることがあるときだけチップを出す。 */
+function syncLook() {
+  const s = store.syncState();
+  if (s.rejected > 0) return { tone: "bad", ic: "alert", text: `送信できず ${s.rejected}件` };
+  if (s.mode === "offline") return { tone: "warn", ic: "alert", text: "オフライン" };
+  if (s.state === "error") return { tone: "warn", ic: "refresh", text: "再送を待機中" };
+  if (s.state === "syncing") return { tone: "busy", ic: "refresh", text: "同期中" };
+  if (s.pending > 0) return { tone: "warn", ic: "clock", text: `未送信 ${s.pending}件` };
+  return null;
+}
+
+function paintSyncChip(chip) {
+  const look = syncLook();
+  chip.hidden = !look;
+  if (!look) return;
+  chip.dataset.tone = look.tone;
+  clear(chip).append(icon(look.ic, 14), el("span", {}, look.text));
+}
+
+/* ---- 接続とデータの設定 ---- */
+function openSyncPanel() {
+  const s = store.syncState();
+  const info = supabase.info();
+  const prog = migrationProgress();
+
+  const modeLabel = { demo: "デモモード(端末内のみ)", online: "接続中", offline: "オフライン" }[s.mode] || s.mode;
+  const rows = [
+    ["接続先", info ? info.url : "未設定"],
+    ["状態", modeLabel],
+    ["ログイン", supabase.user()?.email || (info ? "未ログイン" : "—")],
+    ["未送信の変更", `${s.pending}件`],
+    ["送信できず", `${s.rejected}件`],
+    ["最終同期", s.lastSyncAt ? relTime(s.lastSyncAt) : "—"],
+    ["サーバー化済み", `${prog.done} / ${prog.total} コレクション(${remoteCollections().join("・")})`],
+  ];
+
+  const table = el("div", { class: "sp-kv" },
+    rows.map(([k, v]) => el("div", { class: "sp-row" },
+      el("span", { class: "sp-k" }, k),
+      el("span", { class: "sp-v" }, String(v)))));
+
+  const rejected = store.syncRejected();
+  const rejectedCard = rejected.length
+    ? el("div", { class: "card mt-12", style: { borderColor: "var(--critical)" } },
+        el("div", { class: "card-title" }, `送信できなかった変更(${rejected.length}件)`),
+        el("p", { class: "muted", style: { fontSize: "var(--fs-sm)" } },
+          "権限や入力内容の問題で、サーバーに反映できませんでした。端末内には残っています。"),
+        el("div", { class: "row-list" },
+          rejected.slice(0, 8).map((r) => el("div", { class: "row-item" },
+            el("span", { class: "row-main" },
+              el("span", { class: "row-title" }, `${r.coll} / ${r.id}`),
+              el("span", { class: "row-sub", style: { whiteSpace: "normal" } }, r.error))))),
+        el("div", { class: "sp-actions" },
+          el("button", {
+            class: "btn ghost sm",
+            onclick: () => { store.clearSyncRejected(); d.close(); toast("記録を消しました"); },
+          }, "この記録を消す")))
+    : null;
+
+  const actions = el("div", { class: "sp-actions" },
+    el("button", {
+      class: "btn primary", disabled: s.mode !== "online",
+      onclick: async (e) => {
+        e.currentTarget.disabled = true;
+        await store.flushSync();
+        await store.refresh();
+        toast("同期しました", "success");
+        d.close();
+      },
+    }, icon("refresh", 16), "今すぐ同期する"),
+    el("button", {
+      class: "btn ghost",
+      onclick: async () => {
+        const ok = await confirmDialog({
+          title: "デモデータのリセット",
+          message: "この端末で加えた変更(投稿・打刻・予約など)をすべて破棄して、初期状態に戻します。よろしいですか?",
+          okLabel: "リセットする", danger: true,
+        });
+        if (ok) { store.reset(); location.reload(); }
+      },
+    }, icon("trash", 16), "デモデータをリセット"),
+  );
+
+  const note = el("div", { class: "sp-note" }, icon("info", 14),
+    el("span", {}, s.mode === "demo"
+      ? "Supabase の接続先が未設定のため、データはこの端末のなかだけに保存されています。Vercel の環境変数に SUPABASE_URL と SUPABASE_ANON_KEY を設定すると、サーバーとの同期が始まります。"
+      : "入力はまず端末に保存され、通信は裏側で行われます。電波が切れても操作を続けられ、つながり次第まとめて送信されます。"));
+
+  const d = drawer({
+    title: "接続とデータ",
+    body: el("div", { class: "sync-panel" }, table, rejectedCard, actions, note),
+  });
+}
 
 /* ---- ログインユーザー切替(デモ用:権限の違いを体験できる) ---- */
 function openUserSwitcher() {
@@ -272,6 +370,11 @@ function onNavigate(page) {
 router.setGuard((pageId) => canSeePage(pageId));
 // 業務のなかで発生したタスク(発注・承認待ち・日報など)を毎回の描画前に積み直す
 router.setBeforeRender(syncAutoTasks);
+// 各ページが needs で宣言したデータを、描画前にそろえる
+router.setLoader((needs) => store.load(needs));
+
+// シェル自体がスタッフと店舗を使うので、先にそろえてから組み立てる
+await store.load("staff", "stores");
 
 // サイドバーの未完了バッジを正しく出すため、シェルより先に一度同期しておく
 syncAutoTasks();

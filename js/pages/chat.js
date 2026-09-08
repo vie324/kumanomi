@@ -59,6 +59,8 @@ export default {
   title: "チャット",
   icon: "chat",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["chatMessages", "chatRooms", "staff", "stores"],
   render(root, params = []) {
     const meId = store.state.currentUserId;
     const me = store.me();

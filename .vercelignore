@@ -1,0 +1,7 @@
+# 配信に不要なものは Vercel へ上げない
+# (scripts/ はビルドコマンドで使うので除外しないこと)
+supabase/
+docs/
+.github/
+README.md
+config.example.js

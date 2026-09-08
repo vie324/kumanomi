@@ -23,6 +23,9 @@ export default {
   id: "shift",
   title: "シフト管理",
   icon: "calendar",
+
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["shiftRequests", "shifts", "staff", "staffingRules", "stores"],
   render(root) {
     const state = {
       view: "week",          // week | month

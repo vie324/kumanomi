@@ -842,6 +842,9 @@ export default {
   id: "patients",
   title: "顧客・カルテ",
   icon: "users",
+
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["attendance", "karte", "menus", "patients", "staff", "stores"],
   render(root, params) {
     const patientId = params?.[0] || null;
     const draw = () => {

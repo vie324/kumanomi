@@ -56,6 +56,8 @@ export default {
   title: "在庫・経費",
   icon: "box",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["cashbook", "expenses", "inventory", "orders", "registerSales", "staff", "stores"],
   render(root, params) {
     const me = store.me();
     const today = todayStr();

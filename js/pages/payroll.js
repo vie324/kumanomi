@@ -137,6 +137,8 @@ export default {
   title: "給与確認",
   icon: "cash",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["attendance", "expenses", "orders", "payrollAdjustments", "sharoushiSubmissions", "shifts", "staff", "stores"],
   render(root) {
     /* ---------------- 権限ゲート ---------------- */
     if (!can("payroll.view")) {

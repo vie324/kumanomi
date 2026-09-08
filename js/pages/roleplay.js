@@ -757,6 +757,9 @@ export default {
   id: "roleplay",
   title: "ロープレ練習",
   icon: "mic",
+
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["roleplaySessions", "staff", "stores", "talkScripts"],
   render(root, params) {
     stopTimer();
     S.recording = false;

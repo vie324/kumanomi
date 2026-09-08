@@ -911,6 +911,9 @@ export default {
   id: "nippo",
   title: "日報",
   icon: "report",
+
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["attendance", "dailyReports", "shifts", "staff", "stores", "tasks"],
   render(root, params) {
     if (params?.[0] && ["submit", "all", "mentee", "me"].includes(params[0])) state.tab = params[0];
 

@@ -30,6 +30,8 @@ export default {
   title: "ダッシュボード",
   icon: "home",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["attendance", "inventory", "kpiMonthly", "meetings", "patients", "posts", "reservations", "shifts", "staff", "stores", "tasks"],
   render(root) {
     const draw = () => {
       root.innerHTML = "";

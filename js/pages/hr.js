@@ -155,6 +155,8 @@ export default {
   title: "人事管理",
   icon: "clipboard",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["attendance", "shiftRequests", "shifts", "staff", "stores"],
   render(root) {
     /* ---------------- 権限ゲート ---------------- */
     if (!can("hr.view")) {

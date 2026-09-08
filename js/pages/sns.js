@@ -85,6 +85,8 @@ export default {
   title: "社内SNS",
   icon: "chat",
 
+  // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
+  needs: ["channels", "posts", "staff", "stores"],
   render(root) {
     /* ---- ページ内状態(再描画をまたいで保持) ---- */
     let tab = "notice";               // notice | channels | uriage | free | ranking

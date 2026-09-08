@@ -11,9 +11,13 @@
 
 ```bash
 # リポジトリ直下で
+node scripts/gen-config.js   # 接続設定(config.js)を作る。環境変数なしならデモモード
 python3 -m http.server 8080
 # → http://localhost:8080 を開く
 ```
+
+`config.js` は Git 管理外です。生成せずに開いてもデモモードで動きますが、
+ブラウザのコンソールに `config.js` の 404 が出ます(動作には影響しません)。
 
 **GitHub Pages でそのまま公開できます**(Settings → Pages → Branch を選ぶだけ)。
 
@@ -99,14 +103,19 @@ js/
   app.js            … シェル構築・ナビゲーション・通知・検索・テーマ・ユーザー切替
   auth.js           … 権限(RBAC)エンジン — ランク/メンター関係/出勤状態から可視範囲を決定
   router.js         … ハッシュベース SPA ルーター
-  store.js          … 状態管理+localStorage 永続化
+  store.js          … データ入口(ローカルキャッシュ+背面同期。画面はここだけを見る)
+  sync.js           … 背面同期エンジン(送信キュー・取得・再送・オフライン対応)
+  remote.js         … コレクション ⇄ Supabase テーブルの対応表
   data.js           … デモ用シードデータ(実行日基準で自動生成)
   ui.js             … UI 部品ライブラリ(依存ゼロ)
   charts.js         … SVG チャート(折れ線/バー/ドーナツ/レーダー等、依存ゼロ)
   ai.js             … AI 機能の抽象化レイヤー(デモでは擬似実装)
   supabase.js       … Supabase 接続レイヤー(依存ゼロ・未設定ならデモモード)
   roster.js         … 組織図シートの解釈エンジン(取込SQLと同じ判定をブラウザでも実行)
-  pages/*.js        … 各機能モジュール
+  pages/*.js        … 各機能モジュール(needs で必要なデータを宣言する)
+scripts/
+  gen-config.js     … 環境変数から config.js を作る(Vercel のビルドコマンド)
+vercel.json         … Vercel の設定(ビルドコマンド・キャッシュ制御)
 supabase/
   migrations/*.sql  … 本番スキーマ(店舗・メンバー・組織・RLS・アカウント紐付け)
   seed/             … 組織図シート(TSV)と、それを流し込む実行用SQL
@@ -154,16 +163,61 @@ psql "$DATABASE_URL" -c "select repeat('  ', depth) || full_name || ' 【' || ro
 - 画面(`組織運営 → メンバー・組織図の一括登録`)からは、
   **スプレッドシートのセルの色から資格・性別を自動判定**して取り込めます。
 - 権限(RLS)は `js/auth.js` と同じ形を SQL 側にも実装しています。
-- 接続先は `config.example.js` を `config.js` にコピーして設定します(未設定ならデモモードのまま動きます)。
+
+### 接続先の設定(Vercel)
+
+Vercel → Settings → Environment Variables に 2 つ入れるだけです。
+ビルド時に `scripts/gen-config.js` が `config.js` を書き出し、アプリがそれを読みます。
+
+| 変数名 | 値 |
+| --- | --- |
+| `SUPABASE_URL` | `https://xxxxxxxx.supabase.co`(Settings → API → Project URL) |
+| `SUPABASE_ANON_KEY` | Settings → API → Project API keys → **anon public** |
+
+> **service_role キーは絶対に設定しないでください。**
+> RLS を迂回するキーなので、ブラウザに配ると誰でも全データを読めてしまいます。
+> 誤って設定された場合、`gen-config.js` がビルドを失敗させます。
+
+環境変数が未設定のときはデモモード(端末内のみ)でデプロイされます。
+未設定のまま本番に出したくない場合は `KUMANOMI_REQUIRE_SUPABASE=1` を足すと、
+接続先が無いビルドを失敗させられます。
+
+### データの流れ(案B:ローカルキャッシュ + 背面同期)
+
+画面は `js/store.js` だけを見ます。localStorage も Supabase も直接は触りません。
+
+```
+画面 ──▶ store.load(...)   … 必要なデータをそろえる(非同期の入口)
+     ──▶ store.get(...)    … そろったキャッシュを読む(同期)
+     ──▶ store.update(...) … 端末に即反映し、送信は裏側で
+                                 │
+                          js/sync.js(送信キュー・再送・取得)
+                                 │
+                              Supabase
+```
+
+- 入力はまず端末に保存され、画面はすぐ次に進めます。通信は裏で行われます。
+- 電波が切れても操作を続けられ、つながり次第まとめて送信されます(未送信件数はヘッダーに出ます)。
+- 更新は **変えた項目だけ** を PATCH で送るため、同じレコードを別々の項目で直しても打ち消し合いません。
+  同じ項目を同時に直した場合は後勝ちです。
+- 権限エラーなど何度送っても通らない変更は 3 回でキューから外し、
+  「接続とデータ」画面に理由付きで記録します(キューが詰まりません)。
+- 各ページは `needs: ["attendance", "staff"]` のように必要なデータを宣言し、
+  ルーターがそろえてから描画します。
+
+**あとから案A(全面非同期・常にサーバーを見る)へ移す場合**、画面は 1 行も変えずに済みます。
+`store.load()` の中身を「キャッシュを返す」から「毎回サーバーから取る」に変え、`js/sync.js` を外すだけです。
+そのために、画面から同期的に読んでよいのは `load()` 済みのコレクションだけ、という約束を守ってください。
 
 ### 残りのステップ(想定)
 
-1. 勤怠・シフト・日報・カルテのテーブルを同じ RLS の形で追加
-2. 社員アカウントの発行と `auth.users` への紐付け(`docs/supabase-migration.md` の 7 章)
-3. LINE 公式アカウント(Messaging API)連携 — 予約・回数券残数通知・カルテ送信・離反リマインド
-4. 姿勢推定モデル(MediaPipe Pose 等)による実写真からの 33 ポイント検出、ロープレの音声認識(Whisper 等)接続
-5. mPOP レジ・決済端末との実連携
-6. ジンジャー等からのデータ移行ツール
+1. 残り 33 コレクションのテーブル追加と RLS(`js/remote.js` の `PENDING_TABLES` が一覧です)
+2. 社員アカウントの発行と `auth.users` への紐付け(`docs/supabase-migration.md` の 7 章)、ログイン画面
+3. 画像(経費レシート・姿勢分析写真)を Supabase Storage へ
+4. LINE 公式アカウント(Messaging API)連携 — 予約・回数券残数通知・カルテ送信・離反リマインド
+5. 姿勢推定モデル(MediaPipe Pose 等)による実写真からの 33 ポイント検出、ロープレの音声認識(Whisper 等)接続
+6. mPOP レジ・決済端末との実連携
+7. ジンジャー等からのデータ移行ツール
 
 ---
 成増店での先行導入を想定したプロトタイプです。フィードバックをもとに全店展開版を設計します。
