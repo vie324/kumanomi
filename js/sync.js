@@ -130,18 +130,26 @@ async function send(op) {
   const where = { [def.key]: op.id };
 
   if (op.type === "insert") {
-    await supabase.insert(def.table, [def.toRemote(op.data)], { upsert: true, onConflict: def.key });
+    // ビュー越しに書くコレクションは ON CONFLICT が使えない。
+    // 代わりにビュー側のトリガが同じ id を上書きしてくれる。
+    const useUpsert = def.upsert !== false;
+    await supabase.insert(def.table, [def.toRemote(op.data)], {
+      upsert: useUpsert,
+      onConflict: useUpsert ? def.key : null,
+    });
   } else if (op.type === "update") {
-    // 変えた項目だけを送る(= 項目単位の後勝ち)
-    const patch = def.toRemote({ id: op.id, ...op.data });
-    for (const k of Object.keys(patch)) {
-      if (!(k in op.data) && k !== def.key) delete patch[k];
-    }
-    delete patch[def.key];
+    // 変えた項目だけを送る(= 項目単位の後勝ち)。
+    // toRemote は渡された項目しか書き出さないので、そのまま部分更新になる。
+    const patch = def.toRemote(op.data);
+    delete patch[def.key]; // キー列は動かさない
     if (Object.keys(patch).length) await supabase.update(def.table, patch, where);
   } else if (op.type === "delete") {
-    // 消し込みは論理削除に寄せる(履歴を残すため)
-    await supabase.update(def.table, { is_active: false }, where);
+    if (def.softDelete) {
+      // 店舗・メンバーは消さずに在籍フラグを落とす(履歴を守るため)
+      await supabase.update(def.table, { [def.softDelete]: false }, where);
+    } else {
+      await supabase.remove(def.table, where);
+    }
   }
 }
 

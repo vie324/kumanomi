@@ -118,9 +118,9 @@ scripts/
   gen-config.js     … 環境変数から config.js を作る(Vercel のビルドコマンド)
 vercel.json         … Vercel の設定(ビルドコマンド・キャッシュ制御)
 supabase/
-  migrations/*.sql  … 本番スキーマ(店舗・メンバー・組織・RLS・アカウント紐付け)
+  migrations/*.sql  … 本番スキーマ(店舗・メンバー・組織・RLS・アカウント・勤怠/シフト/日報)
   seed/             … 組織図シート(TSV)と、それを流し込む実行用SQL
-  tests/            … 取込の回帰テスト
+  tests/            … 取込と権限(RLS)の回帰テスト
 docs/
   supabase-migration.md … 本番移行の手順書
 ```
@@ -221,7 +221,7 @@ Vercel → Settings → Environment Variables に 2 つ入れるだけです。
 
 ### 残りのステップ(想定)
 
-1. 残り 33 コレクションのテーブル追加と RLS(`js/remote.js` の `PENDING_TABLES` が一覧です)
+1. 残り 29 コレクションのテーブル追加と RLS(`js/remote.js` の `PENDING_TABLES` が一覧です)
 2. 社員アカウントの発行(約120名)と `auth.users` への紐付け(`docs/supabase-migration.md` の 7 章)
 3. 画像(経費レシート・姿勢分析写真)を Supabase Storage へ
 4. LINE 公式アカウント(Messaging API)連携 — 予約・回数券残数通知・カルテ送信・離反リマインド

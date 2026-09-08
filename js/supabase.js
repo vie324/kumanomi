@@ -201,6 +201,12 @@ export const supabase = {
     });
   },
 
+  async remove(table, eq = {}) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(eq)) params.set(k, `eq.${v}`);
+    return request(`/rest/v1/${table}?${params}`, { method: "DELETE" });
+  },
+
   /** ストアド関数(RPC)を呼ぶ */
   async rpc(fn, args = {}) {
     return request(`/rest/v1/rpc/${fn}`, { method: "POST", body: JSON.stringify(args) });

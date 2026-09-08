@@ -15,6 +15,31 @@
    ============================================================ */
 
 const nn = (v) => (v == null || v === "" ? null : v);
+/** Postgres の time("09:55:00")をアプリの "09:55" に落とす */
+const hm = (v) => (v ? String(v).slice(0, 5) : null);
+
+/**
+ * 「ローカルの項目名 → サーバーの列名」の対応から書き出し関数を作る。
+ *
+ * 大事なのは **渡されなかった項目は出さない** こと。
+ * 更新は「変えた項目だけ」を送りたいので、
+ *   toRemote({ clockOut: "20:10" })  →  { clock_out: "20:10" }
+ * のように、部分的なオブジェクトをそのまま部分的な列に写す。
+ * (項目名が変わる列を落としてしまうと、変更が送られない)
+ *
+ * spec の値は "列名" か ["列名", 変換関数]。
+ */
+function writer(spec) {
+  return (obj) => {
+    const out = {};
+    for (const [local, def] of Object.entries(spec)) {
+      if (!(local in obj)) continue;
+      const [column, fn] = Array.isArray(def) ? def : [def, null];
+      out[column] = fn ? fn(obj[local]) : nn(obj[local]);
+    }
+    return out;
+  };
+}
 
 /** 何もしない素通しマッパー(テーブルの列名がローカルと同じ場合用) */
 const passthrough = {
@@ -45,20 +70,12 @@ export const REMOTE = {
       deptCode: row.dept_code || "",
       isPilot: !!row.is_pilot,
     }),
-    toRemote: (obj) => ({
-      code: obj.id,
-      name: obj.name,
-      short_name: nn(obj.short),
-      category: obj.category,
-      phone: nn(obj.phone),
-      address: nn(obj.address),
-      lat: obj.lat ?? null,
-      lng: obj.lng ?? null,
-      open_hour: nn(obj.openHour),
-      close_hour: nn(obj.closeHour),
-      beds: obj.beds ?? null,
-      color: nn(obj.color),
-      dept_code: nn(obj.deptCode),
+    softDelete: "is_active", // 店舗は消さずに閉店扱いにする
+    toRemote: writer({
+      id: "code", name: "name", short: "short_name", category: "category",
+      phone: "phone", address: "address", lat: "lat", lng: "lng",
+      openHour: "open_hour", closeHour: "close_hour", beds: "beds",
+      color: "color", deptCode: "dept_code",
     }),
   },
 
@@ -83,14 +100,124 @@ export const REMOTE = {
       licenses: row.license_label && row.license_label !== "未確認" ? [row.license_label] : [],
       isActive: row.is_active !== false,
     }),
-    toRemote: (obj) => ({
-      employee_no: obj.empCode || obj.id,
-      full_name: obj.name,
-      kana: nn(obj.kana),
-      role_title: nn(obj.role),
-      rank: obj.rank || "staff",
-      color: nn(obj.color),
-      joined_on: nn(obj.joined),
+    softDelete: "is_active", // 退職者は消さずに在籍フラグを落とす
+    toRemote: writer({
+      empCode: "employee_no", name: "full_name", kana: "kana",
+      role: "role_title", rank: "rank", color: "color", joined: "joined_on",
+    }),
+  },
+
+  /* ---------------- 勤怠 ----------------
+     読み書きとも v_app_attendance(0007)を通す。
+     ビュー側の INSTEAD OF トリガが 社員番号 → uuid を解決するので、
+     アプリは uuid を一切知らなくてよい。 */
+  attendance: {
+    table: "v_app_attendance",
+    key: "id",
+    order: "date.desc",
+    upsert: false, // ビューの ON CONFLICT は使えない。トリガ側で上書きする
+    toLocal: (row) => ({
+      id: row.id,
+      staffId: row.staff_id,
+      storeId: row.store_id,
+      date: row.date,
+      shiftType: row.shift_type,
+      clockIn: hm(row.clock_in),
+      clockOut: hm(row.clock_out),
+      breakMin: row.break_min ?? 0,
+      status: row.status || "normal",
+      gpsOk: row.gps_ok !== false,
+      approved: !!row.approved,
+      approvedBy: row.approved_by || null,
+      note: row.note || "",
+    }),
+    toRemote: writer({
+      id: "id", staffId: "staff_id", storeId: "store_id", date: "date",
+      shiftType: "shift_type", clockIn: "clock_in", clockOut: "clock_out",
+      breakMin: ["break_min", (v) => v ?? 0],
+      status: "status",
+      gpsOk: ["gps_ok", (v) => v !== false],
+      approved: ["approved", (v) => !!v],
+      note: ["note", (v) => v ?? ""],
+    }),
+  },
+
+  /* ---------------- シフト ---------------- */
+  shifts: {
+    table: "v_app_shifts",
+    key: "id",
+    order: "date",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      staffId: row.staff_id,
+      storeId: row.store_id,
+      date: row.date,
+      type: row.type || "full",
+      note: row.note || "",
+    }),
+    toRemote: writer({
+      id: "id", staffId: "staff_id", storeId: "store_id",
+      date: "date", type: "type", note: ["note", (v) => v ?? ""],
+    }),
+  },
+
+  /* ---------------- 希望休(理由は任意) ---------------- */
+  shiftRequests: {
+    table: "v_app_shift_requests",
+    key: "id",
+    order: "month.desc",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      staffId: row.staff_id,
+      month: row.month,
+      wishes: row.wishes || {},
+      reasons: row.reasons || {},
+      note: row.note || "",
+      submittedAt: (row.submitted_at || "").slice(0, 10),
+    }),
+    toRemote: writer({
+      id: "id", staffId: "staff_id", month: "month",
+      wishes: ["wishes", (v) => v || {}],
+      reasons: ["reasons", (v) => v || {}],
+      note: ["note", (v) => v ?? ""],
+      submittedAt: "submitted_at",
+    }),
+  },
+
+  /* ---------------- 日報 ---------------- */
+  dailyReports: {
+    table: "v_app_daily_reports",
+    key: "id",
+    order: "date.desc",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      staffId: row.staff_id,
+      storeId: row.store_id,
+      date: row.date,
+      revenue: row.revenue ?? 0,
+      treatments: row.treatments ?? 0,
+      newPatients: row.new_patients ?? 0,
+      proposals: row.proposals ?? 0,
+      contracts: row.contracts ?? 0,
+      goods: row.goods ?? 0,
+      comment: row.comment || "",
+      aiSummary: row.ai_summary || null,
+      status: row.status || "draft",
+    }),
+    toRemote: writer({
+      id: "id", staffId: "staff_id", storeId: "store_id", date: "date",
+      revenue: ["revenue", (v) => v ?? 0],
+      treatments: ["treatments", (v) => v ?? 0],
+      newPatients: ["new_patients", (v) => v ?? 0],
+      proposals: ["proposals", (v) => v ?? 0],
+      contracts: ["contracts", (v) => v ?? 0],
+      goods: ["goods", (v) => v ?? 0],
+      comment: ["comment", (v) => v ?? ""],
+      aiSummary: "ai_summary",
+      status: "status",
     }),
   },
 };
@@ -102,8 +229,7 @@ export const REMOTE = {
    ------------------------------------------------------------ */
 export const PENDING_TABLES = [
   "patients", "karte", "reservations", "waitlist", "menus",
-  "shifts", "shiftRequests", "staffingRules", "attendance",
-  "dailyReports", "posts", "channels", "chatRooms", "chatMessages",
+  "staffingRules", "posts", "channels", "chatRooms", "chatMessages",
   "tasks", "meetings", "notifications",
   "inventory", "orders", "expenses", "cashbook", "registerSales",
   "trainings", "tests", "evaluations", "interviews",

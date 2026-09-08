@@ -14,6 +14,116 @@
 -- ============================================================
 
 -- ------------------------------------------------------------
+-- ログイン済みユーザーに「入口」を渡す
+--
+-- 0004 は RLS(どの行が見えるか)を整えたが、その手前の
+-- テーブル権限(そもそも触れるか)がビューにしか渡っていなかった。
+-- RLS のポリシー式は「問い合わせた本人の権限」で評価されるため、
+--   ・app.* を呼ぶための schema USAGE
+--   ・実テーブルへの select / insert / update
+-- が無いと、社員がログインした瞬間にすべて
+-- 「permission denied for schema app」「permission denied for table members」
+-- になる。ここで渡すのは入口だけで、どの行が見えるかは 0004 の RLS が決める。
+--
+-- ※ PostgREST が API に公開するのは public スキーマだけなので、
+--    app スキーマの関数が外から直接叩かれることはない。
+-- ------------------------------------------------------------
+grant usage on schema app to authenticated;
+
+grant select, insert, update, delete on
+  public.stores,
+  public.members,
+  public.member_store_assignments,
+  public.mentorships
+  to authenticated;
+
+grant select, insert on public.org_change_log to authenticated;
+
+-- ------------------------------------------------------------
+-- ビューは既定で「作った人の権限」で動く
+--
+-- PostgreSQL のビューは所有者(= マイグレーションを流した管理者)の
+-- 権限で中身を読む。つまりビュー越しに読むと、下のテーブルに掛けた
+-- RLS がまるごと素通りする。
+-- security_invoker を立てると「見ている本人の権限」で読むようになり、
+-- RLS が効く。PostgreSQL 15 以降で使える(Supabase は 15+)。
+--
+-- これを忘れると、v_app_attendance のようなビューが
+-- 全社員の勤怠を誰にでも見せてしまう。
+-- ------------------------------------------------------------
+alter view public.v_org_tree        set (security_invoker = true);
+alter view public.v_store_roster    set (security_invoker = true);
+alter view public.v_account_status  set (security_invoker = true);
+
+-- ------------------------------------------------------------
+-- 管轄店舗に「主所属」も数える
+--
+-- 0002 の app.managed_store_ids は member_store_assignments(兼務表)
+-- だけを見ていた。組織図シートから取り込めば必ず作られる表だが、
+-- 画面からメンバーを1人足したときなど、兼務行が無いまま
+-- primary_store_id だけが埋まることがある。
+-- そのとき院長が自分の院の勤怠を承認できない・シフトを組めない、
+-- という分かりにくい詰まり方をするので、主所属も管轄に数える。
+--
+-- 広がるのは「院長・店長以上」だけ(判定条件は 0002 のまま)。
+-- アプリが名前の横に出している店舗と、権限の範囲が一致する。
+-- ------------------------------------------------------------
+create or replace function app.managed_store_ids(p_member_id uuid)
+returns table (store_id uuid)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_rank  public.member_rank;
+  v_level integer;
+begin
+  select m.rank into v_rank from public.members m where m.id = p_member_id;
+  if v_rank is null then
+    return;
+  end if;
+
+  -- 本部人事は勤怠・シフト管理のため全店舗を対象にする
+  if v_rank::text = 'hr' then
+    return query select s.id from public.stores s where s.is_active;
+    return;
+  end if;
+
+  v_level := app.rank_level(v_rank);
+
+  return query
+  with scope as (
+    select p_member_id as id
+    union
+    select t.member_id from app.subtree_ids(p_member_id) t
+  ),
+  owned as (
+    -- 兼務表(組織図シートの取込が作る)
+    select a.store_id, m.rank
+      from public.member_store_assignments a
+      join scope on scope.id = a.member_id
+      join public.members m on m.id = a.member_id
+     where a.ended_on is null
+    union all
+    -- 主所属(画面から足した人など、兼務行が無い場合の受け皿)
+    select m.primary_store_id, m.rank
+      from public.members m
+      join scope on scope.id = m.id
+     where m.primary_store_id is not null
+       and m.is_active
+  )
+  select distinct o.store_id
+    from owned o
+   where o.store_id is not null
+     and (v_level >= 3 or o.rank::text = 'manager');
+end;
+$$;
+
+comment on function app.managed_store_ids is
+  'シフト編集・勤怠承認ができる店舗。兼務表と主所属の両方から、組織ツリーをたどって毎回計算する';
+
+-- ------------------------------------------------------------
 -- 社労士へ提出する「所属コード」。給与連絡表の1列目に入る2桁の番号で、
 -- 店舗ごとに固定。アプリ側は stores.deptCode として持っている。
 -- ------------------------------------------------------------
@@ -26,7 +136,8 @@ comment on column public.stores.dept_code is '社労士提出用の所属コー�
 --   create or replace view は「末尾への追加」だけ許されるため、
 --   既存の列順は 0002 のまま一字も変えずに写している。
 -- ------------------------------------------------------------
-create or replace view public.v_member_directory as
+create or replace view public.v_member_directory
+  with (security_invoker = true) as
 select
   m.id,
   m.name_key,
@@ -86,7 +197,8 @@ comment on view public.v_member_directory is
 --   RLS で stores を直接読ませているが、
 --   列名をアプリ側の形にそろえた入口も用意しておく。
 -- ------------------------------------------------------------
-create or replace view public.v_app_stores as
+create or replace view public.v_app_stores
+  with (security_invoker = true) as
 select
   s.code,
   s.name,

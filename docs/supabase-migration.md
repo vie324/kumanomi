@@ -18,12 +18,14 @@ supabase/
     0003_roster_import.sql  組織図シート(TSV)の一括取込
     0004_rls.sql            行レベルセキュリティ
     0005_accounts.sql       社員アカウント(auth.users)との紐付け
-    0006_app_bridge.sql     アプリとの橋渡し(安定キー・所属コード・社員番号の採番)
+    0006_app_bridge.sql     アプリとの橋渡し(安定キー・所属コード・社員番号の採番・権限の入口)
+    0007_daily_operations.sql 勤怠・シフト・希望休・日報
   seed/
     roster_sheet.tsv        組織図シートそのもの(ここを直すのが一番早い)
     0001_roster.sql         上のシートを埋め込んだ実行用SQL
   tests/
-    roster_import_test.sql  取込の回帰テスト(53件)
+    roster_import_test.sql     取込の回帰テスト(53件)
+    daily_operations_test.sql  勤怠・シフト・希望休・日報のRLS回帰テスト(33件)
 js/
   supabase.js               接続レイヤー(依存ゼロ・未設定ならデモモード)
   store.js                  データ入口(画面はここだけを見る)
@@ -105,8 +107,9 @@ select full_name, store_name, role_title, license, gender
 ### 2-4. テスト
 
 ```bash
-# 空のDBに 0001〜0006 を適用してから
+# 空のDBに 0001〜0007 を適用してから
 psql "$TEST_DATABASE_URL" -f supabase/tests/roster_import_test.sql
+psql "$TEST_DATABASE_URL" -f supabase/tests/daily_operations_test.sql
 ```
 
 `すべて成功しました` が出れば OK です。テストは最後に `rollback` するのでデータは残りません。
@@ -343,6 +346,28 @@ select count(*) from public.members where employee_no is null;
 `authenticated` からは実行できないようにしてあります。
 画面からはランクを検査する `import_roster_sheet_as_admin()` を経由します。
 
+### 勤怠・シフト・希望休・日報(0007)
+
+| 見えるもの | 本人 | 院長(管轄) | 統括院長・MG | 本部人事 | 事務職員 |
+|---|---|---|---|---|---|
+| 勤怠 | ○ | ○ | ○ | ○(全社) | ○(全社) |
+| シフト | ○ | ○ | ○ | ○(全社) | ○ |
+| 希望休 | ○ | ○ | ○ | ○ | × |
+| 日報 | ○ | ○ | ○ | **×** | **×** |
+
+- **承認済みの打刻は本人でも書き換えられません**(給与に直結するため)。直せるのは管轄の責任者と本部人事です。
+- 承認すると、誰がいつ承認したか(`approved_by` / `approved_at`)が自動で残ります。
+- シフトを組めるのは管轄の責任者だけ。本部人事は全社を見られますが編集はしません(`js/auth.js` と同じ)。
+- 希望休の**理由は任意**です。書かなかった日は `reasons` に入りません。
+
+アプリは uuid を持たないので、読み書きはすべて `v_app_*` ビューを通します。
+ビューの INSTEAD OF トリガが 社員番号・店舗コード → uuid を解決します。
+
+> **ビューには `security_invoker` を必ず付けてください。**
+> PostgreSQL のビューは既定で「作った人の権限」で中身を読むため、
+> これが無いとビュー越しに RLS がまるごと素通りします
+> (= 全社員の勤怠が誰にでも見えてしまう)。
+
 ---
 
 ## 9. 画面から Supabase につなぐ
@@ -417,12 +442,10 @@ update public.members set license = 'unknown', gender = 'unknown';
 アプリ側の受け口(`js/sync.js` の送信キューと取得)は共通なので、
 テーブルを作って `js/remote.js` の `REMOTE` に 1 行足せば、その画面はサーバー化されます。
 
-1. 勤怠 `attendance` — 店舗の GPS(`stores.lat/lng/radius_m`)で打刻を判定
-2. シフト `shifts` / `shift_requests` — 編集は `app.managed_store_ids()` の範囲
-3. 日報 `daily_reports` — 閲覧は `app.can_see_member()`
-4. 患者・カルテ — 出勤打刻との連動、店舗単位の分離。**要配慮個人情報**のため取扱方針を別途定める
+1. 患者・カルテ — 出勤打刻との連動、店舗単位の分離。**要配慮個人情報**のため取扱方針を別途定める
 5. 画像(経費レシート・姿勢分析写真)を Supabase Storage へ
 6. LINE Messaging API 連携、mPOP レジ連携
 
-現在の進捗は 2 / 35 コレクション(`stores` / `staff`)。
+現在の進捗は 6 / 35 コレクション
+(`stores` / `staff` / `attendance` / `shifts` / `shiftRequests` / `dailyReports`)。
 アプリの「接続とデータ」画面でも確認できます。
