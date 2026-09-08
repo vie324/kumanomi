@@ -45,6 +45,47 @@ session = readJSON(SESSION_KEY);
 
 function notify() { listeners.forEach((fn) => { try { fn(); } catch (e) { console.error(e); } }); }
 
+/* ---------------- セッションの寿命 ---------------- */
+
+const EXPIRY_MARGIN_S = 60; // これだけ手前で先に取り直す
+
+function setSession(next) {
+  if (next && next.expires_in && !next.expires_at) {
+    next.expires_at = Math.floor(Date.now() / 1000) + Number(next.expires_in);
+  }
+  session = next;
+  writeJSON(SESSION_KEY, session);
+  notify();
+  return session;
+}
+
+function isExpiring(s) {
+  if (!s?.expires_at) return false;
+  return Number(s.expires_at) - EXPIRY_MARGIN_S <= Math.floor(Date.now() / 1000);
+}
+
+let refreshing = null;
+
+/** 同時に何本走っても、実際の更新は1回にまとめる */
+function refreshSession() {
+  if (!session?.refresh_token) return Promise.resolve(null);
+  if (refreshing) return refreshing;
+  refreshing = request("/auth/v1/token?grant_type=refresh_token", {
+    method: "POST",
+    body: JSON.stringify({ refresh_token: session.refresh_token }),
+    auth: false,
+  })
+    .then((res) => setSession(res))
+    .catch((err) => {
+      // 更新できない = ログインし直してもらうしかない
+      console.warn("[supabase] セッションを更新できませんでした:", err);
+      setSession(null);
+      return null;
+    })
+    .finally(() => { refreshing = null; });
+  return refreshing;
+}
+
 /* ---------------- 設定 ---------------- */
 
 export const supabase = {
@@ -99,9 +140,7 @@ export const supabase = {
       body: JSON.stringify({ email, password }),
       auth: false,
     });
-    session = res;
-    writeJSON(SESSION_KEY, session);
-    notify();
+    setSession(res);
     return session;
   },
 
@@ -109,9 +148,21 @@ export const supabase = {
     if (session?.access_token) {
       try { await request("/auth/v1/logout", { method: "POST" }); } catch { /* 期限切れは無視 */ }
     }
-    session = null;
-    writeJSON(SESSION_KEY, null);
-    notify();
+    setSession(null);
+  },
+
+  /**
+   * アクセストークンを取り直す。
+   * GoTrue のトークンは 1 時間ほどで切れるので、
+   * 期限が近ければ自動で更新し、勝手にログアウトされないようにする。
+   */
+  async refreshSession() { return refreshSession(); },
+
+  /** 期限切れが近ければ更新する。切れていて更新もできなければログアウト扱い */
+  async ensureSession() {
+    if (!session?.refresh_token) return session;
+    if (!isExpiring(session)) return session;
+    return refreshSession();
   },
 
   /* ---------------- データアクセス ---------------- */
@@ -165,8 +216,10 @@ export const supabase = {
 
 /* ---------------- 内部:fetch ラッパー ---------------- */
 
-async function request(path, { method = "GET", body = null, headers = {}, auth = true, head = false } = {}) {
+async function request(path, { method = "GET", body = null, headers = {}, auth = true, head = false, retried = false } = {}) {
   if (!config) throw new Error("Supabase の接続先が設定されていません。");
+  // 期限が近いトークンで投げると 401 になるので、先に取り直しておく
+  if (auth && session?.refresh_token && isExpiring(session)) await refreshSession();
   const h = {
     apikey: config.anonKey,
     "Content-Type": "application/json",
@@ -197,6 +250,11 @@ async function request(path, { method = "GET", body = null, headers = {}, auth =
 
   if (!res.ok) {
     const msg = data?.message || data?.error_description || data?.error || data?.hint || res.statusText;
+    // 期限切れの取りこぼしは1度だけ更新して投げ直す
+    if (res.status === 401 && auth && !retried && session?.refresh_token) {
+      const next = await refreshSession();
+      if (next) return request(path, { method, body, headers, auth, head, retried: true });
+    }
     if (res.status === 401 || res.status === 403) {
       throw new Error(`権限がありません:${msg}(ログイン状態と RLS の設定を確認してください)`);
     }

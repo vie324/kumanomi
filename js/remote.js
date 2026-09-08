@@ -26,6 +26,7 @@ export const REMOTE = {
   /* ---------------- 店舗 ---------------- */
   stores: {
     table: "stores",
+    view: "v_app_stores", // uuid を出さない参照用ビュー(0006)
     key: "code", // ローカル id が入る列
     order: "sort_order,name",
     toLocal: (row) => ({
@@ -37,8 +38,8 @@ export const REMOTE = {
       address: row.address || "",
       lat: row.lat,
       lng: row.lng,
-      openHour: (row.open_at || "10:00").slice(0, 5),
-      closeHour: (row.close_at || "20:00").slice(0, 5),
+      openHour: (row.open_hour || "10:00").slice(0, 5),
+      closeHour: (row.close_hour || "20:00").slice(0, 5),
       color: row.color || "#2a78d6",
       beds: row.beds ?? 3,
       deptCode: row.dept_code || "",
@@ -53,6 +54,9 @@ export const REMOTE = {
       address: nn(obj.address),
       lat: obj.lat ?? null,
       lng: obj.lng ?? null,
+      open_hour: nn(obj.openHour),
+      close_hour: nn(obj.closeHour),
+      beds: obj.beds ?? null,
       color: nn(obj.color),
       dept_code: nn(obj.deptCode),
     }),

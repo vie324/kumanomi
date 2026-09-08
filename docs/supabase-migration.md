@@ -18,6 +18,7 @@ supabase/
     0003_roster_import.sql  組織図シート(TSV)の一括取込
     0004_rls.sql            行レベルセキュリティ
     0005_accounts.sql       社員アカウント(auth.users)との紐付け
+    0006_app_bridge.sql     アプリとの橋渡し(安定キー・所属コード・社員番号の採番)
   seed/
     roster_sheet.tsv        組織図シートそのもの(ここを直すのが一番早い)
     0001_roster.sql         上のシートを埋め込んだ実行用SQL
@@ -25,8 +26,14 @@ supabase/
     roster_import_test.sql  取込の回帰テスト(53件)
 js/
   supabase.js               接続レイヤー(依存ゼロ・未設定ならデモモード)
+  store.js                  データ入口(画面はここだけを見る)
+  sync.js                   背面同期(送信キュー・取得・再送)
+  remote.js                 コレクション ⇄ テーブルの対応表
+  login.js                  ログイン画面と、名簿との突き合わせ
   roster.js                 シート解釈エンジン(SQL側と同じ判定をブラウザでも行う)
   pages/orgimport.js        「メンバー・組織図の一括登録」画面
+scripts/
+  gen-config.js             環境変数から config.js を生成(Vercel のビルドコマンド)
 ```
 
 ---
@@ -98,7 +105,7 @@ select full_name, store_name, role_title, license, gender
 ### 2-4. テスト
 
 ```bash
-# 空のDBに 0001〜0005 を適用してから
+# 空のDBに 0001〜0006 を適用してから
 psql "$TEST_DATABASE_URL" -f supabase/tests/roster_import_test.sql
 ```
 
@@ -279,6 +286,34 @@ select status, count(*) from public.v_account_status group by status;
 
 `メール未登録` → `招待待ち` → `ログイン可` の順に進みます。
 
+### 社員番号を振る(アプリ側の安定キー)
+
+アプリは uuid ではなく **社員番号** で人を識別します(`js/remote.js` の `key: "employee_no"`)。
+シートに番号が無い場合は、取込のあとに一度だけ採番してください。
+
+```sql
+select public.fill_employee_numbers();        -- 'K0001' 形式
+select public.fill_employee_numbers('S', 3);  -- 'S001' 形式
+-- 既に番号が入っている人は触りません。何度実行しても安全です。
+
+-- 未採番が残っていないか確認
+select count(*) from public.members where employee_no is null;
+```
+
+### ログイン
+
+`config.js` に接続先が入っていれば、アプリは起動時にログイン画面を出します
+(未設定のあいだはデモモードのままログイン不要)。
+
+1. 社員がメールアドレスとパスワードでログイン
+2. アプリが `public.me()` を呼び、自分が名簿のどの行かを社員番号で特定
+3. その人の権限で画面が組み上がる
+
+紐付いていないアカウントでログインすると、**別人として入らせず**に
+「名簿と紐付いていません」と表示してログアウトします。
+アクセストークンは期限が近づくと自動で更新されるので、
+業務中に勝手にログアウトされることはありません。
+
 ---
 
 ## 8. 権限(RLS)
@@ -320,22 +355,34 @@ PostgREST / GoTrue の REST API を `fetch` で直接叩く最小クライアン
 1. `window.KUMANOMI_CONFIG` — `config.js` を置いて埋め込む(Git 管理外)
 2. `localStorage["kumanomi.supabase"]` — 画面の「接続設定」から入力した値
 
-```js
-// config.js — config.example.js をコピーして作る。Git にはコミットしない
-window.KUMANOMI_CONFIG = {
-  url: "https://xxxxxxxx.supabase.co",
-  anonKey: "eyJhbGciOi...",   // anon (public) キー
-};
-```
+**Vercel では手作業は要りません。** 環境変数を 2 つ入れると、
+ビルド時に `scripts/gen-config.js` が `config.js` を書き出します。
 
-```html
-<!-- index.html の app.js より前に読み込む -->
-<script src="config.js"></script>
+| 変数名 | 値 |
+| --- | --- |
+| `SUPABASE_URL` | Settings → API → Project URL |
+| `SUPABASE_ANON_KEY` | Settings → API → Project API keys → **anon public** |
+
+ローカルで動かすときは同じスクリプトを手で実行します。
+
+```bash
+SUPABASE_URL=https://xxxxxxxx.supabase.co \
+SUPABASE_ANON_KEY=eyJhbGciOi... \
+node scripts/gen-config.js
 ```
 
 > **`service_role` キーは絶対にブラウザに置かないでください。**
 > RLS を迂回するキーなので、置いた時点で誰でも全データにアクセスできます。
-> `js/supabase.js` は `service_role` キーが入力されたら保存を拒否します。
+> `scripts/gen-config.js` は `service_role` キーを渡されるとビルドを失敗させ、
+> `js/supabase.js` は画面から入力されても保存を拒否します。
+
+### データの流れ
+
+画面は `js/store.js` だけを見ます。localStorage も Supabase も直接は触りません。
+
+- 入力はまず端末に保存され、送信は `js/sync.js` が裏で行います(電波が切れても操作を続けられます)
+- 更新は **変えた項目だけ** を PATCH で送るので、同じレコードを別々の項目で直しても打ち消し合いません
+- どのコレクションがサーバー化済みかは `js/remote.js` の `REMOTE` / `PENDING_TABLES` を見てください
 
 ---
 
@@ -367,8 +414,15 @@ update public.members set license = 'unknown', gender = 'unknown';
 この上に載せていくテーブルの想定です。RLS は `app.can_see_member()` と
 `app.managed_store_ids()` を使えば同じ形で書けます。
 
+アプリ側の受け口(`js/sync.js` の送信キューと取得)は共通なので、
+テーブルを作って `js/remote.js` の `REMOTE` に 1 行足せば、その画面はサーバー化されます。
+
 1. 勤怠 `attendance` — 店舗の GPS(`stores.lat/lng/radius_m`)で打刻を判定
 2. シフト `shifts` / `shift_requests` — 編集は `app.managed_store_ids()` の範囲
 3. 日報 `daily_reports` — 閲覧は `app.can_see_member()`
-4. 患者・カルテ — 出勤打刻との連動、店舗単位の分離
-5. LINE Messaging API 連携、mPOP レジ連携
+4. 患者・カルテ — 出勤打刻との連動、店舗単位の分離。**要配慮個人情報**のため取扱方針を別途定める
+5. 画像(経費レシート・姿勢分析写真)を Supabase Storage へ
+6. LINE Messaging API 連携、mPOP レジ連携
+
+現在の進捗は 2 / 35 コレクション(`stores` / `staff`)。
+アプリの「接続とデータ」画面でも確認できます。

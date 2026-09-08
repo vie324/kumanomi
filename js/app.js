@@ -9,6 +9,7 @@ import { canSeePage, rankLabel, scopeLabel, RANKS, rankOf } from "./auth.js";
 import { syncAutoTasks } from "./autotasks.js";
 import { supabase } from "./supabase.js";
 import { migrationProgress, remoteCollections } from "./remote.js";
+import { needsLogin, renderLogin, teardownLogin, isDemoBypass, signOutAndReload } from "./login.js";
 
 import dashboard from "./pages/dashboard.js";
 import sns from "./pages/sns.js";
@@ -186,6 +187,39 @@ function buildShell() {
 
 function closeMobileNav() { app.classList.remove("nav-open"); }
 
+/* ---- 本番ログイン中のアカウント画面(切替はできない) ---- */
+function openAccountPanel(me) {
+  const rows = [
+    ["氏名", me.name],
+    ["社員コード", me.empCode || me.id],
+    ["所属", `${store.storeName(me.storeId)}・${me.role}`],
+    ["権限", `${rankLabel(me)}(${scopeLabel(me)})`],
+    ["メール", supabase.user()?.email || "—"],
+  ];
+  const d = drawer({
+    title: "アカウント",
+    body: el("div", { class: "sync-panel" },
+      el("div", { class: "sp-kv" },
+        rows.map(([k, v]) => el("div", { class: "sp-row" },
+          el("span", { class: "sp-k" }, k),
+          el("span", { class: "sp-v" }, String(v))))),
+      el("div", { class: "sp-actions" },
+        el("button", {
+          class: "btn ghost",
+          onclick: async () => {
+            const ok = await confirmDialog({
+              title: "ログアウト",
+              message: "この端末からログアウトします。未送信の変更が残っている場合は、先に同期してください。",
+              okLabel: "ログアウトする",
+            });
+            if (ok) { d.close(); await signOutAndReload(); }
+          },
+        }, icon("user", 16), "ログアウト")),
+      el("div", { class: "sp-note" }, icon("info", 14),
+        el("span", {}, "見える範囲は組織図(だれの傘の下にいるか)で決まります。変更は管理者にご依頼ください。"))),
+  });
+}
+
 /* ---- 同期の状態表示 ----
    ふだんは何も出さない。伝えることがあるときだけチップを出す。 */
 function syncLook() {
@@ -281,9 +315,11 @@ function openSyncPanel() {
   });
 }
 
-/* ---- ログインユーザー切替(デモ用:権限の違いを体験できる) ---- */
+/* ---- ログインユーザー切替(デモ用:権限の違いを体験できる) ----
+   本番ログイン中は切り替えさせない。自分のアカウントとログアウトだけを出す。 */
 function openUserSwitcher() {
   const me = store.me();
+  if (supabase.user()) { openAccountPanel(me); return; }
   const order = { ceo: 0, exec: 1, area: 2, chief: 3, hr: 4, clerk: 5, manager: 6, mentor: 7, staff: 8 };
   const list = [...store.get("staff")].sort(
     (a, b) => (order[rankOf(a)] ?? 9) - (order[rankOf(b)] ?? 9) || a.id.localeCompare(b.id));
@@ -373,29 +409,58 @@ router.setBeforeRender(syncAutoTasks);
 // 各ページが needs で宣言したデータを、描画前にそろえる
 router.setLoader((needs) => store.load(needs));
 
-// シェル自体がスタッフと店舗を使うので、先にそろえてから組み立てる
-await store.load("staff", "stores");
+function closeSplash() {
+  const splash = document.getElementById("splash");
+  if (splash) { splash.classList.add("hide"); setTimeout(() => splash.remove(), 500); }
+}
 
-// サイドバーの未完了バッジを正しく出すため、シェルより先に一度同期しておく
-syncAutoTasks();
+/** アプリ本体を立ち上げる(ログイン済み、またはデモモード) */
+async function bootApp() {
+  teardownLogin(app);
 
-const built = buildShell();
-titleRef.el = built.titleEl;
-router.init(built.main, onNavigate);
+  // シェル自体がスタッフと店舗を使うので、先にそろえてから組み立てる
+  await store.load("staff", "stores");
+
+  // サイドバーの未完了バッジを正しく出すため、シェルより先に一度同期しておく
+  syncAutoTasks();
+
+  const built = buildShell();
+  titleRef.el = built.titleEl;
+  router.init(built.main, onNavigate);
+
+  // 本番につながっているのに種データを見ている、という取り違えを防ぐ
+  if (supabase.isConfigured() && isDemoBypass()) showDemoBanner();
+
+  setTimeout(closeSplash, 650);
+
+  // 初回訪問メッセージ
+  if (!sessionStorage.getItem("kumanomi.welcomed")) {
+    sessionStorage.setItem("kumanomi.welcomed", "1");
+    setTimeout(() => toast(`おはようございます、${store.me().name.split(" ")[0]}さん!今日も一日よろしくお願いします`, "info", { fish: true }), 1200);
+  }
+}
+
+function showDemoBanner() {
+  document.querySelector(".demo-banner")?.remove();
+  document.body.appendChild(el("div", { class: "demo-banner" },
+    icon("alert", 15),
+    el("span", {}, "デモデータを表示中(サーバー未接続)"),
+    el("button", { class: "db-out", onclick: signOutAndReload }, "ログインする")));
+}
+
+if (needsLogin()) {
+  closeSplash();
+  renderLogin(app, async (staffId) => {
+    if (staffId) store.switchUser(staffId);
+    await bootApp();
+  });
+} else {
+  // 期限切れのトークンで起動すると全画面が権限エラーになるので、先に確かめる
+  if (supabase.isConfigured() && supabase.session()) await supabase.ensureSession();
+  await bootApp();
+}
 
 function refreshBell() {
   const dot = document.querySelector(".icon-btn .dot");
   if (dot && store.unreadCount() === 0) dot.remove();
-}
-
-// スプラッシュを閉じる
-setTimeout(() => {
-  const splash = document.getElementById("splash");
-  if (splash) { splash.classList.add("hide"); setTimeout(() => splash.remove(), 500); }
-}, 650);
-
-// 初回訪問メッセージ
-if (!sessionStorage.getItem("kumanomi.welcomed")) {
-  sessionStorage.setItem("kumanomi.welcomed", "1");
-  setTimeout(() => toast(`おはようございます、${store.me().name.split(" ")[0]}さん!今日も一日よろしくお願いします`, "info", { fish: true }), 1200);
 }
