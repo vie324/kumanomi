@@ -8,6 +8,7 @@ let outlet = null;
 let onNavigate = null;
 let hashBound = false;
 let guard = null;
+let beforeRender = null;
 
 export const router = {
   /** ページモジュール({id,title,icon,group,render})を登録 */
@@ -18,6 +19,9 @@ export const router = {
 
   /** アクセス可否のフック。(pageId) => boolean を設定する */
   setGuard(fn) { guard = fn; },
+
+  /** 描画の直前に毎回走らせる処理(自動タスクの同期など) */
+  setBeforeRender(fn) { beforeRender = fn; },
 
   init(outletEl, navigateHook) {
     outlet = outletEl;
@@ -47,6 +51,11 @@ export const router = {
 
   render() {
     if (!outlet) return;
+    try {
+      beforeRender?.();
+    } catch (err) {
+      console.warn("[router] 描画前フックでエラー:", err);
+    }
     const { id, params } = router.current();
     const page = pages.get(id);
     if (!page) return;

@@ -221,3 +221,79 @@
   background: color-mix(in srgb, var(--brand) 8%, transparent);
   border-radius: 8px;
 }
+
+/* ============================================================
+   予約管理の強化(重複チェック/一覧/未来院/キャンセル待ち)
+   ============================================================ */
+
+/* ---- 登録時の重複警告 ---- */
+.page-reserve .rv-conflict {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 13px;
+  background: var(--critical-soft);
+  border: 1px solid color-mix(in srgb, var(--critical) 32%, var(--hairline));
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  color: var(--critical-text);
+  font-weight: 700;
+  line-height: 1.6;
+}
+.page-reserve .rv-conflict svg { flex: none; margin-top: 1px; }
+.page-reserve .rv-fromwait {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 13px;
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  border-radius: var(--r-md);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.page-reserve .rv-check {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.page-reserve .rv-cancelreason { color: var(--critical-text); font-weight: 700; }
+
+/* ---- 一覧ビュー ---- */
+.page-reserve .rv-search { max-width: 320px; height: 34px; font-size: var(--fs-sm); }
+@media (max-width: 640px) { .page-reserve .rv-search { max-width: 100%; } }
+.page-reserve .rv-today { color: var(--brand-ink); font-weight: 800; }
+.page-reserve .rv-listmenu {
+  display: inline-block; max-width: 190px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: bottom;
+}
+.page-reserve .rv-listnote {
+  display: inline-block; max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: bottom;
+  font-size: var(--fs-xs); color: var(--ink-2);
+}
+
+/* ---- 未来院アラート ---- */
+.page-reserve .rv-overdue {
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--hairline));
+  background: linear-gradient(180deg, var(--warn-soft) 0%, var(--surface) 60%);
+  margin-bottom: 16px;
+}
+.page-reserve .rv-overdue-head {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: var(--fs-sm);
+  margin-bottom: 12px;
+}
+.page-reserve .rv-overdue-head svg { color: var(--warn-text); flex: none; margin-top: 2px; }
+.page-reserve .rv-overdue-list { display: flex; flex-direction: column; gap: 8px; }
+.page-reserve .rv-overdue-item {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+}
+.page-reserve .rv-od-time { font-weight: 700; white-space: nowrap; }
+.page-reserve .rv-od-name { font-weight: 800; }
+
+/* ---- キャンセル待ち ---- */
+.page-reserve .rv-waititem { gap: 10px; flex-wrap: wrap; }

@@ -49,6 +49,25 @@ export function fmtYen(n) { return "¥" + Math.round(Number(n) || 0).toLocaleStr
 export function fmtNum(n) { return (Number(n) || 0).toLocaleString("ja-JP"); }
 export function fmtPct(n, digits = 0) { return `${Number(n ?? 0).toFixed(digits)}%`; }
 
+/**
+ * CSV を書き出してダウンロードさせる(Excel でそのまま開ける BOM 付き UTF-8)。
+ * rows は配列の配列: [["見出し1","見出し2"], [値, 値], ...]
+ */
+export function downloadCSV(filename, rows) {
+  const cell = (v) => {
+    const s = String(v ?? "");
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = "\uFEFF" + rows.map((r) => r.map(cell).join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /** '2026-07-30' → '7/30(木)' */
 const DOW_JA = ["日", "月", "火", "水", "木", "金", "土"];
 export function fmtDate(dateStr, { withDow = true, withYear = false } = {}) {

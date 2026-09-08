@@ -46,12 +46,13 @@ const iso = (dateStr, hm) => `${dateStr}T${hm}:00`;
 
 /** category: 整骨院/整体院/鍼灸院 は責任者=院長、美容・エステ は責任者=店長 */
 /** beds: 予約枠の基軸になるベッド数(予約はベッド単位で管理する) */
+/** deptCode: 社労士へ提出する給与連絡表の「所属」コード(例:(34)成増駅前院) */
 const stores = [
-  { id: "st-narimasu", name: "成増店", short: "成増", category: "整骨院", isPilot: true, phone: "03-5967-xxxx", address: "東京都板橋区成増2-XX-X", lat: 35.7772, lng: 139.632, openHour: "10:00", closeHour: "20:00", color: "#2a78d6", beds: 4 },
-  { id: "st-omiya", name: "大宮店", short: "大宮", category: "整体院", isPilot: false, phone: "048-641-xxxx", address: "埼玉県さいたま市大宮区桜木町1-XX", lat: 35.9063, lng: 139.6242, openHour: "10:00", closeHour: "20:00", color: "#eb6834", beds: 3 },
-  { id: "st-kawagoe", name: "川越店", short: "川越", category: "鍼灸院", isPilot: false, phone: "049-224-xxxx", address: "埼玉県川越市脇田町X-X", lat: 35.9086, lng: 139.4823, openHour: "10:00", closeHour: "20:00", color: "#1baf7a", beds: 3 },
-  { id: "st-urawa", name: "浦和店", short: "浦和", category: "整体院", isPilot: false, phone: "048-813-xxxx", address: "埼玉県さいたま市浦和区高砂1-XX", lat: 35.8598, lng: 139.6574, openHour: "10:00", closeHour: "20:00", color: "#eda100", beds: 3 },
-  { id: "st-biyou", name: "ビューティー大宮店", short: "美容大宮", category: "美容・エステ", isPilot: false, phone: "048-641-yyyy", address: "埼玉県さいたま市大宮区宮町X-X", lat: 35.908, lng: 139.626, openHour: "10:00", closeHour: "20:00", color: "#e87ba4", beds: 2 },
+  { id: "st-narimasu", name: "成増店", short: "成増", deptCode: "34", category: "整骨院", isPilot: true, phone: "03-5967-xxxx", address: "東京都板橋区成増2-XX-X", lat: 35.7772, lng: 139.632, openHour: "10:00", closeHour: "20:00", color: "#2a78d6", beds: 4 },
+  { id: "st-omiya", name: "大宮店", short: "大宮", deptCode: "12", category: "整体院", isPilot: false, phone: "048-641-xxxx", address: "埼玉県さいたま市大宮区桜木町1-XX", lat: 35.9063, lng: 139.6242, openHour: "10:00", closeHour: "20:00", color: "#eb6834", beds: 3 },
+  { id: "st-kawagoe", name: "川越店", short: "川越", deptCode: "19", category: "鍼灸院", isPilot: false, phone: "049-224-xxxx", address: "埼玉県川越市脇田町X-X", lat: 35.9086, lng: 139.4823, openHour: "10:00", closeHour: "20:00", color: "#1baf7a", beds: 3 },
+  { id: "st-urawa", name: "浦和店", short: "浦和", deptCode: "27", category: "整体院", isPilot: false, phone: "048-813-xxxx", address: "埼玉県さいたま市浦和区高砂1-XX", lat: 35.8598, lng: 139.6574, openHour: "10:00", closeHour: "20:00", color: "#eda100", beds: 3 },
+  { id: "st-biyou", name: "ビューティー大宮店", short: "美容大宮", deptCode: "02", category: "美容・エステ", isPilot: false, phone: "048-641-yyyy", address: "埼玉県さいたま市大宮区宮町X-X", lat: 35.908, lng: 139.626, openHour: "10:00", closeHour: "20:00", color: "#e87ba4", beds: 2 },
 ];
 
 /** 店舗のベッド一覧(予約グリッドの列になる) */
@@ -78,24 +79,25 @@ export function directorTitle(store) {
  * 管轄は毎月変わる想定 → 組織図ページのドラッグで reportsTo を付け替える。
  */
 const staff = [
-  { id: "s01", name: "佐藤 健太", kana: "さとう けんた", role: "院長", storeId: "st-narimasu", color: "#0c7489", points: 320, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.6, 接客: 4.2, 数値: 4.0, 理念: 4.8, 協調: 4.4 }, rank: "manager", reportsTo: "s15" },
-  { id: "s02", name: "鈴木 美咲", kana: "すずき みさき", role: "柔道整復師", storeId: "st-narimasu", color: "#c2547e", points: 415, joined: "2022-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.8, 接客: 4.7, 数値: 3.5, 理念: 4.2, 協調: 4.6 }, rank: "mentor", reportsTo: "s01", mentorId: "s01", menteeIds: ["s11", "s06"] },
-  { id: "s03", name: "田中 大輔", kana: "たなか だいすけ", role: "鍼灸師", storeId: "st-narimasu", color: "#4a3aa7", points: 268, joined: "2021-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.3, 接客: 3.6, 数値: 3.9, 理念: 3.8, 協調: 4.0 }, rank: "staff", reportsTo: "s01", mentorId: "s01" },
-  { id: "s04", name: "高橋 由美", kana: "たかはし ゆみ", role: "受付", storeId: "st-narimasu", color: "#b0771a", points: 388, joined: "2020-07-01", licenses: [], skills: { 技術: 3.0, 接客: 4.9, 数値: 3.4, 理念: 4.5, 協調: 4.8 }, rank: "staff", reportsTo: "s01", mentorId: "s01" },
-  { id: "s05", name: "伊藤 翔太", kana: "いとう しょうた", role: "院長", storeId: "st-omiya", color: "#1f7a4d", points: 295, joined: "2018-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.7, 接客: 4.0, 数値: 4.4, 理念: 4.3, 協調: 4.1 }, rank: "manager", reportsTo: "s15" },
-  { id: "s06", name: "渡辺 花子", kana: "わたなべ はなこ", role: "柔道整復師", storeId: "st-omiya", color: "#d95926", points: 342, joined: "2023-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.4, 接客: 4.4, 数値: 3.2, 理念: 4.0, 協調: 4.5 }, rank: "staff", reportsTo: "s05", mentorId: "s02" },
-  { id: "s07", name: "山本 拓海", kana: "やまもと たくみ", role: "院長", storeId: "st-kawagoe", color: "#2a78d6", points: 251, joined: "2019-10-01", licenses: ["柔道整復師", "はり師"], skills: { 技術: 4.5, 接客: 3.9, 数値: 4.2, 理念: 4.1, 協調: 3.9 }, rank: "manager", reportsTo: "s16" },
-  { id: "s08", name: "中村 さくら", kana: "なかむら さくら", role: "鍼灸師", storeId: "st-kawagoe", color: "#a83a52", points: 377, joined: "2022-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.0, 接客: 4.6, 数値: 3.6, 理念: 4.4, 協調: 4.7 }, rank: "mentor", reportsTo: "s07", mentorId: "s07", menteeIds: ["s03"] },
-  { id: "s09", name: "小林 誠", kana: "こばやし まこと", role: "統括マネージャー", storeId: "st-narimasu", color: "#3d4f6b", points: 198, joined: "2017-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.2, 接客: 4.1, 数値: 4.8, 理念: 4.6, 協調: 4.3 }, rank: "exec", reportsTo: "s14" },
-  { id: "s10", name: "加藤 恵", kana: "かとう めぐみ", role: "マネージャー", storeId: "st-omiya", color: "#7b5cc4", points: 289, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.1, 接客: 4.5, 数値: 4.5, 理念: 4.2, 協調: 4.6 }, rank: "area", reportsTo: "s09" },
-  { id: "s11", name: "吉田 陽菜", kana: "よしだ ひな", role: "柔道整復師", storeId: "st-urawa", color: "#0f8f7a", points: 305, joined: "2024-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.2, 接客: 4.3, 数値: 3.0, 理念: 3.9, 協調: 4.4 }, rank: "staff", reportsTo: "s12", mentorId: "s02" },
-  { id: "s12", name: "山口 蓮", kana: "やまぐち れん", role: "院長", storeId: "st-urawa", color: "#c46a1f", points: 233, joined: "2020-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.4, 接客: 3.8, 数値: 4.1, 理念: 4.0, 協調: 3.8 }, rank: "manager", reportsTo: "s16" },
-  { id: "s13", name: "森 あかり", kana: "もり あかり", role: "本部人事", storeId: "st-narimasu", color: "#5b6f8a", points: 120, joined: "2021-04-01", licenses: [], skills: { 技術: 2.0, 接客: 4.4, 数値: 4.7, 理念: 4.5, 協調: 4.6 }, rank: "hr", reportsTo: "s14" },
-  { id: "s14", name: "熊野 太志", kana: "くまの たいし", role: "社長", storeId: "st-narimasu", color: "#8a4b12", points: 88, joined: "2015-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.5, 接客: 4.3, 数値: 4.9, 理念: 5.0, 協調: 4.5 }, rank: "ceo", reportsTo: null },
-  { id: "s15", name: "大森 隆", kana: "おおもり たかし", role: "統括院長", storeId: "st-narimasu", color: "#146b5c", points: 176, joined: "2017-10-01", licenses: ["柔道整復師", "はり師"], skills: { 技術: 4.8, 接客: 4.2, 数値: 4.3, 理念: 4.6, 協調: 4.2 }, rank: "chief", reportsTo: "s10" },
-  { id: "s16", name: "高木 純", kana: "たかぎ じゅん", role: "マネージャー", storeId: "st-kawagoe", color: "#4d5fb3", points: 205, joined: "2018-10-01", licenses: ["柔道整復師"], skills: { 技術: 4.0, 接客: 4.4, 数値: 4.6, 理念: 4.1, 協調: 4.4 }, rank: "area", reportsTo: "s09" },
-  { id: "s17", name: "白鳥 結衣", kana: "しらとり ゆい", role: "店長", storeId: "st-biyou", color: "#c25a86", points: 264, joined: "2020-10-01", licenses: ["エステティシャン"], skills: { 技術: 4.3, 接客: 4.8, 数値: 4.0, 理念: 4.2, 協調: 4.5 }, rank: "manager", reportsTo: "s16", menteeIds: ["s18"] },
-  { id: "s18", name: "井村 心春", kana: "いむら こはる", role: "エステティシャン", storeId: "st-biyou", color: "#7a9e3f", points: 142, joined: "2024-10-01", licenses: ["エステティシャン"], skills: { 技術: 3.1, 接客: 4.5, 数値: 2.9, 理念: 3.8, 協調: 4.3 }, rank: "staff", reportsTo: "s17", mentorId: "s17" },
+  { id: "s01", empCode: "145", name: "佐藤 健太", kana: "さとう けんた", role: "院長", storeId: "st-narimasu", color: "#0c7489", points: 320, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.6, 接客: 4.2, 数値: 4.0, 理念: 4.8, 協調: 4.4 }, rank: "manager", reportsTo: "s15" },
+  { id: "s02", empCode: "242", name: "鈴木 美咲", kana: "すずき みさき", role: "柔道整復師", storeId: "st-narimasu", color: "#c2547e", points: 415, joined: "2022-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.8, 接客: 4.7, 数値: 3.5, 理念: 4.2, 協調: 4.6 }, rank: "mentor", reportsTo: "s01", mentorId: "s01", menteeIds: ["s11", "s06"] },
+  { id: "s03", empCode: "326", name: "田中 大輔", kana: "たなか だいすけ", role: "鍼灸師", storeId: "st-narimasu", color: "#4a3aa7", points: 268, joined: "2021-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.3, 接客: 3.6, 数値: 3.9, 理念: 3.8, 協調: 4.0 }, rank: "staff", reportsTo: "s01", mentorId: "s01" },
+  { id: "s04", empCode: "63", name: "高橋 由美", kana: "たかはし ゆみ", role: "受付", storeId: "st-narimasu", color: "#b0771a", points: 388, joined: "2020-07-01", licenses: [], skills: { 技術: 3.0, 接客: 4.9, 数値: 3.4, 理念: 4.5, 協調: 4.8 }, rank: "staff", reportsTo: "s01", mentorId: "s01" },
+  { id: "s05", empCode: "171", name: "伊藤 翔太", kana: "いとう しょうた", role: "院長", storeId: "st-omiya", color: "#1f7a4d", points: 295, joined: "2018-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.7, 接客: 4.0, 数値: 4.4, 理念: 4.3, 協調: 4.1 }, rank: "manager", reportsTo: "s15" },
+  { id: "s06", empCode: "221", name: "渡辺 花子", kana: "わたなべ はなこ", role: "柔道整復師", storeId: "st-omiya", color: "#d95926", points: 342, joined: "2023-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.4, 接客: 4.4, 数値: 3.2, 理念: 4.0, 協調: 4.5 }, rank: "staff", reportsTo: "s05", mentorId: "s02" },
+  { id: "s07", empCode: "230", name: "山本 拓海", kana: "やまもと たくみ", role: "院長", storeId: "st-kawagoe", color: "#2a78d6", points: 251, joined: "2019-10-01", licenses: ["柔道整復師", "はり師"], skills: { 技術: 4.5, 接客: 3.9, 数値: 4.2, 理念: 4.1, 協調: 3.9 }, rank: "manager", reportsTo: "s16" },
+  { id: "s08", empCode: "319", name: "中村 さくら", kana: "なかむら さくら", role: "鍼灸師", storeId: "st-kawagoe", color: "#a83a52", points: 377, joined: "2022-10-01", licenses: ["はり師", "きゅう師"], skills: { 技術: 4.0, 接客: 4.6, 数値: 3.6, 理念: 4.4, 協調: 4.7 }, rank: "mentor", reportsTo: "s07", mentorId: "s07", menteeIds: ["s03"] },
+  { id: "s09", empCode: "6", name: "小林 誠", kana: "こばやし まこと", role: "統括マネージャー", storeId: "st-narimasu", color: "#3d4f6b", points: 198, joined: "2017-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.2, 接客: 4.1, 数値: 4.8, 理念: 4.6, 協調: 4.3 }, rank: "exec", reportsTo: "s14" },
+  { id: "s10", empCode: "104", name: "加藤 恵", kana: "かとう めぐみ", role: "マネージャー", storeId: "st-omiya", color: "#7b5cc4", points: 289, joined: "2019-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.1, 接客: 4.5, 数値: 4.5, 理念: 4.2, 協調: 4.6 }, rank: "area", reportsTo: "s09" },
+  { id: "s11", empCode: "283", name: "吉田 陽菜", kana: "よしだ ひな", role: "柔道整復師", storeId: "st-urawa", color: "#0f8f7a", points: 305, joined: "2024-04-01", licenses: ["柔道整復師"], skills: { 技術: 3.2, 接客: 4.3, 数値: 3.0, 理念: 3.9, 協調: 4.4 }, rank: "staff", reportsTo: "s12", mentorId: "s02" },
+  { id: "s12", empCode: "264", name: "山口 蓮", kana: "やまぐち れん", role: "院長", storeId: "st-urawa", color: "#c46a1f", points: 233, joined: "2020-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.4, 接客: 3.8, 数値: 4.1, 理念: 4.0, 協調: 3.8 }, rank: "manager", reportsTo: "s16" },
+  { id: "s13", empCode: "72", name: "森 あかり", kana: "もり あかり", role: "本部人事", storeId: "st-narimasu", color: "#5b6f8a", points: 120, joined: "2021-04-01", licenses: [], skills: { 技術: 2.0, 接客: 4.4, 数値: 4.7, 理念: 4.5, 協調: 4.6 }, rank: "hr", reportsTo: "s14" },
+  { id: "s14", empCode: "2", name: "熊野 太志", kana: "くまの たいし", role: "社長", storeId: "st-narimasu", color: "#8a4b12", points: 88, joined: "2015-04-01", licenses: ["柔道整復師"], skills: { 技術: 4.5, 接客: 4.3, 数値: 4.9, 理念: 5.0, 協調: 4.5 }, rank: "ceo", reportsTo: null },
+  { id: "s15", empCode: "80", name: "大森 隆", kana: "おおもり たかし", role: "統括院長", storeId: "st-narimasu", color: "#146b5c", points: 176, joined: "2017-10-01", licenses: ["柔道整復師", "はり師"], skills: { 技術: 4.8, 接客: 4.2, 数値: 4.3, 理念: 4.6, 協調: 4.2 }, rank: "chief", reportsTo: "s10" },
+  { id: "s16", empCode: "317", name: "高木 純", kana: "たかぎ じゅん", role: "マネージャー", storeId: "st-kawagoe", color: "#4d5fb3", points: 205, joined: "2018-10-01", licenses: ["柔道整復師"], skills: { 技術: 4.0, 接客: 4.4, 数値: 4.6, 理念: 4.1, 協調: 4.4 }, rank: "area", reportsTo: "s09" },
+  { id: "s17", empCode: "97", name: "白鳥 結衣", kana: "しらとり ゆい", role: "店長", storeId: "st-biyou", color: "#c25a86", points: 264, joined: "2020-10-01", licenses: ["エステティシャン"], skills: { 技術: 4.3, 接客: 4.8, 数値: 4.0, 理念: 4.2, 協調: 4.5 }, rank: "manager", reportsTo: "s16", menteeIds: ["s18"] },
+  { id: "s18", empCode: "321", name: "井村 心春", kana: "いむら こはる", role: "エステティシャン", storeId: "st-biyou", color: "#7a9e3f", points: 142, joined: "2024-10-01", licenses: ["エステティシャン"], skills: { 技術: 3.1, 接客: 4.5, 数値: 2.9, 理念: 3.8, 協調: 4.3 }, rank: "staff", reportsTo: "s17", mentorId: "s17" },
+  { id: "s19", empCode: "369", name: "青木 若菜", kana: "あおき わかな", role: "事務職員", storeId: "st-narimasu", color: "#6b7f3f", points: 96, joined: "2022-10-01", licenses: [], skills: { 技術: 2.0, 接客: 4.2, 数値: 4.8, 理念: 4.3, 協調: 4.6 }, rank: "clerk", reportsTo: "s13" },
 ];
 
 /** 現場の担当者(受付・本部職を除く=日報/予約/評価の対象) */
@@ -307,6 +309,10 @@ function makeReservations(patients) {
           menuId: menu.id,
           status,
           source: pick(["LINE", "LINE", "電話", "店頭", "Web"]),
+          // キャンセル理由は分析(離反防止)に使うため必ず残す運用
+          cancelReason: status === "cancelled"
+            ? pick(["体調不良", "仕事の都合", "家族の予定", "症状が改善したため", "その他"])
+            : status === "noshow" ? "無断キャンセル(連絡なし)" : null,
           note: "",
         });
       }
@@ -408,21 +414,42 @@ function makeAttendance(shifts) {
   return att;
 }
 
-/** 希望休は月単位で申請する(翌月分)。wishes: { "YYYY-MM-DD": off|paid|special|birthday } */
+/**
+ * 希望休は月単位で申請する(翌月分)。
+ * wishes:  { "YYYY-MM-DD": off|paid|special|birthday }
+ * reasons: { "YYYY-MM-DD": "理由テキスト" } … 日ごとの理由も一緒に提出できる
+ */
 function makeShiftRequests() {
   const [ty, tm] = TODAY.split("-").map(Number);
   const nm = new Date(ty, tm, 1); // 翌月1日
   const month = `${nm.getFullYear()}-${pad(nm.getMonth() + 1)}`;
+  const reasonBank = ["子どもの学校行事のため", "通院のため", "家族の予定に合わせるため", "資格試験の受験日です", "友人の結婚式に出席します", ""];
+  // 定休日(水曜)は希望休の対象外なので避ける
+  const pickDay = (lo, hi) => {
+    let d = `${month}-${pad(ri(lo, hi))}`;
+    while (dow(d) === 3) d = `${month}-${pad(ri(lo, hi))}`;
+    return d;
+  };
   return staff.slice(0, 8).map((sf, i) => {
     const wishes = {};
-    wishes[`${month}-${pad(ri(2, 14))}`] = pick(["off", "off", "off", "paid"]);
-    wishes[`${month}-${pad(ri(15, 27))}`] = pick(["off", "off", "paid", "special"]);
-    if (i === 2) wishes[`${month}-${pad(ri(2, 27))}`] = "birthday";
+    const reasons = {};
+    const d1 = pickDay(2, 14);
+    const d2 = pickDay(15, 27);
+    wishes[d1] = pick(["off", "off", "off", "paid"]);
+    wishes[d2] = pick(["off", "off", "paid", "special"]);
+    const r1 = pick(reasonBank); if (r1) reasons[d1] = r1;
+    const r2 = pick(reasonBank); if (r2) reasons[d2] = r2;
+    if (i === 2) {
+      const bd = pickDay(2, 27);
+      wishes[bd] = "birthday";
+      reasons[bd] = "誕生日休暇を取得します";
+    }
     return {
       id: `sr${i + 1}`,
       staffId: sf.id,
       month,
       wishes,
+      reasons,
       note: pick(["", "", "子どもの行事のためお願いします", "通院のため", ""]),
       submittedAt: addDays(TODAY, -ri(0, 3)),
     };
@@ -565,7 +592,74 @@ function makePosts() {
   P({ type: "notice", channelId: "ch-all", authorId: "s09", date: iso(addDays(TODAY, -9), "10:00"),
     title: "8月の研修日程",
     body: "技術研修 8/5(火)・鍼研修 8/19(火)・接遇座学 8/26(火)。技術研修と鍼研修は該当職種は必須参加です。シフトは研修枠で自動確保されます。", likes: ["s02", "s06", "s08", "s11"] });
+  // --- 社内SNS(スタッフの自由投稿) ---
+  P({ type: "free", authorId: "s06", date: iso(addDays(TODAY, -1), "21:02"),
+    body: "大宮店の近くに新しくできたお弁当屋さん、ボリューム満点でおすすめです🍱 午後の施術も力が入ります!", likes: ["s02", "s04", "s11"] });
+  P({ type: "free", authorId: "s11", date: iso(addDays(TODAY, -2), "12:40"),
+    body: "休憩中にストレッチ講座の動画で勉強しています。おすすめの教材があったらコメントで教えてください🙏", likes: ["s02"],
+    comments: [{ id: "cf1", authorId: "s02", body: "解剖学アプリの3D表示が分かりやすいですよ!今度見せますね", date: iso(addDays(TODAY, -2), "13:05") }] });
+  P({ type: "free", authorId: "s04", date: iso(addDays(TODAY, -3), "18:22"),
+    body: "受付の飾り付けを秋仕様に変えました🍁 患者様から「かわいいね」と好評です!", likes: ["s01", "s02", "s03", "s09"] });
   return posts;
+}
+
+/** デモ用の消化率写真(SVGをdata URLにしたもの)。売上報告の必須添付を再現する */
+function digestionSvg(storeName, pct, date) {
+  const barW = Math.round(240 * Math.min(100, Math.max(0, pct)) / 100);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="300" viewBox="0 0 420 300"><rect width="420" height="300" fill="#f5f1ea"/><rect x="18" y="18" width="384" height="264" rx="12" fill="#ffffff" stroke="#ddd3c4"/><text x="40" y="58" font-size="18" fill="#584a33" font-family="sans-serif" font-weight="bold">回数券 消化率ボード</text><text x="40" y="82" font-size="13" fill="#8a7c62" font-family="sans-serif">${storeName}・${date}</text><text x="210" y="170" font-size="56" text-anchor="middle" fill="#c9500a" font-family="sans-serif" font-weight="bold">${pct}%</text><rect x="80" y="200" width="240" height="18" rx="9" fill="#efe8db"/><rect x="80" y="200" width="${barW}" height="18" rx="9" fill="#e2621a"/><text x="210" y="248" font-size="12" text-anchor="middle" fill="#8a7c62" font-family="sans-serif">本日締め時点の消化率(店内掲示の写真)</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * 売上報告(毎日の業務)。店舗の代表者が締め後に投稿し、
+ * 全スタッフの「売上報告」タイムラインに表示される。
+ * uriage: { sales(売上), patients(来患数), newPatients(新患数), cancels(キャンセル数) }
+ * images[0] は消化率の写真(必須添付)
+ */
+function makeUriagePosts() {
+  const arr = [];
+  let n = 1;
+  const reps = { "st-narimasu": "s01", "st-omiya": "s05", "st-kawagoe": "s07", "st-urawa": "s12", "st-biyou": "s17" };
+  const horenso = [
+    "回数券のご提案が2件成約しました。夕方枠に空きが出たため、明日のLINE配信で埋めにいきます。",
+    "新患様1名がご紹介経由でした。紹介カードのお声がけが効いています。",
+    "キャンセル1件は体調不良によるもの。振替のご予約を取得済みです。",
+    "物販(骨盤ベルト)が1件。施術後のセルフケア説明からの流れが良い形でした。",
+    "",
+  ];
+  const times = ["19:45", "20:05", "20:15", "20:30"];
+  for (const dOff of [-2, -1]) {
+    const date = addDays(TODAY, dOff);
+    if (dow(date) === 3) continue; // 水曜定休
+    for (const st of stores) {
+      const pct = ri(62, 93);
+      arr.push({
+        id: `ur${String(n++).padStart(3, "0")}`,
+        type: "uriage",
+        authorId: reps[st.id],
+        storeId: st.id,
+        date: iso(date, pick(times)),
+        uriage: { sales: ri(120, 260) * 1000, patients: ri(14, 32), newPatients: ri(0, 4), cancels: ri(0, 3) },
+        images: [digestionSvg(st.name, pct, date)],
+        body: pick(horenso),
+        likes: [], comments: [], pinned: false,
+      });
+    }
+  }
+  // 本日分は成増店だけ提出済みにして「本日の提出状況」を体験できるようにする
+  const pctToday = ri(62, 93);
+  arr.push({
+    id: `ur${String(n++).padStart(3, "0")}`,
+    type: "uriage",
+    authorId: "s01",
+    storeId: "st-narimasu",
+    date: iso(TODAY, "12:30"),
+    uriage: { sales: 128000, patients: 11, newPatients: 1, cancels: 0 },
+    images: [digestionSvg("成増店", pctToday, TODAY)],
+    body: "午前締め時点の中間報告です。午後の予約は7件、新規の方が1名ご来院予定です。",
+    likes: ["s09"], comments: [], pinned: false,
+  });
+  return arr;
 }
 
 // ============================================================
@@ -863,6 +957,17 @@ const faq = [
   { id: "f14", q: "デモデータを最初の状態に戻したい", keywords: ["リセット", "初期化", "デモ", "データ"], a: "トップバーの設定(歯車)から「デモデータをリセット」を選ぶと、初期状態に戻ります。" },
   { id: "f15", q: "タスクリストの使い方は?", keywords: ["タスク", "TODO", "議事録", "チャット"], a: "「タスク」ページで自分のタスクを管理できます。チャットのメッセージは吹き出し横の📋ボタン、議事録のアクションアイテムは「タスクへ」ボタンからタスクリストに送れます。担当者と期限を付けて、未着手→進行中→完了で管理します。" },
   { id: "f16", q: "予約のベッド(枠)を変更したい", keywords: ["予約", "ベッド", "枠", "変更", "移動"], a: "「予約管理」はベッド基軸のタイムテーブルです。PCでは予約カードをドラッグして別のベッド・時間帯へ移動できます。予約カードをクリックすると詳細からベッド・開始時間を選び直すこともできます。" },
+  { id: "f17", q: "売上報告はどこから投稿しますか?", keywords: ["売上報告", "売上", "報告", "消化率", "来患", "キャンセル"], a: "「毎日の業務 > 売上報告」の「売上報告を投稿」から、店舗・売上・来患数・新患数・キャンセル数(すべて必須)と消化率の写真(必須)、報連相(自由)を投稿します。店舗の代表者(締め担当)が締め後に投稿してください。投稿は全スタッフの社内SNS「売上報告」タイムラインに表示されます。" },
+  { id: "f18", q: "タイムラインの4つの違いは?", keywords: ["タイムライン", "連絡事項", "チャンネル", "社内SNS", "投稿"], a: "社内SNSのタイムラインは用途別に4つに分かれています。①連絡事項=全体の業務連絡・朝礼メモ ②チャンネル=委員会などチャンネルへの投稿だけ ③売上報告=各店舗の売上報告だけ ④社内SNS=サンクスとスタッフの自由投稿。投稿の種類に合わせてタブを選んでください。" },
+  { id: "f19", q: "希望休の理由はどこに書きますか?", keywords: ["希望休", "理由", "申請", "備考"], a: "「シフト管理」の「希望休を申請(月単位)」でカレンダーの日付を選ぶと、その下に日ごとの理由入力欄が表示されます。理由も一緒に提出でき、責任者は「希望休の提出状況」から申請内容(日付・種別・理由)を確認できます。" },
+  { id: "f20", q: "給与の締め前に勤怠や経費をまとめて確認したい", keywords: ["給与", "確認", "勤怠", "経費", "交通費", "発注", "CSV", "エクセル", "書き出し"], a: "「組織運営 > 給与確認」(事務職員・本部人事・統括以上)で、勤怠サマリー(出勤数・勤務時間・有給・特別休暇・欠勤・残業・遅刻・早退)、経費申請、交通費申請、発注を月ごとに1欄で確認できます。各表は右上のボタンからCSV(Excelでそのまま開けます)で書き出せます。" },
+  { id: "f21", q: "発注する品目を追加・編集したい", keywords: ["発注", "品目", "追加", "編集", "在庫", "登録"], a: "「在庫・経費 > 在庫」タブの「品目を追加」から新しい品目を登録できます(院長以上)。既存品目は操作列の鉛筆ボタンから編集・削除できます。発注するものが今後増えても、ここからいつでも追加できます。" },
+  { id: "f22", q: "日報の出し忘れを防ぎたい", keywords: ["日報", "忘れ", "タスク", "リマインド", "毎日"], a: "「日報を提出する(本日分)」タスクが毎日自動でタスクリストに追加されます。日報を提出すると自動で完了になります。未提出のままだとナビの未完了バッジに残るので、退勤前にタスクを確認する習慣がおすすめです。" },
+  { id: "f23", q: "社労士へのデータ送付はどうやりますか?", keywords: ["社労士", "給与連絡表", "送付", "提出", "給与", "締め"], a: "「給与確認」ページの「社労士へ提出」タブを開くと、いつも送付している給与連絡表と同じ列構成でプレビューが出ます。勤怠から自動算出される項目(出勤日数・就労時間・残業・遅早など)は入力済みで、色付きの列(アチーブメント代・前借金など)だけ行をクリックして手入力します。「CSVで書き出し」でExcel用のファイルを作り、「社労士に提出」を押すとCSVの書き出し・送信履歴への記録・宛先へのメール下書き作成をまとめて行います。提出先や締日・支給日は「提出先を設定」から変更できます。" },
+  { id: "f24", q: "タスクを別の人にお願いしたい", keywords: ["タスク", "振り分け", "担当", "変更", "引き継ぎ"], a: "タスク一覧の各行にある👥ボタンから担当者を変更できます。引き継ぎメモを添えられ、「誰から誰へ」の履歴が残ります。自動で追加されたタスクを振り分けた場合も、その担当者のまま維持されます。" },
+  { id: "f25", q: "タスクが勝手に増えるのはなぜですか?", keywords: ["タスク", "自動", "追加", "在庫", "承認"], a: "業務のなかで対応が必要になった事柄を、システムが自動でタスクにしています(在庫の発注点割れ・経費や勤怠の承認待ち・日報や売上報告の未提出・希望休の締切・入荷待ちの追跡)。対応が終わると自動で消える(または完了になる)ので、消し込みの手間はありません。「自動」バッジが付いた行が対象です。" },
+  { id: "f26", q: "キャンセルが出たときの対応は?", keywords: ["キャンセル", "理由", "キャンセル待ち", "予約", "空き"], a: "予約詳細から「キャンセル」を押すと理由の記録画面が開きます(理由は分析に使うため必須です)。同じ画面で「キャンセル待ちリストに登録」にチェックすると、その患者様を待ちリストに入れられます。予約管理の下部にあるキャンセル待ちカードでは、希望日・希望時間帯に空きがあると「◯◯時に登録」ボタンが出るので、そのまま予約に変換できます。" },
+  { id: "f27", q: "予約を患者様の名前で探したい", keywords: ["予約", "検索", "一覧", "探す"], a: "「予約管理」の表示切替で「一覧」を選ぶと、予約の一覧表と検索ボックスが出ます。患者様・担当・メニューの名前で検索でき、検索時は前後2週間から探します。" },
 ];
 
 // ============================================================
@@ -1055,6 +1160,8 @@ function makeRoleplaySessions() {
 /**
  * source.kind: chat(チャット発) / meeting(議事録発) / manual(手動)
  * status: todo | doing | done
+ * ※ 日報・売上報告・在庫・承認待ちなど「業務のなかで発生するタスク」は
+ *    autotasks.js のエンジンが起動時に自動生成する(ここには置かない)。
  */
 function makeTasks() {
   return [
@@ -1062,6 +1169,84 @@ function makeTasks() {
     { id: "tk02", title: "鍼(セイリン J15)の発注を院長に依頼", note: "在庫が残り8箱。チャットの報告から起票。", ownerId: "s01", createdBy: "s03", due: addDays(TODAY, 1), status: "todo", source: { kind: "chat", refId: "cr-narimasu", label: "成増店ルーム" }, createdAt: addDays(TODAY, -1) },
     { id: "tk03", title: "受付メンバーへのボイス入力レクチャー", note: "", ownerId: "s01", createdBy: "s01", due: addDays(TODAY, 3), status: "todo", source: { kind: "meeting", refId: "mt05", label: "導入キックオフ" }, createdAt: addDays(TODAY, -7) },
     { id: "tk04", title: "夕方枠のLINEリマインド配信文面を確認", note: "マーケ委員会のドラフトにコメントを返す。", ownerId: "s07", createdBy: "s10", due: addDays(TODAY, -1), status: "todo", source: { kind: "chat", refId: "cr-managers", label: "院長・マネージャー" }, createdAt: addDays(TODAY, -2) },
+  ];
+}
+
+// ============================================================
+// 発注履歴(在庫画面の「発注する」で追記される)
+// ============================================================
+
+// ============================================================
+// 社労士への提出(給与連絡表)
+// ============================================================
+
+/**
+ * 社労士の提出先と、給与連絡表のヘッダー情報。
+ * 実際に社労士へ送っている「給与連絡表」に合わせた項目構成。
+ */
+const sharoushiSetting = {
+  officeName: "さくら社会保険労務士事務所",
+  contactName: "櫻井 恵子",
+  email: "payroll@example-sharoushi.jp",
+  companyCode: "2306",
+  companyName: "株式会社くまのみ",
+  closingDay: 31,   // 賃金締日(月末なら31)
+  payDay: 25,       // 支給日(翌月25日)
+};
+
+/** 提出履歴。誰がいつどの月分を送ったかを残す */
+function makeSharoushiSubmissions() {
+  const [ty, tm] = TODAY.split("-").map(Number);
+  const prev = new Date(ty, tm - 2, 1);
+  const prevMonth = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}`;
+  return [
+    {
+      id: "ss01",
+      month: prevMonth,
+      submittedBy: "s19",
+      submittedAt: `${addDays(TODAY, -21)}T10:24:00`,
+      staffCount: 19,
+      fileName: `給与連絡表_${prevMonth}.csv`,
+      to: sharoushiSetting.email,
+      note: "先月分。特記事項なし。",
+    },
+  ];
+}
+
+/**
+ * 給与連絡表のうち、システムで自動算出できない手入力項目。
+ * key は `${staffId}|${month}`
+ */
+function makePayrollAdjustments() {
+  const [ty, tm] = TODAY.split("-").map(Number);
+  const month = `${ty}-${pad(tm)}`;
+  return [
+    { id: "pa01", staffId: "s02", month, taxableCommute: 0, retroAdjust: 0, achievement: 12000, advance: 0, otherDeduction: 0, memo: "アチーブメント代(7月度表彰)" },
+    { id: "pa02", staffId: "s06", month, taxableCommute: 0, retroAdjust: 0, achievement: 0, advance: 20000, otherDeduction: 0, memo: "前借金(本人申請)" },
+  ];
+}
+
+// ============================================================
+// キャンセル待ち(予約管理)
+// ============================================================
+
+/** 希望日・希望時間帯を登録しておき、空きが出たら候補として提示する */
+function makeWaitlist() {
+  return [
+    { id: "wl01", patientId: "p05", storeId: "st-narimasu", date: addDays(TODAY, 1), prefer: "午後", menuId: "m2", note: "16時以降だと助かるとのこと", createdBy: "s04", createdAt: addDays(TODAY, -1), status: "waiting" },
+    { id: "wl02", patientId: "p07", storeId: "st-narimasu", date: addDays(TODAY, 2), prefer: "終日", menuId: "m1", note: "", createdBy: "s04", createdAt: TODAY, status: "waiting" },
+    { id: "wl03", patientId: "p09", storeId: "st-omiya", date: addDays(TODAY, 1), prefer: "午前", menuId: "m1", note: "10時台希望", createdBy: "s05", createdAt: TODAY, status: "waiting" },
+  ];
+}
+
+/** status: ordered(発注済・入荷待ち) | received(入荷済) */
+function makeOrders() {
+  return [
+    { id: "od01", itemId: "in01", itemName: "フェイスタオル", qty: 42, unit: "枚", unitPrice: 380, amount: 15960, supplier: "白洋リネン", storeId: "st-narimasu", staffId: "s01", date: addDays(TODAY, -2), status: "ordered", note: "発注点割れのため補充" },
+    { id: "od02", itemId: "in07", itemName: "キネシオテープ 50mm", qty: 24, unit: "巻", unitPrice: 480, amount: 11520, supplier: "スポーツメディクス", storeId: "st-narimasu", staffId: "s01", date: addDays(TODAY, -9), status: "received", note: "" },
+    { id: "od03", itemId: "in02", itemName: "ペーパーシーツ(新規格)", qty: 30, unit: "本", unitPrice: 990, amount: 29700, supplier: "メディカル商事", storeId: "st-narimasu", staffId: "s09", date: addDays(TODAY, -12), status: "received", note: "全店統一の新規格へ切替" },
+    { id: "od04", itemId: "in09", itemName: "骨盤ベルト(物販)", qty: 10, unit: "個", unitPrice: 4980, amount: 49800, supplier: "スポーツメディクス", storeId: "st-omiya", staffId: "s05", date: addDays(TODAY, -15), status: "received", note: "" },
+    { id: "od05", itemId: "in10", itemName: "プロテイン(物販)", qty: 12, unit: "袋", unitPrice: 3980, amount: 47760, supplier: "ヘルスサプライ", storeId: "st-narimasu", staffId: "s01", date: addDays(TODAY, -1), status: "ordered", note: "" },
   ];
 }
 
@@ -1075,16 +1260,17 @@ const orgChangeLog = [
   { id: "og02", date: addDays(TODAY, -32), staffId: "s12", fromId: "s15", toId: "s16", by: "s09", note: "浦和店をエリアBへ移管" },
 ];
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 8;
 
 export function createSeed() {
   const patients = makePatients();
   const shifts = makeShifts();
+  const dailyReports = makeDailyReports();
   return {
     schemaVersion: SCHEMA_VERSION,
     generatedAt: TODAY,
     currentUserId: "s01",
-    settings: { theme: "light", gpsSimulated: true, storeFilter: "all" },
+    settings: { theme: "light", gpsSimulated: true, storeFilter: "all", sharoushi: sharoushiSetting },
     stores, staff, menus, philosophy, channels, staffingRules,
     patients,
     karte: makeKarte(patients),
@@ -1092,9 +1278,9 @@ export function createSeed() {
     shifts,
     attendance: makeAttendance(shifts),
     shiftRequests: makeShiftRequests(),
-    dailyReports: makeDailyReports(),
+    dailyReports,
     kpiMonthly: makeKpiMonthly(),
-    posts: makePosts(),
+    posts: [...makeUriagePosts(), ...makePosts()],
     meetings: makeMeetings(),
     trainings: makeTrainings(),
     tests: makeTests(),
@@ -1103,6 +1289,10 @@ export function createSeed() {
     inventory: makeInventory(),
     cashbook: makeCashbook(),
     expenses: makeExpenses(),
+    orders: makeOrders(),
+    waitlist: makeWaitlist(),
+    sharoushiSubmissions: makeSharoushiSubmissions(),
+    payrollAdjustments: makePayrollAdjustments(),
     registerSales: makeRegisterSales(),
     notifications: makeNotifications(),
     tasks: makeTasks(),

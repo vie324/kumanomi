@@ -594,6 +594,10 @@ function submitTab(renderAll) {
       });
       toast("日報を提出しました。おつかれさまでした!");
     }
+    // 「日報を提出する」デイリータスク(毎日自動追加)を完了にする
+    const dailyTask = store.get("tasks").find((t) =>
+      t.ownerId === me.id && t.source?.kind === "nippo" && t.due === date && t.status !== "done");
+    if (dailyTask) store.update("tasks", dailyTask.id, { status: "done" });
     renderAll();
   });
 

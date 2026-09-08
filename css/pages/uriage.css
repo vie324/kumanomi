@@ -1,0 +1,103 @@
+/* 売上報告 ページ固有スタイル(.page-uriage 配下にスコープ。投稿モーダルでも使う) */
+
+/* ---- 投稿モーダル ---- */
+.page-uriage .ur-lead {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 13px;
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+}
+.page-uriage .ur-req {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--critical-soft);
+  color: var(--critical-text);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+/* ---- 本日の提出状況 ---- */
+.page-uriage .ur-storedot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* ---- 報告カード ---- */
+.page-uriage .ur-feed { display: flex; flex-direction: column; gap: 14px; }
+.page-uriage .ur-report { padding: 16px 18px; }
+.page-uriage .ur-head {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.page-uriage .ur-store { font-size: var(--fs-md); font-weight: 800; }
+.page-uriage .ur-when { font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; }
+
+.page-uriage .ur-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 640px) { .page-uriage .ur-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.page-uriage .ur-stat {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 9px 12px;
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0;
+}
+.page-uriage .ur-stat.big { background: var(--brand-soft); border-color: color-mix(in srgb, var(--brand) 25%, var(--hairline)); }
+.page-uriage .ur-stat-label { font-size: var(--fs-xs); color: var(--ink-3); font-weight: 700; }
+.page-uriage .ur-stat-value { font-size: var(--fs-lg); font-weight: 800; font-variant-numeric: tabular-nums; }
+.page-uriage .ur-stat.big .ur-stat-value { color: var(--brand-ink); }
+
+.page-uriage .ur-body {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+  align-items: start;
+}
+@media (max-width: 640px) { .page-uriage .ur-body { grid-template-columns: 1fr; } }
+.page-uriage .ur-photo {
+  position: relative;
+  display: block;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  padding: 0;
+  cursor: zoom-in;
+}
+.page-uriage .ur-photo img { display: block; width: 100%; height: 132px; object-fit: cover; }
+.page-uriage .ur-photo-cap {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 4px 8px;
+  font-size: var(--fs-xs); font-weight: 700;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+  text-align: left;
+}
+.page-uriage .ur-author { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.page-uriage .ur-horenso {
+  margin-top: 8px;
+  font-size: var(--fs-sm);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.page-uriage .ur-horenso-label {
+  display: inline-block;
+  margin-right: 7px;
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}

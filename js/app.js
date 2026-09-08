@@ -6,11 +6,13 @@ import { store } from "./store.js";
 import { router } from "./router.js";
 import { el, icon, avatar, badge, toast, relTime, fmtDate, confirmDialog, drawer, clear } from "./ui.js";
 import { canSeePage, rankLabel, scopeLabel, RANKS, rankOf } from "./auth.js";
+import { syncAutoTasks } from "./autotasks.js";
 
 import dashboard from "./pages/dashboard.js";
 import sns from "./pages/sns.js";
 import chat from "./pages/chat.js";
 import nippo from "./pages/nippo.js";
+import uriage from "./pages/uriage.js";
 import kintai from "./pages/kintai.js";
 import shift from "./pages/shift.js";
 import reserve from "./pages/reserve.js";
@@ -21,6 +23,7 @@ import meetings from "./pages/meetings.js";
 import tasksPage from "./pages/tasks.js";
 import backoffice from "./pages/backoffice.js";
 import hr from "./pages/hr.js";
+import payroll from "./pages/payroll.js";
 import org from "./pages/org.js";
 import orgimport from "./pages/orgimport.js";
 import assistant from "./pages/assistant.js";
@@ -29,9 +32,9 @@ import assistant from "./pages/assistant.js";
 const NAV_GROUPS = [
   { label: "ホーム", pages: [dashboard] },
   { label: "コミュニケーション", pages: [chat, sns, meetings, tasksPage] },
-  { label: "毎日の業務", pages: [nippo, kintai, shift] },
+  { label: "毎日の業務", pages: [nippo, uriage, kintai, shift] },
   { label: "患者様", pages: [reserve, patients] },
-  { label: "組織運営", pages: [org, orgimport, staffPage, roleplay, backoffice, hr] },
+  { label: "組織運営", pages: [org, orgimport, staffPage, roleplay, backoffice, hr, payroll] },
   { label: "サポート", pages: [assistant] },
 ];
 
@@ -183,7 +186,7 @@ function closeMobileNav() { app.classList.remove("nav-open"); }
 /* ---- ログインユーザー切替(デモ用:権限の違いを体験できる) ---- */
 function openUserSwitcher() {
   const me = store.me();
-  const order = { ceo: 0, exec: 1, area: 2, chief: 3, hr: 4, manager: 5, mentor: 6, staff: 7 };
+  const order = { ceo: 0, exec: 1, area: 2, chief: 3, hr: 4, clerk: 5, manager: 6, mentor: 7, staff: 8 };
   const list = [...store.get("staff")].sort(
     (a, b) => (order[rankOf(a)] ?? 9) - (order[rankOf(b)] ?? 9) || a.id.localeCompare(b.id));
 
@@ -267,6 +270,11 @@ function onNavigate(page) {
 }
 
 router.setGuard((pageId) => canSeePage(pageId));
+// 業務のなかで発生したタスク(発注・承認待ち・日報など)を毎回の描画前に積み直す
+router.setBeforeRender(syncAutoTasks);
+
+// サイドバーの未完了バッジを正しく出すため、シェルより先に一度同期しておく
+syncAutoTasks();
 
 const built = buildShell();
 titleRef.el = built.titleEl;
