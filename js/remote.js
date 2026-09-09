@@ -220,7 +220,264 @@ export const REMOTE = {
       status: "status",
     }),
   },
+
+  /* ============================================================
+     ここから下は 0009(みんなで使う部分)。
+     投稿・タスク・チャットは「他の人の操作が自分の画面に届く」
+     コレクションなので、サーバーに置いて初めて連動する。
+     ============================================================ */
+
+  /* ---------------- 投稿(連絡事項 / タイムライン / サンクスギフト / 売上報告) ---------------- */
+  posts: {
+    table: "v_app_posts",
+    key: "id",
+    order: "date.desc",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      type: row.type,
+      channelId: row.channel_id || null,
+      authorId: row.author_id,
+      storeId: row.store_id || null,
+      toId: row.to_id || null,
+      title: row.title || "",
+      body: row.body || "",
+      points: row.points ?? 0,
+      pinned: !!row.pinned,
+      likes: row.likes || [],
+      comments: row.comments || [],
+      uriage: row.uriage || null,
+      images: row.images || [],
+      date: localIso(row.date),
+    }),
+    toRemote: writer({
+      id: "id", type: "type", channelId: "channel_id", authorId: "author_id",
+      storeId: "store_id", toId: "to_id", title: "title",
+      body: ["body", (v) => v ?? ""],
+      points: ["points", (v) => v ?? 0],
+      pinned: ["pinned", (v) => !!v],
+      likes: ["likes", (v) => v || []],
+      comments: ["comments", (v) => v || []],
+      uriage: "uriage",
+      images: ["images", (v) => v || []],
+      date: ["date", utcIso],
+    }),
+  },
+
+  /* ---------------- タスク ---------------- */
+  tasks: {
+    table: "v_app_tasks",
+    key: "id",
+    order: "due.asc.nullslast,created_at.desc",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      title: row.title,
+      note: row.note || "",
+      ownerId: row.owner_id,
+      createdBy: row.created_by || null,
+      due: row.due || null,
+      status: row.status || "todo",
+      progress: row.progress ?? 0,
+      source: row.source || {},
+      auto: !!row.auto,
+      autoKey: row.auto_key || null,
+      autoResolve: row.auto_resolve || null,
+      reassigned: !!row.reassigned,
+      assignLog: row.assign_log || [],
+      alertedAt: row.alerted_at || null,
+      completedAt: row.completed_at || null,
+      createdAt: row.created_at,
+    }),
+    toRemote: writer({
+      id: "id", title: "title", note: ["note", (v) => v ?? ""],
+      ownerId: "owner_id", createdBy: "created_by", due: "due",
+      status: "status", progress: ["progress", (v) => v ?? 0],
+      source: ["source", (v) => v || {}],
+      auto: ["auto", (v) => !!v], autoKey: "auto_key", autoResolve: "auto_resolve",
+      reassigned: ["reassigned", (v) => !!v],
+      assignLog: ["assign_log", (v) => v || []],
+      alertedAt: "alerted_at",
+      createdAt: "created_at",
+    }),
+  },
+
+  /* ---------------- チャット ---------------- */
+  chatRooms: {
+    table: "v_app_chat_rooms",
+    key: "id",
+    order: "name",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      kind: row.kind || "group",
+      name: row.name,
+      icon: row.icon || "💬",
+      desc: row.desc || "",
+      storeId: row.store_id || null,
+      memberIds: row.member_ids || [],
+      announceOnly: !!row.announce_only,
+      pinnedMessageId: row.pinned_message_id || null,
+      createdBy: row.created_by || null,
+    }),
+    toRemote: writer({
+      id: "id", kind: "kind", name: "name", icon: "icon", desc: "desc",
+      storeId: "store_id", memberIds: ["member_ids", (v) => v || []],
+      announceOnly: ["announce_only", (v) => !!v],
+      pinnedMessageId: "pinned_message_id", createdBy: "created_by",
+    }),
+  },
+
+  chatMessages: {
+    table: "v_app_chat_messages",
+    key: "id",
+    order: "date",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      roomId: row.room_id,
+      authorId: row.author_id,
+      date: localIso(row.date),
+      text: row.text || "",
+      mentions: row.mentions || [],
+      reactions: row.reactions || {},
+      readBy: row.read_by || [],
+      replyToId: row.reply_to_id || null,
+      attachment: row.attachment || null,
+      taskId: row.task_id || null,
+      edited: !!row.edited,
+      deleted: !!row.deleted,
+    }),
+    toRemote: writer({
+      id: "id", roomId: "room_id", authorId: "author_id",
+      date: ["date", utcIso],
+      text: ["text", (v) => v ?? ""],
+      mentions: ["mentions", (v) => v || []],
+      reactions: ["reactions", (v) => v || {}],
+      readBy: ["read_by", (v) => v || []],
+      replyToId: "reply_to_id", attachment: "attachment", taskId: "task_id",
+      edited: ["edited", (v) => !!v], deleted: ["deleted", (v) => !!v],
+    }),
+  },
+
+  /* ---------------- 研修とレポート ---------------- */
+  trainings: {
+    table: "v_app_trainings",
+    key: "id",
+    order: "date.desc",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      title: row.title,
+      type: row.type || "技術研修",
+      date: row.date,
+      start: hm(row.start) || "10:00",
+      durationMin: row.duration_min ?? 120,
+      required: !!row.required,
+      place: row.place || "",
+      attendees: row.attendees || [],
+    }),
+    toRemote: writer({
+      id: "id", title: "title", type: "type", date: "date", start: "start",
+      durationMin: "duration_min", required: ["required", (v) => !!v],
+      place: "place", attendees: ["attendees", (v) => v || []],
+    }),
+  },
+
+  trainingReports: {
+    table: "v_app_training_reports",
+    key: "id",
+    order: "submitted_at.desc.nullslast",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      trainingId: row.training_id,
+      authorId: row.author_id,
+      body: row.body || "",
+      learned: row.learned || "",
+      applyPlan: row.apply_plan || "",
+      status: row.status || "draft",
+      submittedAt: row.submitted_at ? localIso(row.submitted_at) : null,
+    }),
+    toRemote: writer({
+      id: "id", trainingId: "training_id", authorId: "author_id",
+      body: ["body", (v) => v ?? ""], learned: "learned", applyPlan: "apply_plan",
+      status: "status", submittedAt: ["submitted_at", (v) => (v ? utcIso(v) : null)],
+    }),
+  },
+
+  /* ---------------- 始末書・業務改善書 ---------------- */
+  incidentReports: {
+    table: "v_app_incident_reports",
+    key: "id",
+    order: "occurred_on.desc",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      authorId: row.author_id,
+      kind: row.kind || "kaizen",
+      occurredOn: row.occurred_on,
+      conclusion: row.conclusion || "",
+      cause: row.cause || "",
+      processDetail: row.process_detail || "",
+      worstCase: row.worst_case || "",
+      prevention: row.prevention || "",
+      status: row.status || "draft",
+      submittedAt: row.submitted_at ? localIso(row.submitted_at) : null,
+      acknowledgedBy: row.acknowledged_by || null,
+      acknowledgedAt: row.acknowledged_at ? localIso(row.acknowledged_at) : null,
+      ackComment: row.ack_comment || "",
+    }),
+    toRemote: writer({
+      id: "id", authorId: "author_id", kind: "kind", occurredOn: "occurred_on",
+      conclusion: ["conclusion", (v) => v ?? ""], cause: ["cause", (v) => v ?? ""],
+      processDetail: ["process_detail", (v) => v ?? ""], worstCase: ["worst_case", (v) => v ?? ""],
+      prevention: ["prevention", (v) => v ?? ""], status: "status",
+      ackComment: "ack_comment",
+    }),
+  },
+
+  /* ---------------- 予算(店舗 × 月) ---------------- */
+  budgets: {
+    table: "v_app_budgets",
+    key: "id",
+    order: "month.desc",
+    upsert: false,
+    toLocal: (row) => ({
+      id: row.id,
+      storeId: row.store_id,
+      month: row.month,
+      amount: row.amount ?? 0,
+      note: row.note || "",
+    }),
+    toRemote: writer({
+      id: "id", storeId: "store_id", month: "month",
+      amount: ["amount", (v) => v ?? 0], note: "note",
+    }),
+  },
 };
+
+/* ------------------------------------------------------------
+   日時の受け渡し。
+   アプリは "2026-09-09T08:45:00" のような端末ローカルの素の文字列で持ち、
+   サーバーは timestamptz(UTC)で持つ。ここで往復させる。
+   ------------------------------------------------------------ */
+const two = (n) => String(n).padStart(2, "0");
+
+/** サーバーの timestamptz → 端末ローカルの "YYYY-MM-DDTHH:mm:ss" */
+function localIso(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v);
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+}
+
+/** 端末ローカルの素の文字列 → UTC の ISO(サーバーへ送る形) */
+function utcIso(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
 
 /* ------------------------------------------------------------
    PHASE 2 で Supabase へ移すコレクション。
@@ -229,10 +486,9 @@ export const REMOTE = {
    ------------------------------------------------------------ */
 export const PENDING_TABLES = [
   "patients", "karte", "reservations", "waitlist", "menus",
-  "staffingRules", "posts", "channels", "chatRooms", "chatMessages",
-  "tasks", "meetings", "notifications",
+  "staffingRules", "channels", "meetings", "notifications",
   "inventory", "orders", "expenses", "cashbook", "registerSales",
-  "trainings", "tests", "evaluations", "interviews",
+  "tests", "evaluations", "interviews",
   "talkScripts", "roleplaySessions",
   "kpiMonthly", "sharoushiSubmissions", "payrollAdjustments",
   "orgChangeLog", "faq",

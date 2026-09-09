@@ -342,6 +342,34 @@
 .page-chat .msg-attach .at-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .page-chat .msg-attach .at-hint { margin-left: auto; opacity: 0.7; flex: none; }
 
+/* ---- タスクカード(振り分け・リマインド・完了の知らせ) ---- */
+.page-chat .msg-task {
+  display: flex; flex-direction: column; gap: 6px;
+  width: 100%; min-width: 220px;
+  margin-bottom: 6px; padding: 9px 11px;
+  border-radius: 10px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: box-shadow var(--dur) var(--ease);
+}
+.page-chat .msg-task:hover { box-shadow: var(--shadow-1); }
+.page-chat .msg-task.done { opacity: 0.8; }
+.page-chat .msg-task.gone { cursor: default; color: var(--ink-3); flex-direction: row; align-items: center; }
+.page-chat .msg-task .mt-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.page-chat .msg-task .mt-ic { font-size: 15px; flex: none; }
+.page-chat .msg-task .mt-title { flex: 1; min-width: 0; font-weight: 800; font-size: var(--fs-sm); line-height: 1.4; }
+.page-chat .msg-task.done .mt-title { text-decoration: line-through; }
+.page-chat .msg-task .mt-meta { display: flex; gap: 10px; flex-wrap: wrap; color: var(--ink-3); }
+.page-chat .msg-task .mt-overdue { color: var(--critical-text); font-weight: 700; }
+.page-chat .msg-task .mt-track { display: block; height: 5px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.page-chat .msg-task .mt-fill { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
+.page-chat .cv-tool-task { color: var(--brand-ink); }
+.page-chat .cv-default-rooms { margin: 4px auto 0; max-width: 420px; text-align: center; }
+
 /* 時刻・既読 */
 .page-chat .msg-meta {
   flex: none;

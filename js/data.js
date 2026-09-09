@@ -1262,7 +1262,66 @@ const orgChangeLog = [
   { id: "og02", date: addDays(TODAY, -32), staffId: "s12", fromId: "s15", toId: "s16", by: "s09", note: "浦和店をエリアBへ移管" },
 ];
 
-export const SCHEMA_VERSION = 8;
+// ============================================================
+// 予算・研修レポート・始末書(0009 でサーバー化した新しい記録)
+// ============================================================
+
+/** 店舗 × 月の売上予算。デモでは月次KPIの目標値をそのまま予算にする */
+function makeBudgets(kpiMonthly) {
+  return kpiMonthly.map((k) => ({
+    id: `bg-${k.storeId}-${k.month}`,
+    storeId: k.storeId,
+    month: k.month,
+    amount: k.target,
+    note: "",
+  }));
+}
+
+/** 研修ごとのレポート(実施済み研修に対する提出例) */
+function makeTrainingReports() {
+  return [
+    {
+      id: "trp01", trainingId: "tr04", authorId: "s02", status: "submitted",
+      submittedAt: iso(addDays(TODAY, -11), "21:10"),
+      body: "骨盤帯の評価では、ASIS・PSISの高さの左右差を立位と座位の両方で確認する流れを練習しました。矯正は仙腸関節のモビライゼーションを中心に、患者様の呼吸に合わせて圧を入れるタイミングを重点的に指導いただきました。",
+      learned: "評価→仮説→施術→再評価の順番を崩さないこと。矯正前後で必ず同じ検査を行う。",
+      applyPlan: "初診の姿勢分析で骨盤の左右差を必ず記録し、3回目の来院で再評価して患者様に変化を見せる。",
+    },
+    {
+      id: "trp02", trainingId: "tr04", authorId: "s06", status: "submitted",
+      submittedAt: iso(addDays(TODAY, -10), "19:40"),
+      body: "腸骨の前傾・後傾の見分け方を実技で確認しました。自分は触診の圧が強すぎる癖があると指摘を受け、指腹で面で触れる練習をしました。",
+      learned: "触診は「探す」ではなく「感じる」。圧を弱くしたほうが左右差がわかる。",
+      applyPlan: "毎日の施術で最初の触診を10秒長く取り、左右差を言葉にしてカルテに残す。",
+    },
+    {
+      id: "trp03", trainingId: "tr04", authorId: "s11", status: "draft",
+      submittedAt: null,
+      body: "骨盤の評価の流れを学びました。",
+      learned: "",
+      applyPlan: "",
+    },
+  ];
+}
+
+/** 業務改善書・始末書(組織図で上の人だけが読める) */
+function makeIncidentReports() {
+  return [
+    {
+      id: "ir01", authorId: "s06", kind: "kaizen", occurredOn: addDays(TODAY, -4),
+      conclusion: "回数券の残回数を誤って案内し、患者様に会計時に訂正をお願いすることになった。",
+      cause: "前回の消化入力が反映される前に残回数を口頭で伝えてしまった。",
+      processDetail: "施術後、患者様から「あと何回?」と聞かれ、画面を確認せずに記憶で「3回」と答えた。会計時に受付が確認すると残り2回だった。",
+      worstCase: "残回数の認識違いから追加購入のタイミングがずれ、通院が途切れて信頼を失っていた可能性がある。",
+      prevention: "残回数は必ず画面を見て答える。施術後の声かけの前に消化入力を済ませる手順に変える。",
+      status: "acknowledged", submittedAt: iso(addDays(TODAY, -3), "20:15"),
+      acknowledgedBy: "s05", acknowledgedAt: iso(addDays(TODAY, -2), "09:05"),
+      ackComment: "共有ありがとう。朝礼で「残回数は画面で確認」を店舗ルールとして周知します。",
+    },
+  ];
+}
+
+export const SCHEMA_VERSION = 9;
 
 /* ------------------------------------------------------------
    「記録」と「設定」を分ける
@@ -1286,6 +1345,7 @@ export const RECORD_COLLECTIONS = [
   "inventory", "cashbook", "expenses", "orders", "registerSales",
   "sharoushiSubmissions", "payrollAdjustments",
   "notifications", "tasks", "chatMessages", "orgChangeLog",
+  "budgets", "trainingReports", "incidentReports",
 ];
 
 /**
@@ -1325,6 +1385,7 @@ export function createSeed({ demo = true } = {}) {
   const patients = makePatients();
   const shifts = makeShifts();
   const dailyReports = makeDailyReports();
+  const kpiMonthly = makeKpiMonthly();
   return {
     schemaVersion: SCHEMA_VERSION,
     generatedAt: TODAY,
@@ -1339,7 +1400,10 @@ export function createSeed({ demo = true } = {}) {
     attendance: makeAttendance(shifts),
     shiftRequests: makeShiftRequests(),
     dailyReports,
-    kpiMonthly: makeKpiMonthly(),
+    kpiMonthly,
+    budgets: makeBudgets(kpiMonthly),
+    trainingReports: makeTrainingReports(),
+    incidentReports: makeIncidentReports(),
     posts: [...makeUriagePosts(), ...makePosts()],
     meetings: makeMeetings(),
     trainings: makeTrainings(),

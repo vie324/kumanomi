@@ -13,6 +13,7 @@ import { radar } from "../charts.js";
 import { store, todayStr } from "../store.js";
 import { makeTest, testTopics, summarizeInterview, sampleInterviewVoice } from "../ai.js";
 import { can, canSeeStaff, rankLevel } from "../auth.js";
+import { pointsOf } from "./sns.js";
 
 /* ---------------- 共通ヘルパー ---------------- */
 
@@ -96,7 +97,7 @@ function membersView(body) {
       el("div", { class: "st-mbadges" },
         badge(store.storeName(s.storeId), "brand"),
         badge(s.role),
-        el("span", { class: "st-pts", title: "サンクスポイント" }, icon("gift", 13), `${s.points}pt`)),
+        el("span", { class: "st-pts", title: "サンクスポイント" }, icon("gift", 13), `${pointsOf(s.id)}pt`)),
       el("div", { class: "st-mradar" },
         canViewScore(s.id) ? skillsRadar(s, 150) : scoreLockNote())));
   }
@@ -141,8 +142,10 @@ function openMemberModal(s) {
           h4("基本情報"),
           kv("入社", fmtDate(s.joined, { withYear: true, withDow: false })),
           kv("保有資格", s.licenses?.length ? s.licenses.join("・") : "—"),
-          kv("サンクスポイント", `${s.points} pt`),
-          showScore ? kv("スキル平均", (Object.values(s.skills).reduce((a, v) => a + v, 0) / Object.keys(s.skills).length).toFixed(1) + " / 5.0") : null,
+          kv("サンクスポイント", `${pointsOf(s.id)} pt`),
+          showScore && Object.keys(s.skills || {}).length
+            ? kv("スキル平均", (Object.values(s.skills).reduce((a, v) => a + v, 0) / Object.keys(s.skills).length).toFixed(1) + " / 5.0")
+            : null,
           h4("テスト受験履歴"),
           historyBody))),
     actions: [closeBtn],

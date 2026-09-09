@@ -1,17 +1,23 @@
 /* ============================================================
-   社内SNS — サンクスギフト + 社内タイムライン(TUNAG代替)
-   タイムラインは用途別に4つに分かれている:
-   ① 連絡事項(全体の業務連絡・朝礼メモ)
-   ② チャンネル(委員会などチャンネルへの投稿だけ)
-   ③ 売上報告(各店舗の売上報告だけ)
-   ④ 社内SNS(サンクス+スタッフの自由投稿)
+   社内SNS — 連絡事項 / タイムライン / チャンネル / 売上報告 / サンクスギフト
+   タイムラインは用途別に分かれている:
+   ① 連絡事項    … 全体への業務連絡(責任者はピン留めできる)
+   ② タイムライン … 連絡事項と同じ使い勝手で、日々の共有・気づき・写真など何でも
+   ③ チャンネル  … 委員会などチャンネルへの投稿だけ
+   ④ 売上報告    … 各店舗の売上報告だけ
+   ⑤ サンクスギフト … ありがとうをポイントと一緒に贈り合う
+   ⑥ ランキング  … サンクスポイントの順位
+
+   「毎月のお願い」(1minuteアンケート・交通費申請)は、ここに置くのをやめて
+   タスクに自動で積むようにした(js/autotasks.js)。脇のカードは状況だけ映す。
    ============================================================ */
 import {
   el, clear, icon, avatar, badge, kv, card, sectionHeader,
-  tabs, segmented, statTile, emptyState, modal, toast, relTime, fmtDate, fmtNum, fmtYen, celebrate,
+  tabs, statTile, emptyState, modal, toast, relTime, fmtDate, fmtNum, fmtYen, celebrate,
   fileToDataURL, openImageModal,
 } from "../ui.js";
 import { store, todayStr, addDays, monthOf } from "../store.js";
+import { rankLevel } from "../auth.js";
 import { openUriageModal } from "./uriage.js";
 
 /* 手持ちポイント(月の上限)は廃止。
@@ -19,29 +25,33 @@ import { openUriageModal } from "./uriage.js";
 const SEND_BONUS = 10;
 const PT_OPTIONS = [10, 20, 30];
 const MAX_POST_IMAGES = 3;
-const SURVEY_URL = "https://forms.gle/xjRUN51dF7Rj8vqs9";
 
 const TYPE_META = {
-  notice: { label: "連絡", emoji: "📣", kind: "brand" },
+  notice: { label: "連絡事項", emoji: "📣", kind: "brand" },
+  timeline: { label: "タイムライン", emoji: "📝", kind: "" },
   chourei: { label: "朝礼", emoji: "🌅", kind: "accent" },
   philosophy: { label: "理念", emoji: "🧭", kind: "brand" },
   committee: { label: "委員会", emoji: "🗂", kind: "" },
   thanks: { label: "サンクス", emoji: "🎁", kind: "accent" },
   uriage: { label: "売上報告", emoji: "📊", kind: "brand" },
-  free: { label: "フリー投稿", emoji: "💬", kind: "" },
+  free: { label: "タイムライン", emoji: "📝", kind: "" },
 };
 
-/* ---- 4つのタイムラインの振り分け ---- */
+/* ---- タイムラインの振り分け ---- */
 const isChannelPost = (p) => !!p.channelId && p.channelId !== "ch-all";
 const inNotice = (p) => ["notice", "chourei", "philosophy"].includes(p.type) && !isChannelPost(p);
+const inTimeline = (p) => ["timeline", "free"].includes(p.type) && !isChannelPost(p);
 const inUriage = (p) => p.type === "uriage";
-const inFree = (p) => p.type === "free" || p.type === "thanks";
+const inThanks = (p) => p.type === "thanks";
+
+const TABS = ["notice", "timeline", "channels", "uriage", "thanks", "ranking"];
 
 const TIMELINE_META = {
-  notice: { emoji: "📣", desc: "全店舗向けの業務連絡・朝礼メモが流れるタイムラインです(全体連絡はここへ)" },
+  notice: { emoji: "📣", desc: "全店舗向けの業務連絡が流れるタイムラインです。責任者は重要な連絡をピン留めできます" },
+  timeline: { emoji: "📝", desc: "日々の共有・気づき・お知らせを何でも。連絡事項と同じように写真も添えられます" },
   channels: { emoji: "🗂", desc: "委員会などチャンネルへの投稿だけが流れるタイムラインです" },
   uriage: { emoji: "📊", desc: "各店舗の売上報告だけが流れるタイムラインです(毎日の業務「売上報告」から投稿されます)" },
-  free: { emoji: "💬", desc: "サンクスギフトとスタッフの自由投稿のタイムラインです。気軽にどうぞ!" },
+  thanks: { emoji: "🎁", desc: "ありがとうをポイントと一緒に贈り合うタイムラインです。送っても受け取ってもポイントが貯まります" },
 };
 
 function nowIso() {
@@ -51,6 +61,21 @@ function nowIso() {
 }
 
 function byDateDesc(a, b) { return a.date < b.date ? 1 : -1; }
+
+/* ---- ポイントは投稿から計算する ----
+   以前はスタッフの行にポイントを書き込んでいたが、それだと端末ごとに数字がずれる。
+   サンクス投稿(全員に届く)から毎回計算すれば、誰の画面でも同じ順位になる。
+   デモデータのスタッフに入っている points は「これまでの持ち越し」として足す。 */
+export function pointsOf(staffId) {
+  const base = store.byId("staff", staffId)?.points || 0;
+  let pts = 0;
+  for (const p of store.get("posts") || []) {
+    if (p.type !== "thanks") continue;
+    if (p.toId === staffId) pts += p.points || 0;
+    if (p.authorId === staffId) pts += SEND_BONUS;
+  }
+  return base + pts;
+}
 
 /** 今月自分が送ったサンクス(件数と送信ボーナス) */
 function sentThisMonth() {
@@ -75,9 +100,14 @@ function earnedThisMonth() {
   return receivedThisMonth().points + sentThisMonth().bonus;
 }
 
+function rankedStaff() {
+  return [...store.get("staff")]
+    .map((s) => ({ s, pts: pointsOf(s.id) }))
+    .sort((a, b) => b.pts - a.pts);
+}
+
 function myRank() {
-  const sorted = [...store.get("staff")].sort((a, b) => (b.points || 0) - (a.points || 0));
-  return sorted.findIndex((s) => s.id === store.me().id) + 1;
+  return rankedStaff().findIndex((r) => r.s.id === store.me().id) + 1;
 }
 
 export default {
@@ -86,16 +116,14 @@ export default {
   icon: "chat",
 
   // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
-  needs: ["channels", "posts", "staff", "stores"],
-  render(root) {
+  needs: ["channels", "posts", "staff", "stores", "tasks"],
+  render(root, params = []) {
     /* ---- ページ内状態(再描画をまたいで保持) ---- */
-    let tab = "notice";               // notice | channels | uriage | free | ranking
+    let tab = TABS.includes(params[0]) ? params[0] : "notice";
     let activeChannel = null;         // チャンネルタイムラインの絞り込み
-    let composerType = "notice";
-    let composerDraft = "";
-    let composerImages = [];          // 添付画像 dataURL(最大3枚)
-    let freeDraft = "";               // 社内SNS(自由投稿)の下書き
-    let freeImages = [];
+    const drafts = { notice: "", timeline: "" };
+    const images = { notice: [], timeline: [] };   // 添付画像 dataURL(最大3枚)
+    let pinDraft = false;             // 連絡事項をピン留めして投稿するか
     let channelDraft = "";            // チャンネル投稿の下書き
     let channelTarget = null;         // チャンネル投稿先
     let feedQuery = "";               // タイムライン内の検索語
@@ -113,7 +141,7 @@ export default {
       clear(root);
       root.appendChild(sectionHeader(
         "社内SNS",
-        "タイムラインは用途別に4つ:連絡事項・チャンネル・売上報告・社内SNS(サンクス+自由投稿)。",
+        "連絡事項・タイムライン・チャンネル・売上報告・サンクスギフト。用途ごとに分かれているので、読みたいものだけ追えます。",
         [el("button", { class: "btn accent", onclick: openThanksModal }, icon("gift", 17), "サンクスを送る")],
       ));
 
@@ -124,22 +152,25 @@ export default {
       const posts = store.get("posts");
       main.appendChild(tabs([
         { id: "notice", label: "📣 連絡事項", badge: posts.filter(inNotice).length },
+        { id: "timeline", label: "📝 タイムライン", badge: posts.filter(inTimeline).length },
         { id: "channels", label: "🗂 チャンネル", badge: posts.filter(isChannelPost).length },
         { id: "uriage", label: "📊 売上報告", badge: posts.filter(inUriage).length },
-        { id: "free", label: "💬 社内SNS", badge: posts.filter(inFree).length },
+        { id: "thanks", label: "🎁 サンクスギフト", badge: posts.filter(inThanks).length },
         { id: "ranking", label: "🏆 ランキング" },
       ], tab, (id) => {
         // タイムラインを切り替えたら検索と表示件数はリセットする
         tab = id; feedQuery = ""; feedLimit = PAGE_SIZE; activeChannel = null;
+        try { history.replaceState(null, "", `#/sns/${id}`); } catch (e) { /* noop */ }
         draw();
       }));
 
       if (tab !== "ranking") main.appendChild(timelineLead(tab));
 
       if (tab === "notice") drawNotice(main);
+      else if (tab === "timeline") drawTimeline(main);
       else if (tab === "channels") drawChannels(main);
       else if (tab === "uriage") drawUriage(main);
-      else if (tab === "free") drawFree(main);
+      else if (tab === "thanks") drawThanks(main);
       else drawRanking(main);
 
       if (keepFocus) {
@@ -167,63 +198,66 @@ export default {
         el("span", {}, meta.desc));
     }
 
-    /* ================= ① 連絡事項タイムライン ================= */
+    /* ================= ① 連絡事項 ================= */
     function drawNotice(main) {
-      main.appendChild(composer());
+      main.appendChild(composer("notice"));
       const posts = [...store.get("posts")].filter(inNotice).sort(byDateDesc);
       renderFeed(main, posts, { icon: "📣", title: "まだ連絡事項がありません", hint: "最初の業務連絡を書いてみましょう" });
     }
 
-    /* ---- 投稿フォーム(画像を1〜3枚添付できる) ---- */
-    function composer() {
+    /* ================= ② タイムライン(連絡事項と同じ機能) ================= */
+    function drawTimeline(main) {
+      main.appendChild(composer("timeline"));
+      const posts = [...store.get("posts")].filter(inTimeline).sort(byDateDesc);
+      renderFeed(main, posts, { icon: "📝", title: "まだ投稿がありません", hint: "今日の気づきや共有したいことを書いてみましょう" });
+    }
+
+    /* ---- 投稿フォーム(画像を1〜3枚添付できる)。連絡事項・タイムラインで共用 ---- */
+    function composer(type) {
       const me = store.me();
+      const isNotice = type === "notice";
       const ta = el("textarea", {
         class: "textarea composer-input", rows: 2,
-        placeholder: "全体への業務連絡・朝礼メモを書きましょう(連絡事項タイムラインに投稿されます)",
-        oninput: (e) => { composerDraft = e.target.value; },
+        placeholder: isNotice
+          ? "全体への業務連絡を書きましょう(連絡事項タイムラインに投稿されます)"
+          : "業務連絡でなくてOK。今日の気づき、おすすめ、ちょっとした共有をどうぞ",
+        oninput: (e) => { drafts[type] = e.target.value; },
       });
-      ta.value = composerDraft;
-
-      const segWrap = el("div", { class: "composer-seg" });
-      const buildSeg = () => segmented(
-        [{ id: "notice", label: "📣 連絡" }, { id: "chourei", label: "🌅 朝礼メモ" }],
-        composerType,
-        (id) => { composerType = id; clear(segWrap).appendChild(buildSeg()); },
-      );
-      segWrap.appendChild(buildSeg());
+      ta.value = drafts[type];
 
       /* --- 画像添付 --- */
+      const list = images[type];
       const fileIn = el("input", {
         type: "file", accept: "image/*", multiple: true,
         style: { display: "none" },
       });
       const thumbs = el("div", { class: "attach-thumbs composer-thumbs" });
       const attachBtn = el("button", { class: "btn ghost sm", type: "button", onclick: () => fileIn.click() },
-        "🖼", el("span", {}, `画像(${composerImages.length}/${MAX_POST_IMAGES})`));
+        "🖼", el("span", {}, `画像(${list.length}/${MAX_POST_IMAGES})`));
 
       const paintThumbs = () => {
         clear(thumbs);
-        composerImages.forEach((src, i) => {
+        list.forEach((src, i) => {
           thumbs.appendChild(el("span", { class: "attach-thumb" },
             el("img", { src, alt: `添付画像${i + 1}` }),
             el("button", {
               class: "at-del", type: "button", "aria-label": "この画像を外す",
-              onclick: () => { composerImages.splice(i, 1); paintThumbs(); },
+              onclick: () => { list.splice(i, 1); paintThumbs(); },
             }, "×")));
         });
-        clear(attachBtn).append("🖼", el("span", {}, `画像(${composerImages.length}/${MAX_POST_IMAGES})`));
-        attachBtn.disabled = composerImages.length >= MAX_POST_IMAGES;
+        clear(attachBtn).append("🖼", el("span", {}, `画像(${list.length}/${MAX_POST_IMAGES})`));
+        attachBtn.disabled = list.length >= MAX_POST_IMAGES;
       };
 
       fileIn.addEventListener("change", async () => {
         const files = [...(fileIn.files || [])];
         fileIn.value = "";
         if (!files.length) return;
-        const room = MAX_POST_IMAGES - composerImages.length;
+        const room = MAX_POST_IMAGES - list.length;
         if (files.length > room) toast(`画像は最大${MAX_POST_IMAGES}枚までです`, "info");
         for (const f of files.slice(0, room)) {
           try {
-            composerImages.push(await fileToDataURL(f));
+            list.push(await fileToDataURL(f));
           } catch (e) {
             toast(`「${f.name}」を読み込めませんでした`, "error");
           }
@@ -232,22 +266,30 @@ export default {
       });
       paintThumbs();
 
+      // 責任者(院長以上)は連絡事項をピン留めして投稿できる
+      const canPin = isNotice && rankLevel(me) >= 3;
+      const pinCb = el("input", { type: "checkbox", checked: pinDraft, onchange: (e) => { pinDraft = e.target.checked; } });
+      const pinLabel = canPin
+        ? el("label", { class: "composer-pin" }, pinCb, "📌 重要(ピン留め)")
+        : null;
+
       const submit = () => {
-        const body = composerDraft.trim();
-        if (!body && !composerImages.length) { toast("共有する内容を入力してください", "error"); return; }
+        const body = drafts[type].trim();
+        if (!body && !list.length) { toast("共有する内容を入力してください", "error"); return; }
         store.addFirst("posts", {
-          type: composerType,
-          channelId: "ch-all",
+          type,
+          channelId: isNotice ? "ch-all" : null,
           authorId: me.id,
           date: nowIso(),
-          title: composerType === "chourei" ? `朝礼メモ(${store.storeName(me.storeId)})` : null,
+          title: null,
           body,
-          images: [...composerImages],
-          likes: [], comments: [], pinned: false,
+          images: [...list],
+          likes: [], comments: [], pinned: canPin && pinDraft,
         });
-        composerDraft = "";
-        composerImages = [];
-        toast("タイムラインに投稿しました");
+        drafts[type] = "";
+        images[type] = [];
+        pinDraft = false;
+        toast(isNotice ? "連絡事項に投稿しました" : "タイムラインに投稿しました");
         draw();
       };
 
@@ -255,8 +297,9 @@ export default {
         el("div", { class: "composer-row" }, avatar(me, 38), ta),
         thumbs,
         el("div", { class: "composer-foot" },
-          segWrap,
+          badge(`${TYPE_META[type].emoji} ${TYPE_META[type].label}`, TYPE_META[type].kind),
           attachBtn, fileIn,
+          pinLabel,
           el("span", { class: "spacer" }),
           el("button", { class: "btn primary", onclick: submit }, icon("send", 15), "投稿する")));
     }
@@ -295,9 +338,12 @@ export default {
     function postCard(p) {
       if (p.type === "thanks") return thanksCard(p);
       if (p.type === "uriage") return uriageCard(p);
+      const me = store.me();
       const author = store.byId("staff", p.authorId);
       const meta = TYPE_META[p.type] || TYPE_META.notice;
       const channel = p.channelId ? store.byId("channels", p.channelId) : null;
+      const mayPin = ["notice", "chourei", "philosophy"].includes(p.type) && rankLevel(me) >= 3;
+      const mayDelete = p.authorId === me.id || rankLevel(me) >= 3;
 
       return el("article", { class: `post-card ${p.type} ${p.pinned ? "pinned" : ""} ${isNew(p) ? "is-new" : ""}` },
         p.pinned ? el("div", { class: "pin-flag" }, "📌 ピン留めの重要連絡") : null,
@@ -312,7 +358,15 @@ export default {
             badge(`${meta.emoji} ${meta.label}`, meta.kind),
             channel && channel.id !== "ch-all"
               ? el("span", { class: "channel-chip" }, `${channel.icon} ${channel.name}`)
-              : null)),
+              : null,
+            mayPin ? el("button", {
+              class: "icon-btn sm post-op", title: p.pinned ? "ピン留めを外す" : "ピン留めする", "aria-label": "ピン留め",
+              onclick: () => { store.update("posts", p.id, { pinned: !p.pinned }); toast(p.pinned ? "ピン留めを外しました" : "ピン留めしました"); draw(); },
+            }, icon("pin", 14)) : null,
+            mayDelete ? el("button", {
+              class: "icon-btn sm post-op", title: "この投稿を削除", "aria-label": "削除",
+              onclick: () => { store.remove("posts", p.id); toast("投稿を削除しました", "info"); draw(); },
+            }, icon("trash", 14)) : null)),
         p.title ? el("h4", { class: "post-title" }, p.title) : null,
         postBody(p),
         postImages(p),
@@ -322,7 +376,7 @@ export default {
     }
 
     /* ============================================================
-       フィードの描画(4つのタイムライン共通)
+       フィードの描画(各タイムライン共通)
        日付でまとめ、新着に印を付け、長いタイムラインは段階表示する
        ============================================================ */
     const PAGE_SIZE = 12;
@@ -529,7 +583,7 @@ export default {
       return wrap;
     }
 
-    /* ================= ② チャンネルタイムライン ================= */
+    /* ================= ③ チャンネルタイムライン ================= */
     /** チャンネル(ch-all 以外)への投稿だけが流れる。チップで絞り込み+ここから投稿もできる */
     function drawChannels(main) {
       const posts = store.get("posts");
@@ -610,7 +664,7 @@ export default {
           el("button", { class: "btn primary", onclick: submit }, icon("send", 15), "チャンネルに投稿")));
     }
 
-    /* ================= ③ 売上報告タイムライン ================= */
+    /* ================= ④ 売上報告タイムライン ================= */
     function drawUriage(main) {
       const feed = store.get("posts").filter(inUriage).sort(byDateDesc);
       const today = todayStr();
@@ -629,95 +683,30 @@ export default {
       renderFeed(main, feed, { icon: "📊", title: "まだ売上報告がありません", hint: "「売上報告を投稿」から本日の数字を共有しましょう" });
     }
 
-    /* ================= ④ 社内SNS(サンクス+自由投稿) ================= */
-    function drawFree(main) {
+    /* ================= ⑤ サンクスギフト ================= */
+    function drawThanks(main) {
       const me = store.me();
       const sent = sentThisMonth();
       const recv = receivedThisMonth();
 
       main.appendChild(el("div", { class: "kpi-row sns-kpi" },
-        statTile({ label: "累計獲得ポイント", value: `${fmtNum(me.points)} pt`, icon: "gift", tone: "accent", sub: "送っても受け取っても貯まります" }),
+        statTile({ label: "累計獲得ポイント", value: `${fmtNum(pointsOf(me.id))} pt`, icon: "gift", tone: "accent", sub: "送っても受け取っても貯まります" }),
         statTile({ label: "今月の獲得", value: `+${fmtNum(earnedThisMonth())} pt`, icon: "heart", tone: "good", sub: `受取 ${fmtNum(recv.points)}pt+送信ボーナス ${fmtNum(sent.bonus)}pt` }),
         statTile({ label: "全社ランキング", value: `${myRank()}位`, icon: "award", tone: "brand", sub: `全${store.get("staff").length}名中` }),
       ));
 
-      main.appendChild(freeComposer());
+      main.appendChild(el("div", { class: "uriage-actionbar card thanks-bar" },
+        el("span", { class: "ua-main" },
+          el("b", {}, "ありがとうを、ポイントと一緒に。"),
+          el("span", { class: "small muted" }, `送ると +${SEND_BONUS}pt、受け取るとギフト分が貯まります。今月はまだ ${sent.count} 件送っています`)),
+        el("span", { class: "spacer" }),
+        el("button", { class: "btn accent sm", onclick: openThanksModal }, icon("gift", 14), "サンクスを送る")));
 
-      const feed = store.get("posts").filter(inFree).sort(byDateDesc);
-      renderFeed(main, feed, { icon: "💬", title: "まだ投稿がありません", hint: "自由投稿やサンクスで最初の1件を届けましょう" });
+      const feed = store.get("posts").filter(inThanks).sort(byDateDesc);
+      renderFeed(main, feed, { icon: "🎁", title: "まだサンクスがありません", hint: "「サンクスを送る」から最初のありがとうを届けましょう" });
     }
 
-    /** 自由投稿フォーム(サンクスギフトの自由投稿のような気軽な共有) */
-    function freeComposer() {
-      const me = store.me();
-      const ta = el("textarea", {
-        class: "textarea composer-input", rows: 2,
-        placeholder: "業務連絡でなくてOK。おすすめのお店、ちょっとした気づき、なんでも共有しましょう",
-        oninput: (e) => { freeDraft = e.target.value; },
-      });
-      ta.value = freeDraft;
-
-      const fileIn = el("input", { type: "file", accept: "image/*", multiple: true, style: { display: "none" } });
-      const thumbs = el("div", { class: "attach-thumbs composer-thumbs" });
-      const attachBtn = el("button", { class: "btn ghost sm", type: "button", onclick: () => fileIn.click() },
-        "🖼", el("span", {}, `画像(${freeImages.length}/${MAX_POST_IMAGES})`));
-      const paintThumbs = () => {
-        clear(thumbs);
-        freeImages.forEach((src, i) => {
-          thumbs.appendChild(el("span", { class: "attach-thumb" },
-            el("img", { src, alt: `添付画像${i + 1}` }),
-            el("button", {
-              class: "at-del", type: "button", "aria-label": "この画像を外す",
-              onclick: () => { freeImages.splice(i, 1); paintThumbs(); },
-            }, "×")));
-        });
-        clear(attachBtn).append("🖼", el("span", {}, `画像(${freeImages.length}/${MAX_POST_IMAGES})`));
-        attachBtn.disabled = freeImages.length >= MAX_POST_IMAGES;
-      };
-      fileIn.addEventListener("change", async () => {
-        const files = [...(fileIn.files || [])];
-        fileIn.value = "";
-        if (!files.length) return;
-        const room = MAX_POST_IMAGES - freeImages.length;
-        if (files.length > room) toast(`画像は最大${MAX_POST_IMAGES}枚までです`, "info");
-        for (const f of files.slice(0, room)) {
-          try { freeImages.push(await fileToDataURL(f)); }
-          catch (e) { toast(`「${f.name}」を読み込めませんでした`, "error"); }
-        }
-        paintThumbs();
-      });
-      paintThumbs();
-
-      const submit = () => {
-        const body = freeDraft.trim();
-        if (!body && !freeImages.length) { toast("共有する内容を入力してください", "error"); return; }
-        store.addFirst("posts", {
-          type: "free",
-          authorId: me.id,
-          date: nowIso(),
-          title: null,
-          body,
-          images: [...freeImages],
-          likes: [], comments: [], pinned: false,
-        });
-        freeDraft = "";
-        freeImages = [];
-        toast("社内SNSに投稿しました");
-        draw();
-      };
-
-      return el("div", { class: "card composer" },
-        el("div", { class: "composer-row" }, avatar(me, 38), ta),
-        thumbs,
-        el("div", { class: "composer-foot" },
-          badge("💬 自由投稿", ""),
-          attachBtn, fileIn,
-          el("button", { class: "btn accent sm", onclick: openThanksModal }, icon("gift", 14), "サンクスを送る"),
-          el("span", { class: "spacer" }),
-          el("button", { class: "btn primary", onclick: submit }, icon("send", 15), "投稿する")));
-    }
-
-    /* ================= ランキング ================= */
+    /* ================= ⑥ ランキング ================= */
     function drawRanking(main) {
       const m = monthOf(todayStr());
       const monthThanks = store.get("posts").filter((p) => p.type === "thanks" && (p.date || "").startsWith(m));
@@ -730,12 +719,12 @@ export default {
         statTile({ label: "参加スタッフ", value: `${fmtNum(participants.size)} 名`, icon: "users", tone: "good", sub: "送った人+受け取った人" }),
       ));
 
-      const sorted = [...store.get("staff")].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 8);
-      const max = sorted[0]?.points || 1;
+      const sorted = rankedStaff().slice(0, 8);
+      const max = sorted[0]?.pts || 1;
       const medals = ["🥇", "🥈", "🥉"];
       const meId = store.me().id;
 
-      const rows = el("div", {}, sorted.map((s, i) =>
+      const rows = el("div", {}, sorted.map(({ s, pts }, i) =>
         el("div", { class: `rank-row ${s.id === meId ? "is-me" : ""}` },
           el("span", { class: "rank-no" }, i < 3 ? medals[i] : String(i + 1)),
           avatar(s, 36),
@@ -744,14 +733,14 @@ export default {
               el("span", { class: "rank-name" }, s.name,
                 s.id === meId ? badge("自分", "accent") : null,
                 el("span", { class: "rank-sub" }, `${store.storeName(s.storeId)}・${s.role}`)),
-              el("span", { class: "rank-pts" }, `${fmtNum(s.points)} pt`)),
+              el("span", { class: "rank-pts" }, `${fmtNum(pts)} pt`)),
             el("div", { class: "rank-bar-track" },
-              el("div", { class: "rank-bar", style: { width: `${Math.round(((s.points || 0) / max) * 100)}%` } }))))));
+              el("div", { class: "rank-bar", style: { width: `${Math.round((pts / max) * 100)}%` } }))))));
 
       main.appendChild(card({
         title: "サンクスポイント ランキング",
         sub: "累計獲得ポイント TOP8",
-        body: rows,
+        body: sorted.length ? rows : emptyState({ icon: "🏆", title: "まだランキングがありません", hint: "サンクスを送り合うと順位が付きます" }),
       }));
     }
 
@@ -763,7 +752,7 @@ export default {
       return el("div", { class: "card points-card" },
         el("div", { class: "pc-head" }, "🎁 サンクスポイント"),
         el("div", { class: "pc-num" },
-          el("span", { class: "pc-big" }, fmtNum(me.points)),
+          el("span", { class: "pc-big" }, fmtNum(pointsOf(me.id))),
           el("span", { class: "pc-unit" }, "pt(累計)")),
         el("div", { class: "pc-earnnote" },
           icon("sparkle", 13),
@@ -776,25 +765,29 @@ export default {
         el("button", { class: "btn accent block", onclick: openThanksModal }, icon("gift", 16), "サンクスを送る"));
     }
 
-    /* 毎月のお願い(1minuteアンケート+交通費申請) */
+    /* 毎月のお願い:タスクに自動で積まれる。ここでは状況だけ映す */
     function monthlyCard() {
-      const m = Number(monthOf(todayStr()).slice(5));
+      const me = store.me();
+      const month = monthOf(todayStr());
+      const m = Number(month.slice(5));
+      const tasksAll = store.get("tasks") || [];
+      const items = [
+        { key: `survey:${me.id}:${month}`, ic: "📝", title: "1minuteアンケートに回答", sub: "所要1分・月1回" },
+        { key: `transport:${me.id}:${month}`, ic: "🚃", title: "交通費を申請(月1回)", sub: "領収書画像+金額+区間+距離" },
+      ].map((it) => ({ ...it, task: tasksAll.find((t) => t.autoKey === it.key) || null }));
+
       return el("div", { class: "card monthly-card" },
         el("div", { class: "mc-head" }, "📌 毎月のお願い", badge(`${m}月分`, "accent")),
-        el("a", {
-          class: "mc-item", href: SURVEY_URL, target: "_blank", rel: "noopener noreferrer",
-        },
-          el("span", { class: "mc-ic" }, "📝"),
-          el("span", { class: "mc-main" },
-            el("span", { class: "mc-title" }, "1minuteアンケートに回答"),
-            el("span", { class: "mc-sub" }, "所要1分・月1回(Googleフォームが開きます)")),
-          icon("chevR", 15)),
-        el("a", { class: "mc-item", href: "#/backoffice/expense" },
-          el("span", { class: "mc-ic" }, "🚃"),
-          el("span", { class: "mc-main" },
-            el("span", { class: "mc-title" }, "交通費を申請(月1回)"),
-            el("span", { class: "mc-sub" }, "領収書画像+金額+区間(どこからどこまで)+距離")),
-          icon("chevR", 15)));
+        el("p", { class: "small muted mc-note" }, "タスクに自動で追加されています。済んだらタスクで完了にしてください。"),
+        items.map((it) => {
+          const done = it.task?.status === "done";
+          return el("a", { class: `mc-item ${done ? "done" : ""}`, href: "#/tasks" },
+            el("span", { class: "mc-ic" }, done ? "✅" : it.ic),
+            el("span", { class: "mc-main" },
+              el("span", { class: "mc-title" }, it.title),
+              el("span", { class: "mc-sub" }, done ? "完了しました" : it.task ? `タスクに追加済み・期限 ${fmtDate(it.task.due, { withDow: false })}` : it.sub)),
+            icon("chevR", 15));
+        }));
     }
 
     function philosophyCard() {
@@ -872,15 +865,14 @@ export default {
       sendBtn.addEventListener("click", () => {
         if (!toId) { toast("宛先のスタッフを選択してください", "error"); return; }
         if (!msg.trim()) { toast("メッセージを入力してください", "error"); return; }
+        // ポイントは投稿から計算するので、ここで staff に書き込む必要はない
         store.addFirst("posts", {
           type: "thanks", authorId: me.id, toId, points: pts,
           date: nowIso(), body: msg.trim(), likes: [], comments: [], pinned: false,
         });
-        // 受け取った側にはギフト分、送った側には送信ボーナスが貯まる
-        store.update("staff", toId, (s) => ({ points: (s.points || 0) + pts }));
-        store.update("staff", me.id, (s) => ({ points: (s.points || 0) + SEND_BONUS }));
         m.close();
         celebrate(`${store.staffName(toId)}さんに ${pts}pt のサンクスを送りました!(あなたに+${SEND_BONUS}pt)`);
+        if (tab !== "thanks" && tab !== "ranking") tab = "thanks";
         draw();
       });
     }

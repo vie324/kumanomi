@@ -198,15 +198,21 @@ export function lineChart({ series, labels, height = 230, yFmt = defaultFmt, fil
     const x = px(i);
     cursor.setAttribute("x1", x); cursor.setAttribute("x2", x);
     cursor.setAttribute("opacity", 1);
+    // 系列の長さが違う(実績は今日まで・予測は月末まで、など)場合は
+    // その位置に値が無い系列の点とツールチップ行を出さない
+    const has = (s) => Number.isFinite(s.values[i]);
     series.forEach((s, si) => {
+      if (!has(s)) { hoverDots[si].setAttribute("opacity", 0); return; }
       hoverDots[si].setAttribute("cx", x);
       hoverDots[si].setAttribute("cy", py(s.values[i]));
       hoverDots[si].setAttribute("opacity", 1);
     });
+    const lead = series.find(has);
+    if (!lead) { tip.hide(); return; }
     const bx = (x / W) * r.width;
-    const by = (py(series[0].values[i]) / H) * r.height;
-    tip.show(bx, by, tipHTML(labels[i], series.map((s, si) => ({
-      name: s.name, color: s.color || seriesColor(si), value: yFmt(s.values[i]),
+    const by = (py(lead.values[i]) / H) * r.height;
+    tip.show(bx, by, tipHTML(labels[i], series.filter(has).map((s) => ({
+      name: s.name, color: s.color || seriesColor(series.indexOf(s)), value: yFmt(s.values[i]),
     }))));
   });
   svg.addEventListener("mouseleave", () => {

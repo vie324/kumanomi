@@ -212,6 +212,30 @@ export const supabase = {
     return request(`/rest/v1/rpc/${fn}`, { method: "POST", body: JSON.stringify(args) });
   },
 
+  /* ---------------- Storage(プロフィール写真など) ---------------- */
+
+  /**
+   * ファイルをバケットへ置く。同じパスがあれば上書き。
+   *   upload("avatars", "145/me.jpg", blob, { contentType: "image/jpeg" })
+   * 書ける場所は Storage 側のポリシー(0009)で「自分の社員番号のフォルダ」に絞られている。
+   */
+  async upload(bucket, path, body, { contentType = "application/octet-stream" } = {}) {
+    const clean = String(path).replace(/^\/+/, "");
+    await request(`/storage/v1/object/${bucket}/${clean}`, {
+      method: "POST",
+      body,
+      raw: true,
+      headers: { "Content-Type": contentType, "x-upsert": "true" },
+    });
+    return supabase.publicUrl(bucket, clean);
+  },
+
+  /** 公開バケットのファイルURL(キャッシュ避けに更新時刻を付ける) */
+  publicUrl(bucket, path) {
+    if (!config) return null;
+    return `${config.url}/storage/v1/object/public/${bucket}/${String(path).replace(/^\/+/, "")}?v=${Date.now()}`;
+  },
+
   /** 接続確認。成功すると店舗数とメンバー数を返す */
   async ping() {
     const stores = await request("/rest/v1/stores?select=id&limit=1", { head: true });
@@ -222,13 +246,13 @@ export const supabase = {
 
 /* ---------------- 内部:fetch ラッパー ---------------- */
 
-async function request(path, { method = "GET", body = null, headers = {}, auth = true, head = false, retried = false } = {}) {
+async function request(path, { method = "GET", body = null, headers = {}, auth = true, head = false, raw = false, retried = false } = {}) {
   if (!config) throw new Error("Supabase の接続先が設定されていません。");
   // 期限が近いトークンで投げると 401 になるので、先に取り直しておく
   if (auth && session?.refresh_token && isExpiring(session)) await refreshSession();
   const h = {
     apikey: config.anonKey,
-    "Content-Type": "application/json",
+    ...(raw ? {} : { "Content-Type": "application/json" }),
     ...headers,
   };
   if (auth) h.Authorization = `Bearer ${session?.access_token || config.anonKey}`;
@@ -259,7 +283,7 @@ async function request(path, { method = "GET", body = null, headers = {}, auth =
     // 期限切れの取りこぼしは1度だけ更新して投げ直す
     if (res.status === 401 && auth && !retried && session?.refresh_token) {
       const next = await refreshSession();
-      if (next) return request(path, { method, body, headers, auth, head, retried: true });
+      if (next) return request(path, { method, body, headers, auth, head, raw, retried: true });
     }
     if (res.status === 401 || res.status === 403) {
       throw new Error(`権限がありません:${msg}(ログイン状態と RLS の設定を確認してください)`);

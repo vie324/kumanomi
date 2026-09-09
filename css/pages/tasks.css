@@ -143,3 +143,41 @@
 }
 .page-tasks .tk-assign-names { display: flex; align-items: center; gap: 5px; font-size: var(--fs-sm); }
 .page-tasks .tk-assign-note { color: var(--ink-2); line-height: 1.6; }
+
+/* ============================================================
+   進捗とアラート
+   ============================================================ */
+.page-tasks .tk-row.overdue { background: color-mix(in srgb, var(--critical) 4%, transparent); }
+.page-tasks .tk-row.focus {
+  animation: tk-focus 1.6s var(--ease);
+  border-radius: var(--r-md);
+}
+@keyframes tk-focus {
+  0% { background: var(--brand-soft); box-shadow: 0 0 0 2px var(--brand); }
+  100% { background: transparent; box-shadow: none; }
+}
+.page-tasks .tk-progress {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 8px;
+}
+.page-tasks .tk-prog-track {
+  flex: 1 1 120px; max-width: 220px; height: 6px;
+  border-radius: 3px; background: var(--surface-3); overflow: hidden;
+}
+.page-tasks .tk-prog-fill { height: 100%; border-radius: 3px; background: var(--brand); transition: width 0.3s var(--ease); }
+.page-tasks .tk-prog-pct { font-size: var(--fs-xs); font-weight: 800; min-width: 34px; font-variant-numeric: tabular-nums; }
+.page-tasks .tk-prog-steps { display: flex; gap: 3px; }
+.page-tasks .tk-prog-step {
+  width: 30px; height: 22px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  font-size: 10.5px; font-weight: 800; color: var(--ink-3);
+  transition: all var(--dur) var(--ease);
+}
+.page-tasks .tk-prog-step:hover { border-color: var(--brand); color: var(--brand-ink); }
+.page-tasks .tk-prog-step.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-ink); }
+.page-tasks .tk-alerted {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: var(--fs-xs); font-weight: 700; color: var(--accent-ink);
+}

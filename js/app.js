@@ -4,9 +4,10 @@
 
 import { store } from "./store.js";
 import { router } from "./router.js";
-import { el, icon, avatar, badge, toast, relTime, fmtDate, confirmDialog, drawer, clear } from "./ui.js";
+import { el, icon, avatar, badge, toast, relTime, confirmDialog, drawer, clear } from "./ui.js";
 import { canSeePage, rankLabel, scopeLabel, RANKS, rankOf } from "./auth.js";
 import { syncAutoTasks } from "./autotasks.js";
+import { syncTaskAlerts } from "./taskalerts.js";
 import { supabase } from "./supabase.js";
 import { migrationProgress, remoteCollections } from "./remote.js";
 import { needsLogin, renderLogin, teardownLogin, signOutAndReload } from "./login.js";
@@ -427,8 +428,9 @@ function onNavigate(page) {
 }
 
 router.setGuard((pageId) => canSeePage(pageId));
-// 業務のなかで発生したタスク(発注・承認待ち・日報など)を毎回の描画前に積み直す
-router.setBeforeRender(syncAutoTasks);
+// 業務のなかで発生したタスク(発注・承認待ち・日報など)を毎回の描画前に積み直し、
+// 自分が振ったタスクの期限リマインドをチャットへ送る
+router.setBeforeRender(() => { syncAutoTasks(); syncTaskAlerts(); });
 // 各ページが needs で宣言したデータを、描画前にそろえる
 router.setLoader((needs) => store.load(needs));
 
@@ -456,7 +458,9 @@ async function bootApp() {
   }
 
   // サイドバーの未完了バッジを正しく出すため、シェルより先に一度同期しておく
+  await store.load("tasks", "chatRooms", "chatMessages");
   syncAutoTasks();
+  syncTaskAlerts();
 
   const built = buildShell();
   titleRef.el = built.titleEl;
