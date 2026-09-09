@@ -17,23 +17,9 @@ import { supabase } from "./supabase.js";
 import { store } from "./store.js";
 import { el, icon, clear } from "./ui.js";
 
-const DEMO_KEY = "kumanomi.demoBypass";
-
-/** 「デモで見る」を選んでいるか(タブを閉じたら戻る) */
-export function isDemoBypass() {
-  try { return sessionStorage.getItem(DEMO_KEY) === "1"; } catch { return false; }
-}
-function setDemoBypass(on) {
-  try {
-    if (on) sessionStorage.setItem(DEMO_KEY, "1");
-    else sessionStorage.removeItem(DEMO_KEY);
-  } catch { /* プライベートモード */ }
-}
-export function clearDemoBypass() { setDemoBypass(false); }
-
 /** ログイン画面を出す必要があるか */
 export function needsLogin() {
-  return supabase.isConfigured() && !supabase.user() && !isDemoBypass();
+  return supabase.isConfigured() && !supabase.user();
 }
 
 /**
@@ -158,11 +144,9 @@ export function renderLogin(host, onSignedIn) {
     el("h1", { class: "lg-title" }, "統合ポータル"),
     el("p", { class: "lg-lead" }, "社員アカウントでログインしてください。"),
     form,
+    // 接続先が設定されているときは、見せられるデモデータがそもそも無い
+    // (本番では記録を空から始めるため)。逃げ道は出さない。
     el("div", { class: "lg-foot" },
-      el("button", {
-        class: "lg-link", type: "button",
-        onclick: () => { setDemoBypass(true); onSignedIn(null); },
-      }, "デモデータで表示する(サーバーには接続しません)"),
       el("p", { class: "lg-host" }, info ? `接続先 ${info.url.replace(/^https?:\/\//, "")}` : ""),
     ),
   );
@@ -183,7 +167,6 @@ export function teardownLogin(host) { host.classList.remove("is-login"); }
 
 /** ログアウトして最初からやり直す */
 export async function signOutAndReload() {
-  clearDemoBypass();
   await supabase.signOut();
   location.reload();
 }

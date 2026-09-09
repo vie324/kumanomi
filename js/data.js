@@ -55,10 +55,12 @@ const stores = [
   { id: "st-biyou", name: "ビューティー大宮店", short: "美容大宮", deptCode: "02", category: "美容・エステ", isPilot: false, phone: "048-641-yyyy", address: "埼玉県さいたま市大宮区宮町X-X", lat: 35.908, lng: 139.626, openHour: "10:00", closeHour: "20:00", color: "#e87ba4", beds: 2 },
 ];
 
-/** 店舗のベッド一覧(予約グリッドの列になる) */
+/** 店舗のベッド一覧(予約グリッドの列になる)。
+    店舗がまだ1つも無い状態でも呼ばれるので、その場合も形を返す。 */
 export function bedsOf(store) {
   const n = store?.beds || 3;
-  return Array.from({ length: n }, (_, i) => ({ id: `${store.id}-b${i + 1}`, name: `ベッド${i + 1}` }));
+  const prefix = store?.id || "no-store";
+  return Array.from({ length: n }, (_, i) => ({ id: `${prefix}-b${i + 1}`, name: `ベッド${i + 1}` }));
 }
 
 /** 店舗カテゴリから責任者の呼称(院長/店長)を返す */
@@ -1262,15 +1264,73 @@ const orgChangeLog = [
 
 export const SCHEMA_VERSION = 8;
 
-export function createSeed() {
+/* ------------------------------------------------------------
+   「記録」と「設定」を分ける
+
+   本番につないだら、架空の患者・予約・日報などが混じっていては困る。
+   ただし全部を空にすると、メニューもチャンネルも無くて
+   予約すら作れない画面ができてしまう。
+
+   そこで、
+     ・記録(何かが起きた結果)      → 本番では空にする
+     ・設定・マスタ(先に用意するもの)→ たたき台として残し、画面から直せる
+   の2つに分ける。
+   ------------------------------------------------------------ */
+
+/** 本番では空から始めるコレクション(実際の業務で積み上がっていくもの) */
+export const RECORD_COLLECTIONS = [
+  "patients", "karte", "reservations", "waitlist",
+  "shifts", "attendance", "shiftRequests", "dailyReports",
+  "kpiMonthly", "posts", "meetings",
+  "trainings", "tests", "evaluations", "interviews", "roleplaySessions",
+  "inventory", "cashbook", "expenses", "orders", "registerSales",
+  "sharoushiSubmissions", "payrollAdjustments",
+  "notifications", "tasks", "chatMessages", "orgChangeLog",
+];
+
+/**
+ * 初期データを作る。
+ *
+ * @param {object}  opts
+ * @param {boolean} opts.demo  true=デモ用の作り込みデータを入れる
+ *                             false=本番。記録は空、設定・マスタだけ入れる
+ */
+export function createSeed({ demo = true } = {}) {
+  const settings = { theme: "light", gpsSimulated: true, storeFilter: "all", sharoushi: sharoushiSetting };
+
+  if (!demo) {
+    // 本番:記録はすべて空。設定とマスタだけ置く。
+    // 店舗とスタッフはサーバーから届くので、ここでは空でよい。
+    const empty = Object.fromEntries(RECORD_COLLECTIONS.map((k) => [k, []]));
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      generatedAt: TODAY,
+      seedMode: "live",
+      currentUserId: null,
+      settings,
+      stores: [],
+      staff: [],
+      // チャットルームはデモの店舗名とスタッフIDで作られているので本番では持たない。
+      // 実店舗が入ったあとに作る。
+      menus, philosophy, channels, faq, talkScripts,
+      staffingRules: [], chatRooms: [],
+      // 在庫の品目も持たない。実際に使う品目は店舗ごとに違ううえ、
+      // 数量ゼロの品目を残すと「発注点割れ」の自動タスクが初日から並んでしまう。
+      // 画面から追加していってもらう。
+      inventory: [],
+      ...empty,
+    };
+  }
+
   const patients = makePatients();
   const shifts = makeShifts();
   const dailyReports = makeDailyReports();
   return {
     schemaVersion: SCHEMA_VERSION,
     generatedAt: TODAY,
+    seedMode: "demo",
     currentUserId: "s01",
-    settings: { theme: "light", gpsSimulated: true, storeFilter: "all", sharoushi: sharoushiSetting },
+    settings,
     stores, staff, menus, philosophy, channels, staffingRules,
     patients,
     karte: makeKarte(patients),

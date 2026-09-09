@@ -75,11 +75,30 @@ function legend(series, type = "swatch") {
       s.name)));
 }
 
+/* ---------------- データがまだ無いとき ----------------
+   導入直後は当然すべて空になる。目盛りだけのグラフを見せると
+   「壊れている」と受け取られるので、その旨をはっきり出す。 */
+function noDataBox(height, message = "データがまだありません") {
+  return el("div", {
+    class: "chart-box chart-empty",
+    style: { height: `${height}px`, display: "grid", placeItems: "center" },
+  }, el("span", { class: "chart-empty-msg" }, message));
+}
+
 /* ---------------- Sparkline ---------------- */
 
 export function sparkline({ values, width = 110, height = 34, color, fill = true }) {
   const c = color || cssVar("--chart-deemph", "#d4dad7");
   const accent = cssVar("--brand", "#0c7489");
+  // データがまだ無いとき(導入直後)は、平らな線だけ引いて NaN を出さない
+  const vals = Array.isArray(values) ? values.filter((v) => Number.isFinite(v)) : [];
+  if (vals.length < 2) {
+    const svg0 = sv("svg", { viewBox: `0 0 ${width} ${height}`, width, height, "aria-hidden": "true" });
+    const y = height / 2;
+    svg0.appendChild(sv("line", { x1: 2, y1: y, x2: width - 2, y2: y, stroke: c, "stroke-width": 2, "stroke-linecap": "round", opacity: 0.5 }));
+    return svg0;
+  }
+  values = vals;
   const min = Math.min(...values), max = Math.max(...values);
   const span = max - min || 1;
   const px = (i) => 2 + (i / (values.length - 1)) * (width - 4);
@@ -110,8 +129,11 @@ export function lineChart({ series, labels, height = 230, yFmt = defaultFmt, fil
   const W = 720, H = height;
   const padL = 46, padR = 14, padT = 12, padB = 26;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const allVals = series.flatMap((s) => s.values);
-  const yMax = niceMax(Math.max(...allVals) * 1.08);
+  const allVals = series.flatMap((s) => s.values).filter((v) => Number.isFinite(v));
+  // 中身が1つも無ければ、目盛りだけのグラフではなくその旨を出す
+  if (!allVals.length || !labels.length) return noDataBox(height);
+  // 全部ゼロでも目盛りが NaN にならないようにする
+  const yMax = niceMax(Math.max(...allVals) * 1.08) || 1;
   const px = (i) => padL + (i / Math.max(labels.length - 1, 1)) * plotW;
   const py = (v) => padT + plotH - (v / yMax) * plotH;
 
@@ -370,7 +392,7 @@ export function radar({ axes, values, size = 240, max = 5 }) {
   const svg = sv("svg", { viewBox: `0 0 ${size} ${size}`, width: size, height: size });
   const gridC = cssVar("--chart-grid", "#e6e9e7");
   const mutedC = cssVar("--chart-muted", "#8a938f");
-  const n = axes.length;
+  const n = Math.max(axes.length, 1);   // 軸ゼロでも 0 除算にしない
   const pt = (i, r) => {
     const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
     return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
