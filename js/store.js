@@ -23,21 +23,34 @@
 
 import { createSeed, SCHEMA_VERSION, todayStr, addDays, monthOf, dow, mondayOf, SHIFT_TYPES, LEAVE_TYPES, bedsOf } from "./data.js";
 import { sync } from "./sync.js";
+import { supabase } from "./supabase.js";
 
 const LS_KEY = "kumanomi.state.v1";
 
+/**
+ * いまどちらの中身を持つべきか。
+ *   demo … 接続先が未設定。作り込んだデモデータで動かす
+ *   live … Supabase につながっている。記録は空から始める
+ * 接続した瞬間に架空の患者や日報が残っていると実データと紛らわしいので、
+ * モードが変わったら端末内を作り直す。
+ */
+function seedMode() {
+  return supabase.isConfigured() ? "live" : "demo";
+}
+
 function load() {
+  const mode = seedMode();
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // スキーマが変わった/日付が変わった場合は作り直す(デモを常に新鮮に保つ)
-      if (parsed.schemaVersion === SCHEMA_VERSION && parsed.generatedAt === todayStr()) {
-        return parsed;
-      }
+      const sameShape = parsed.schemaVersion === SCHEMA_VERSION && (parsed.seedMode || "demo") === mode;
+      // 本番は毎日作り直す必要がない(サーバーが正)。デモだけ日付で作り直して新鮮に保つ
+      const fresh = mode === "live" ? true : parsed.generatedAt === todayStr();
+      if (sameShape && fresh) return parsed;
     }
   } catch (e) { /* 壊れていたら作り直す */ }
-  const seed = createSeed();
+  const seed = createSeed({ demo: mode === "demo" });
   try { localStorage.setItem(LS_KEY, JSON.stringify(seed)); } catch (e) { /* private mode */ }
   return seed;
 }
@@ -77,8 +90,11 @@ function applyRemote(coll, rows) {
     else if (op.type === "delete" && i >= 0) state[coll].splice(i, 1);
   }
 
-  // 本番データを取り込むとデモ用の s01 が居なくなる。ログイン中の人を貼り直す
-  if (coll === "staff" && !state.staff.some((s) => s.id === state.currentUserId)) {
+  // デモは s01 が居なくなったら先頭の人に寄せる。
+  // 本番で勝手に選ぶと一瞬だけ別人として表示されるので、
+  // ログイン処理(login.js)が決めるまで空のままにしておく。
+  if (coll === "staff" && seedMode() === "demo"
+      && !state.staff.some((x) => x.id === state.currentUserId)) {
     state.currentUserId = state.staff[0]?.id || state.currentUserId;
   }
 
@@ -204,7 +220,7 @@ export const store = {
   subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   notify(coll) { listeners.forEach((fn) => fn(coll)); },
 
-  /** デモデータを初期状態に戻す */
+  /** 端末内のデータを初期状態に戻す(デモ=作り直し / 本番=空にして取り込み直し) */
   reset() {
     localStorage.removeItem(LS_KEY);
     sync.clearQueue();
@@ -215,7 +231,7 @@ export const store = {
   },
 
   // ---- 便利アクセサ ----
-  me() { return store.byId("staff", state.currentUserId); },
+  me() { return state.currentUserId ? store.byId("staff", state.currentUserId) : null; },
   storeOf(staffOrPatient) { return store.byId("stores", staffOrPatient?.storeId); },
   storeName(storeId) { return store.byId("stores", storeId)?.name || "—"; },
   staffName(staffId) { return store.byId("staff", staffId)?.name || "—"; },

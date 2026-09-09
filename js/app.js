@@ -9,7 +9,7 @@ import { canSeePage, rankLabel, scopeLabel, RANKS, rankOf } from "./auth.js";
 import { syncAutoTasks } from "./autotasks.js";
 import { supabase } from "./supabase.js";
 import { migrationProgress, remoteCollections } from "./remote.js";
-import { needsLogin, renderLogin, teardownLogin, isDemoBypass, signOutAndReload } from "./login.js";
+import { needsLogin, renderLogin, teardownLogin, signOutAndReload } from "./login.js";
 
 import dashboard from "./pages/dashboard.js";
 import sns from "./pages/sns.js";
@@ -314,14 +314,17 @@ function openSyncPanel() {
     el("button", {
       class: "btn ghost",
       onclick: async () => {
+        const live = s.mode !== "demo";
         const ok = await confirmDialog({
-          title: "デモデータのリセット",
-          message: "この端末で加えた変更(投稿・打刻・予約など)をすべて破棄して、初期状態に戻します。よろしいですか?",
-          okLabel: "リセットする", danger: true,
+          title: live ? "この端末のデータを消す" : "デモデータのリセット",
+          message: live
+            ? "この端末に保存されている内容を消して、サーバーから取り込み直します。サーバー側のデータは消えません。未送信の変更が残っている場合は、先に同期してください。"
+            : "この端末で加えた変更(投稿・打刻・予約など)をすべて破棄して、初期状態に戻します。よろしいですか?",
+          okLabel: live ? "消して取り込み直す" : "リセットする", danger: true,
         });
         if (ok) { store.reset(); location.reload(); }
       },
-    }, icon("trash", 16), "デモデータをリセット"),
+    }, icon("trash", 16), s.mode !== "demo" ? "端末のデータを消す" : "デモデータをリセット"),
   );
 
   const note = el("div", { class: "sp-note" }, icon("info", 14),
@@ -441,15 +444,23 @@ async function bootApp() {
   // シェル自体がスタッフと店舗を使うので、先にそろえてから組み立てる
   await store.load("staff", "stores");
 
+  // 誰としてログインしているか決まらないまま画面を組むと壊れる。
+  // 起こりうるのはセッション切れなので、ログインからやり直してもらう。
+  if (!store.me()) {
+    if (supabase.isConfigured()) {
+      closeSplash();
+      renderLogin(app, async (staffId) => { if (staffId) store.switchUser(staffId); await bootApp(); });
+      return;
+    }
+    store.reset(); // デモ側で壊れた場合は作り直す
+  }
+
   // サイドバーの未完了バッジを正しく出すため、シェルより先に一度同期しておく
   syncAutoTasks();
 
   const built = buildShell();
   titleRef.el = built.titleEl;
   router.init(built.main, onNavigate);
-
-  // 本番につながっているのに種データを見ている、という取り違えを防ぐ
-  if (supabase.isConfigured() && isDemoBypass()) showDemoBanner();
 
   setTimeout(closeSplash, 650);
 
@@ -458,14 +469,6 @@ async function bootApp() {
     sessionStorage.setItem("kumanomi.welcomed", "1");
     setTimeout(() => toast(`おはようございます、${store.me().name.split(" ")[0]}さん!今日も一日よろしくお願いします`, "info", { fish: true }), 1200);
   }
-}
-
-function showDemoBanner() {
-  document.querySelector(".demo-banner")?.remove();
-  document.body.appendChild(el("div", { class: "demo-banner" },
-    icon("alert", 15),
-    el("span", {}, "デモデータを表示中(サーバー未接続)"),
-    el("button", { class: "db-out", onclick: signOutAndReload }, "ログインする")));
 }
 
 if (needsLogin()) {
