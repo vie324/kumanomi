@@ -4,7 +4,7 @@
 
 import { store } from "./store.js";
 import { router } from "./router.js";
-import { el, icon, avatar, badge, toast, relTime, confirmDialog, drawer, clear } from "./ui.js";
+import { el, icon, avatar, badge, toast, relTime, confirmDialog, drawer, clear, fileToDataURL } from "./ui.js";
 import { canSeePage, rankLabel, scopeLabel, RANKS, rankOf } from "./auth.js";
 import { syncAutoTasks } from "./autotasks.js";
 import { syncTaskAlerts } from "./taskalerts.js";
@@ -31,6 +31,7 @@ import payroll from "./pages/payroll.js";
 import org from "./pages/org.js";
 import orgimport from "./pages/orgimport.js";
 import assistant from "./pages/assistant.js";
+import roumu from "./pages/roumu.js";
 
 /* ---- ナビゲーション構成 ---- */
 const NAV_GROUPS = [
@@ -38,7 +39,7 @@ const NAV_GROUPS = [
   { label: "コミュニケーション", pages: [chat, sns, meetings, tasksPage] },
   { label: "毎日の業務", pages: [nippo, uriage, kintai, shift] },
   { label: "患者様", pages: [reserve, patients] },
-  { label: "組織運営", pages: [org, orgimport, staffPage, roleplay, backoffice, hr, payroll] },
+  { label: "組織運営", pages: [org, orgimport, staffPage, roleplay, backoffice, hr, payroll, roumu] },
   { label: "サポート", pages: [assistant] },
 ];
 
@@ -208,7 +209,7 @@ function buildShell() {
 
 function closeMobileNav() { app.classList.remove("nav-open"); }
 
-/* ---- 本番ログイン中のアカウント画面(切替はできない) ---- */
+/* ---- アカウント画面(本番:ログイン中の自分。デモ:切替ドロワーからも開ける) ---- */
 function openAccountPanel(me) {
   const rows = [
     ["氏名", me.name],
@@ -217,14 +218,72 @@ function openAccountPanel(me) {
     ["権限", `${rankLabel(me)}(${scopeLabel(me)})`],
     ["メール", supabase.user()?.email || "—"],
   ];
+
+  /* --- プロフィール写真 --- */
+  const preview = el("div", { class: "sp-photo-preview" }, avatar(me, 84));
+  const fileIn = el("input", { type: "file", accept: "image/*", style: { display: "none" } });
+  const status = el("span", { class: "small muted sp-photo-status" },
+    me.photoUrl ? "写真を設定済み" : "写真は未設定(名前の頭文字が表示されます)");
+  const pickBtn = el("button", { class: "btn primary sm", onclick: () => fileIn.click() }, icon("camera", 14), me.photoUrl ? "写真を変更" : "写真を追加");
+  const removeBtn = el("button", {
+    class: "btn ghost sm", hidden: !me.photoUrl,
+    onclick: async () => {
+      const ok = await confirmDialog({ title: "写真を削除", message: "プロフィール写真を外して、名前の頭文字の表示に戻します。", okLabel: "削除する", danger: true });
+      if (!ok) return;
+      store.update("staff", me.id, { photoUrl: null });
+      d.close(); rebuild();
+      toast("写真を外しました", "info");
+    },
+  }, icon("trash", 14), "削除");
+
+  fileIn.addEventListener("change", async () => {
+    const file = fileIn.files?.[0];
+    fileIn.value = "";
+    if (!file) return;
+    pickBtn.disabled = true;
+    status.textContent = "写真を準備しています…";
+    try {
+      // 端末側で 512px に縮めてから扱う(通信量とストレージを抑える)
+      const dataUrl = await fileToDataURL(file, { maxSize: 512, quality: 0.85 });
+      let url = dataUrl;
+      if (supabase.isConfigured() && supabase.user()) {
+        status.textContent = "サーバーへ送っています…";
+        const blob = await (await fetch(dataUrl)).blob();
+        const folder = me.empCode || me.id;
+        url = await supabase.upload("avatars", `${folder}/avatar.jpg`, blob, { contentType: "image/jpeg" });
+      }
+      store.update("staff", me.id, { photoUrl: url });
+      clear(preview).appendChild(avatar(store.me(), 84));
+      status.textContent = "写真を設定しました";
+      removeBtn.hidden = false;
+      clear(pickBtn).append(icon("camera", 14), "写真を変更");
+      rebuild();
+      toast("プロフィール写真を設定しました");
+    } catch (err) {
+      console.error(err);
+      status.textContent = "写真を設定できませんでした";
+      toast(`写真を設定できませんでした:${err?.message || err}`, "error");
+    } finally {
+      pickBtn.disabled = false;
+    }
+  });
+
+  const photoBlock = el("div", { class: "sp-photo" },
+    preview,
+    el("div", { class: "sp-photo-main" },
+      el("div", { class: "sp-photo-title" }, "プロフィール写真"),
+      status,
+      el("div", { class: "flex", style: { gap: "6px", flexWrap: "wrap", marginTop: "6px" } }, pickBtn, removeBtn, fileIn)));
+
   const d = drawer({
     title: "アカウント",
     body: el("div", { class: "sync-panel" },
+      photoBlock,
       el("div", { class: "sp-kv" },
         rows.map(([k, v]) => el("div", { class: "sp-row" },
           el("span", { class: "sp-k" }, k),
           el("span", { class: "sp-v" }, String(v))))),
-      el("div", { class: "sp-actions" },
+      supabase.user() ? el("div", { class: "sp-actions" },
         el("button", {
           class: "btn ghost",
           onclick: async () => {
@@ -235,9 +294,9 @@ function openAccountPanel(me) {
             });
             if (ok) { d.close(); await signOutAndReload(); }
           },
-        }, icon("user", 16), "ログアウト")),
+        }, icon("user", 16), "ログアウト")) : null,
       el("div", { class: "sp-note" }, icon("info", 14),
-        el("span", {}, "見える範囲は組織図(だれの傘の下にいるか)で決まります。変更は管理者にご依頼ください。"))),
+        el("span", {}, "写真はチャット・タイムライン・名簿など、あなたのアイコンが出る場所すべてに表示されます。見える範囲は組織図(だれの傘の下にいるか)で決まります。変更は管理者にご依頼ください。"))),
   });
 }
 
@@ -349,6 +408,12 @@ function openUserSwitcher() {
     (a, b) => (order[rankOf(a)] ?? 9) - (order[rankOf(b)] ?? 9) || a.id.localeCompare(b.id));
 
   const body = el("div", { class: "user-switch" },
+    el("div", { class: "us-self" },
+      avatar(me, 40),
+      el("span", { class: "us-meta" },
+        el("span", { class: "us-name" }, me.name),
+        el("span", { class: "us-role" }, `${store.storeName(me.storeId)}・${me.role}`)),
+      el("button", { class: "btn ghost sm", onclick: () => { d.close(); openAccountPanel(me); } }, icon("camera", 14), "写真・アカウント")),
     el("p", { class: "us-lead" },
       "権限によって見える情報が変わります。切り替えて動作をご確認ください。"),
     el("div", { class: "us-list" },

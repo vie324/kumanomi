@@ -99,11 +99,13 @@ export const REMOTE = {
       joined: row.joined_on || "",
       licenses: row.license_label && row.license_label !== "未確認" ? [row.license_label] : [],
       isActive: row.is_active !== false,
+      photoUrl: row.photo_url || null,
     }),
     softDelete: "is_active", // 退職者は消さずに在籍フラグを落とす
     toRemote: writer({
       empCode: "employee_no", name: "full_name", kana: "kana",
       role: "role_title", rank: "rank", color: "color", joined: "joined_on",
+      photoUrl: "photo_url",
     }),
   },
 
@@ -232,6 +234,7 @@ export const REMOTE = {
     table: "v_app_posts",
     key: "id",
     order: "date.desc",
+    limit: 600, // 画像を含むので取りすぎない(新しい順)。過去分はあとから別途
     upsert: false,
     toLocal: (row) => ({
       id: row.id,
@@ -331,7 +334,8 @@ export const REMOTE = {
   chatMessages: {
     table: "v_app_chat_messages",
     key: "id",
-    order: "date",
+    order: "date.desc",
+    limit: 1500, // 新しい順に上限まで。画面側で古い順に並べ直す
     upsert: false,
     toLocal: (row) => ({
       id: row.id,

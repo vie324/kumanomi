@@ -4,7 +4,7 @@
    すべて async で、体感のため少し待ってから結果を返す。
    ============================================================ */
 
-import { store, addDays, dow, SHIFT_TYPES } from "./store.js";
+import { store, addDays, dow } from "./store.js";
 
 export const delay = (ms = 900) => new Promise((r) => setTimeout(r, ms));
 
@@ -262,7 +262,6 @@ export async function analyzePosture(seed = 1) {
 
 export async function chatReply(text) {
   await delay(1100);
-  const t = (text || "").toLowerCase();
   const faqs = store.get("faq");
   // キーワードマッチでスコアリング
   let best = null, bestScore = 0;

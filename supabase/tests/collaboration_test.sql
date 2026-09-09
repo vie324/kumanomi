@@ -87,10 +87,13 @@ update public.members m
 set local role authenticated;
 select pg_temp.login_as('ZZ003');
 
-insert into public.v_app_posts (id, type, author_id, store_id, title, body, date)
-values ('zz-po-1', 'timeline', 'ZZ003', 'zz-test-a', null, '今日も一日ありがとうございました', now());
+insert into public.v_app_posts (id, type, author_id, store_id, title, body, images, date)
+values ('zz-po-1', 'timeline', 'ZZ003', 'zz-test-a', null, '今日も一日ありがとうございました',
+        '["data:image/png;base64,AAAA"]'::jsonb, now());
 select pg_temp.check('投稿が社員番号のまま入る',
   (select author_id from public.v_app_posts where id = 'zz-po-1'), 'ZZ003');
+select pg_temp.check('添付画像が配列のまま保たれる',
+  (select jsonb_array_length(images) from public.v_app_posts where id = 'zz-po-1'), 1);
 
 insert into public.v_app_posts (id, type, author_id, store_id, to_id, body, points, date)
 values ('zz-po-2', 'thanks', 'ZZ003', 'zz-test-a', 'ZZ002', 'いつもフォローありがとうございます', 3, now());
@@ -173,6 +176,17 @@ end $blk$;
 select pg_temp.login_as('ZZ004');   -- よその院長
 select pg_temp.check('よその院長に他店のタスクは見えない',
   (select count(*) from public.v_app_tasks where id in ('zz-tk-1', 'zz-tk-2')), 0::bigint);
+
+-- 自動タスク(auto_key)は、別の端末が同じものを積んでも 1 行にまとまる
+select pg_temp.login_as('ZZ003');
+insert into public.v_app_tasks (id, title, owner_id, created_by, due, status, auto, auto_key, auto_resolve)
+values ('zz-tk-auto-a', '日報を提出する(本日分)', 'ZZ003', 'ZZ003', current_date, 'todo', true, 'nippo:ZZ003:test', 'done');
+insert into public.v_app_tasks (id, title, owner_id, created_by, due, status, auto, auto_key, auto_resolve)
+values ('zz-tk-auto-b', '日報を提出する(本日分)', 'ZZ003', 'ZZ003', current_date, 'todo', true, 'nippo:ZZ003:test', 'done');
+select pg_temp.check('同じ auto_key の自動タスクは 1 行だけ',
+  (select count(*) from public.tasks where auto_key = 'nippo:ZZ003:test'), 1::bigint);
+select pg_temp.check('自動タスクの片付け方(auto_resolve)が保たれる',
+  (select auto_resolve from public.v_app_tasks where auto_key = 'nippo:ZZ003:test'), 'done');
 
 select pg_temp.login_as('ZZ001');   -- 社長
 select pg_temp.check('社長は傘の中のタスクが見える',

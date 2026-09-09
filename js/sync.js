@@ -219,7 +219,8 @@ async function pull(coll) {
   const def = remoteOf(coll);
   if (!def || !canSync()) return false;
   try {
-    const rows = await supabase.select(def.view || def.table, { order: def.order || undefined });
+    // 投稿(画像つき)やチャットのように増え続けるものは、新しい順に上限までを取る
+    const rows = await supabase.select(def.view || def.table, { order: def.order || undefined, limit: def.limit || undefined });
     if (!Array.isArray(rows)) return false;
     applier?.(coll, rows.map((r) => def.toLocal(r)));
     lastPull.set(coll, Date.now());
