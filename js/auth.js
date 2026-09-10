@@ -144,6 +144,8 @@ const RULES = {
   "org.view": () => true,
   // 管轄の付け替え(ドラッグ)は 統括マネージャー以上+本部人事
   "org.edit": (me) => rankLevel(me) >= 6 || rankOf(me) === "hr",
+  // メンバーの手入力追加・編集(異動・退職・委員会)は 統括院長より上(マネージャー以上)+本部人事
+  "members.manage": (me) => rankLevel(me) >= 5 || rankOf(me) === "hr",
 
   /* --- 売上・経営数値:全員閲覧可 --- */
   "sales.view": () => true,

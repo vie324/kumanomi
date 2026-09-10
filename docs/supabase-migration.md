@@ -140,6 +140,7 @@ select full_name, store_name, role_title, license, gender
 psql "$TEST_DATABASE_URL" -f supabase/tests/roster_import_test.sql
 psql "$TEST_DATABASE_URL" -f supabase/tests/daily_operations_test.sql
 psql "$TEST_DATABASE_URL" -f supabase/tests/collaboration_test.sql   # 投稿・タスク・チャット・研修・始末書・予算・写真
+psql "$TEST_DATABASE_URL" -f supabase/tests/members_rooms_test.sql   # メンバーの手入力・自動チャットルーム
 ```
 
 `すべて成功しました` が出れば OK です。テストは最後に `rollback` するのでデータは残りません。
@@ -472,6 +473,24 @@ select count(*) from public.members where employee_no is null;
 - Storage の `avatars` バケットは公開読み取りです。氏名の頭文字の代わりに出す写真なので、
   カルテ写真のような要配慮情報は **絶対にここへ置かないでください**(そちらは非公開バケット+署名URLで別途設計します)。
 
+### メンバーの手入力と自動チャットルーム(0010)
+
+| 対象 | 読める | 書ける |
+|---|---|---|
+| メンバー `members` / `v_app_members` | 全社員 | 追加・異動・退職・委員会は **マネージャー以上と本部人事**(`app.can_manage_members()`)。本人はプロフィールのみ |
+| 委員会 `committees` | 全社員 | マネージャー以上と本部人事 |
+| 自動ルーム(`chat_rooms.auto_key`) | 参加者 | 参加者の変更・削除は不可(所属から自動)。アイコン・説明は参加者が直せる |
+
+- 画面からの追加・編集は `v_app_members` ビュー越し。社員番号・店舗コード・上司の社員番号のまま送ると、
+  INSTEAD OF トリガが uuid に読み替えます。取込キー `name_key` は氏名から作り、同姓同名は `氏名@社員番号` で区別します。
+- 追加所属は `members.store_codes`、委員会は `members.committee_codes`(どちらもコードの配列)。
+  組織図シートの取込が作る `member_store_assignments` はそのまま残し、管轄の判定(`app.managed_store_ids`)は両方を見ます。
+- 自動ルームは `app.sync_auto_rooms()` が用意します。`members` / `stores` / `committees` の変更で
+  トリガが走り、参加者を所属に合わせます(全社=在籍者全員 / 店舗=主所属+追加所属 / 委員会=任命者)。
+  ルームの id は `cr-all` / `cr-store-<店舗コード>` / `cr-committee-<委員会コード>` で固定です。
+- `members_update_self`(0004)はどの列でも直せてしまっていたため、本人の更新ではランク・所属・上司・
+  社員番号・在籍などを元に戻すトリガ(`app.guard_member_self_update()`)を足しました。
+
 ---
 
 ## 9. 画面から Supabase につなぐ
@@ -552,8 +571,8 @@ update public.members set license = 'unknown', gender = 'unknown';
 4. 画像(経費レシート・姿勢分析写真)を Supabase Storage へ(非公開バケット+署名URL)
 5. LINE Messaging API 連携、mPOP レジ連携
 
-現在の進捗は 14 / 38 コレクション
-(`stores` / `staff` / `attendance` / `shifts` / `shiftRequests` / `dailyReports` /
+現在の進捗は 15 / 39 コレクション
+(`stores` / `staff` / `committees` / `attendance` / `shifts` / `shiftRequests` / `dailyReports` /
 `posts` / `tasks` / `chatRooms` / `chatMessages` / `trainings` / `trainingReports` /
 `incidentReports` / `budgets`)。
 アプリの「接続とデータ」画面でも確認できます。

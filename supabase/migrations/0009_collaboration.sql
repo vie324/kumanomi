@@ -793,7 +793,9 @@ create trigger v_app_tasks_write instead of insert or update or delete on public
   for each row execute function app.write_app_tasks();
 
 -- ---------------- chat_rooms ----------------
-create or replace view public.v_app_chat_rooms
+-- 0010 で列(auto_key)を足すので、2 回目以降の実行でも通るよう作り直す
+drop view if exists public.v_app_chat_rooms;
+create view public.v_app_chat_rooms
   with (security_invoker = true) as
 select
   r.app_id      as id,

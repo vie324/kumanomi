@@ -8,8 +8,8 @@ import {
   el, clear, icon, avatar, badge, emptyState, modal, toast, relTime, staffChip, fmtDate,
 } from "../ui.js";
 import { store, todayStr, addDays } from "../store.js";
-import { rankLevel } from "../auth.js";
 import { notifyTaskAssigned } from "../taskalerts.js";
+import { isAutoRoom, autoRoomHint } from "../rooms.js";
 
 const DOW_JA = ["日", "月", "火", "水", "木", "金", "土"];
 const REACTIONS = ["👍", "🙏", "🎉", "💡", "😊", "❤️"];
@@ -168,6 +168,7 @@ export default {
       const sections = [
         { kind: "group", label: "グループ" },
         { kind: "store", label: "店舗" },
+        { kind: "committee", label: "委員会" },
         { kind: "dm", label: "ダイレクト" },
       ];
       let hit = 0;
@@ -244,7 +245,8 @@ export default {
         roomIconNode(room, 38),
         el("div", { class: "cv-title" },
           el("div", { class: "cv-name" }, roomTitle(room),
-            room.kind === "dm" ? badge("ダイレクト", "accent") : null),
+            room.kind === "dm" ? badge("ダイレクト", "accent") : null,
+            isAutoRoom(room) ? el("span", { class: "badge brand", title: autoRoomHint(room) }, "所属で自動") : null),
           el("div", { class: "cv-sub" },
             `メンバー ${members.length}名`,
             room.kind === "dm"
@@ -892,8 +894,10 @@ export default {
       clear(convSearch);
       if (!room) {
         clear(convHead); clear(convPin); clear(convBody);
-        convBody.appendChild(emptyState({ title: "参加中のルームがありません", hint: "「新しいルーム」から作成できます" }));
-        convBody.appendChild(defaultRoomsPanel());
+        convBody.appendChild(emptyState({
+          title: "参加中のルームがありません",
+          hint: "店舗・委員会・全社のルームは所属から自動で作られます。名簿に所属が登録されると表示されます。個別のルームは「新しいルーム」から作れます",
+        }));
         convFoot.style.display = "none";
         return;
       }
@@ -909,54 +913,6 @@ export default {
           : `${roomTitle(room)} に投稿(@でメンション / Enterで送信)`;
       autoGrow();
       drawReplyBar(); drawAttachBar(); closeMentionPop(); closePop();
-    }
-
-    /* ============================================================
-       最初のルーム(本番で誰も部屋を作っていないとき)
-       店舗ルームと全社ルームを、決まった id で作る。
-       id が決まっているので、別の端末が同時に作っても1部屋にまとまる。
-       ============================================================ */
-    function defaultRoomsPanel() {
-      const rooms = store.get("chatRooms") || [];
-      const staff = store.get("staff") || [];
-      const myStore = store.byId("stores", me?.storeId);
-      const storeRoomId = myStore ? `cr-store-${myStore.id}` : null;
-      const hasStoreRoom = storeRoomId && rooms.some((r) => r.id === storeRoomId);
-      const hasAll = rooms.some((r) => r.id === "cr-all");
-      const canAll = rankLevel(me) >= 3;
-      const buttons = [];
-      if (myStore && !hasStoreRoom) {
-        buttons.push(el("button", {
-          class: "btn primary sm",
-          onclick: () => {
-            const room = store.add("chatRooms", {
-              id: storeRoomId, kind: "store", name: myStore.name, icon: "🏠",
-              desc: `${myStore.name}のスタッフルーム`,
-              memberIds: staff.filter((s) => s.storeId === myStore.id).map((s) => s.id),
-              announceOnly: false, pinnedMessageId: null, createdBy: meId,
-            });
-            toast(`「${myStore.name}」のルームを作りました`);
-            openRoom(room.id);
-          },
-        }, icon("plus", 14), `${myStore.name}のルームを作る`));
-      }
-      if (canAll && !hasAll) {
-        buttons.push(el("button", {
-          class: "btn ghost sm",
-          onclick: () => {
-            const room = store.add("chatRooms", {
-              id: "cr-all", kind: "group", name: "全社アナウンス", icon: "📢", desc: "全社員向けの連絡",
-              memberIds: staff.map((s) => s.id), announceOnly: false, pinnedMessageId: null, createdBy: meId,
-            });
-            toast("「全社アナウンス」を作りました");
-            openRoom(room.id);
-          },
-        }, icon("plus", 14), "全社アナウンスを作る"));
-      }
-      if (!buttons.length) return el("span");
-      return el("div", { class: "cv-default-rooms" },
-        el("p", { class: "small muted" }, "最初のルームをここから作れます。店舗のメンバーは自動で参加します。"),
-        el("div", { class: "flex", style: { gap: "8px", flexWrap: "wrap", justifyContent: "center" } }, buttons));
     }
 
     /* ============================================================

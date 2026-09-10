@@ -14,6 +14,7 @@ import { store, todayStr } from "../store.js";
 import { makeTest, testTopics, summarizeInterview, sampleInterviewVoice } from "../ai.js";
 import { can, canSeeStaff, rankLevel } from "../auth.js";
 import { pointsOf } from "./sns.js";
+import { openMemberForm } from "../memberform.js";
 
 /* ---------------- 共通ヘルパー ---------------- */
 
@@ -76,14 +77,32 @@ const h4 = (text) => el("h4", { class: "st-h4" }, text);
    タブ 1:メンバー
    ============================================================ */
 
-function membersView(body) {
+let showRetired = false;
+
+function membersView(body, rerender) {
   if (rankLevel(store.me()) < 3) {
     body.appendChild(el("div", { class: "st-note st-note-block" }, icon("eye", 15),
       el("span", {}, "スキルスコアやテストの点数は、", el("strong", {}, "本人と責任者(院長以上)のみ"), "が閲覧できます。")));
   }
+  const all = store.get("staff");
+  const retired = all.filter((s) => s.isActive === false);
+  const manage = can("members.manage");
+  body.appendChild(el("div", { class: "st-toolrow" },
+    el("div", { class: "st-note" }, icon(manage ? "edit" : "info", 15),
+      el("span", {}, manage
+        ? "メンバーの追加・異動・退職・委員会の任命はここから。所属を変えるとチャットのルームも自動で入れ替わります。"
+        : "メンバーの追加・異動はマネージャー以上と本部人事が行います。")),
+    el("div", { class: "flex", style: { gap: "8px", flexWrap: "wrap" } },
+      retired.length ? el("button", {
+        class: "btn ghost sm", onclick: () => { showRetired = !showRetired; rerender(); },
+      }, showRetired ? "退職者を隠す" : `退職者を表示(${retired.length})`) : null,
+      manage ? el("button", { class: "btn primary sm", onclick: () => openMemberForm({ onSaved: rerender }) },
+        icon("plus", 14), "メンバーを追加") : null)));
+
   const grid = el("div", { class: "st-mgrid" });
-  for (const s of store.get("staff")) {
-    const open = () => openMemberModal(s);
+  for (const s of all) {
+    if (s.isActive === false && !showRetired) continue;
+    const open = () => openMemberModal(s, rerender);
     grid.appendChild(el("div", {
       class: "st-mcard", role: "button", tabindex: "0",
       onclick: open,
@@ -97,6 +116,8 @@ function membersView(body) {
       el("div", { class: "st-mbadges" },
         badge(store.storeName(s.storeId), "brand"),
         badge(s.role),
+        s.isActive === false ? badge("退職", "critical") : null,
+        (s.committeeIds || []).length ? el("span", { class: "small muted", title: (s.committeeIds || []).map((c) => store.byId("committees", c)?.name).filter(Boolean).join("・") }, `委員会 ${s.committeeIds.length}`) : null,
         el("span", { class: "st-pts", title: "サンクスポイント" }, icon("gift", 13), `${pointsOf(s.id)}pt`)),
       el("div", { class: "st-mradar" },
         canViewScore(s.id) ? skillsRadar(s, 150) : scoreLockNote())));
@@ -104,7 +125,7 @@ function membersView(body) {
   body.appendChild(grid);
 }
 
-function openMemberModal(s) {
+function openMemberModal(s, rerender) {
   const showScore = canViewScore(s.id);
   const history = store.get("tests")
     .flatMap((t) => t.results.filter((r) => r.staffId === s.id).map((r) => ({ test: t, r })))
@@ -140,7 +161,10 @@ function openMemberModal(s) {
           showScore ? skillsRadar(s, 250) : scoreLockNote("lg")),
         el("div", { class: "st-detail-right" },
           h4("基本情報"),
-          kv("入社", fmtDate(s.joined, { withYear: true, withDow: false })),
+          kv("入社", s.joined ? fmtDate(s.joined, { withYear: true, withDow: false }) : "—"),
+          kv("上司", s.reportsTo ? store.staffName(s.reportsTo) : "—"),
+          kv("追加所属", (s.storeIds || []).length ? s.storeIds.map((id) => store.storeName(id)).join("・") : "—"),
+          kv("委員会", (s.committeeIds || []).length ? s.committeeIds.map((c) => store.byId("committees", c)?.name).filter(Boolean).join("・") : "—"),
           kv("保有資格", s.licenses?.length ? s.licenses.join("・") : "—"),
           kv("サンクスポイント", `${pointsOf(s.id)} pt`),
           showScore && Object.keys(s.skills || {}).length
@@ -148,7 +172,9 @@ function openMemberModal(s) {
             : null,
           h4("テスト受験履歴"),
           historyBody))),
-    actions: [closeBtn],
+    actions: [closeBtn, can("members.manage")
+      ? el("button", { class: "btn primary", onclick: () => { m.close(); openMemberForm({ existing: s, onSaved: rerender }); } }, icon("edit", 14), "編集・異動")
+      : null].filter(Boolean),
   });
   closeBtn.addEventListener("click", m.close);
 }

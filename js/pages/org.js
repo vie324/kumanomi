@@ -9,6 +9,7 @@
 import { el, clear, icon, avatar, badge, toast, fmtDate, drawer, confirmDialog } from "../ui.js";
 import { store, todayStr } from "../store.js";
 import { directorTitle } from "../data.js";
+import { openMemberForm } from "../memberform.js";
 import {
   can, rankOf, rankLabel, rankLevel,
   subtreeIds, directReports, isDescendant, chainOf,
@@ -292,6 +293,9 @@ export default {
             "管轄は毎月変わります。カードを役職者へドラッグするだけで付け替えられ、日報・情報の見える範囲に即時反映されます。")),
         el("div", { class: "page-actions" },
           el("button", { class: "btn ghost", onclick: openLogDrawer }, icon("clipboard", 15), "変更履歴"),
+          can("members.manage")
+            ? el("button", { class: "btn primary", onclick: () => openMemberForm({ onSaved: draw }) }, icon("plus", 15), "メンバーを追加")
+            : null,
         )));
 
       // 権限バー+表示オプション

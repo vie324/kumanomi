@@ -79,13 +79,16 @@ export const REMOTE = {
     }),
   },
 
-  /* ---------------- スタッフ(= members) ---------------- */
+  /* ---------------- スタッフ(= members) ----------------
+     読むのは名簿ビュー(RLS で「見てよい人」だけが返る)。
+     書くのは v_app_members(0010)。社員番号・店舗コード・上司の社員番号のまま送ると、
+     ビュー側のトリガが uuid に読み替える。異動・退職・委員会の任命もここを通る。 */
   staff: {
-    table: "members",
+    table: "v_app_members",
     key: "employee_no", // ローカル id('s01')ではなく社員番号で突き合わせる
     order: "sort_order,full_name",
-    /* 参照は名簿ビュー経由。RLS で「見てよい人」だけが返る */
     view: "v_member_directory",
+    upsert: false, // ビュー越し。同じ社員番号はトリガ側で上書きする
     toLocal: (row) => ({
       id: row.employee_no || row.id,
       empCode: row.employee_no || "",
@@ -94,18 +97,46 @@ export const REMOTE = {
       role: row.role_title || "スタッフ",
       rank: row.rank || "staff",
       storeId: row.store_code || row.store_id || null,
+      storeIds: row.store_codes || [],          // 追加所属(兼務)
+      committeeIds: row.committee_codes || [],  // 委員会
       reportsTo: row.manager_employee_no || row.manager_id || null,
       color: row.color || "#2a78d6",
       joined: row.joined_on || "",
+      email: row.email || "",
       licenses: row.license_label && row.license_label !== "未確認" ? [row.license_label] : [],
       isActive: row.is_active !== false,
       photoUrl: row.photo_url || null,
+      sortOrder: row.sort_order ?? 0,
     }),
     softDelete: "is_active", // 退職者は消さずに在籍フラグを落とす
     toRemote: writer({
       empCode: "employee_no", name: "full_name", kana: "kana",
-      role: "role_title", rank: "rank", color: "color", joined: "joined_on",
-      photoUrl: "photo_url",
+      role: "role_title", rank: "rank",
+      storeId: "primary_store_code", reportsTo: "manager_employee_no",
+      storeIds: ["store_codes", (v) => v || []],
+      committeeIds: ["committee_codes", (v) => v || []],
+      color: "color", joined: "joined_on", email: "email",
+      isActive: ["is_active", (v) => v !== false],
+      photoUrl: "photo_url", sortOrder: "sort_order",
+    }),
+  },
+
+  /* ---------------- 委員会マスタ ---------------- */
+  committees: {
+    table: "committees",
+    key: "code",
+    order: "sort_order,name",
+    toLocal: (row) => ({
+      id: row.code,
+      name: row.name,
+      icon: row.icon || "🗂",
+      desc: row.description || "",
+      isActive: row.is_active !== false,
+    }),
+    softDelete: "is_active",
+    toRemote: writer({
+      id: "code", name: "name", icon: "icon", desc: "description",
+      isActive: ["is_active", (v) => v !== false],
     }),
   },
 
@@ -322,6 +353,7 @@ export const REMOTE = {
       announceOnly: !!row.announce_only,
       pinnedMessageId: row.pinned_message_id || null,
       createdBy: row.created_by || null,
+      autoKey: row.auto_key || null, // 所属から自動で作られるルーム(参加者は手で変えない)
     }),
     toRemote: writer({
       id: "id", kind: "kind", name: "name", icon: "icon", desc: "desc",

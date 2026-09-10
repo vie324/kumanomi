@@ -105,6 +105,32 @@ const staff = [
 /** 現場の担当者(受付・本部職を除く=日報/予約/評価の対象) */
 const practitioners = staff.filter((s) => ["院長", "店長", "柔道整復師", "鍼灸師", "エステティシャン"].includes(s.role));
 
+/**
+ * 委員会マスタ。メンバーは committeeIds で任命され、委員会ごとのチャットルームに自動で入る。
+ * (社内SNSのチャンネルとは別。チャンネルは投稿の宛先、委員会は人の所属)
+ */
+const committees = [
+  { id: "cm-tech", name: "技術委員会", icon: "✋", desc: "手技研鑽・症例共有・技術研修運営", isActive: true },
+  { id: "cm-marketing", name: "マーケ委員会", icon: "📈", desc: "集客・LINE配信・キャンペーン企画", isActive: true },
+  { id: "cm-recruit", name: "採用委員会", icon: "🤝", desc: "採用活動・面接調整", isActive: true },
+  { id: "cm-env", name: "衛生委員会", icon: "🌿", desc: "院内環境・衛生・備品", isActive: true },
+  { id: "cm-traffic", name: "交通事故委員会", icon: "🚗", desc: "交通事故対応・保険手続きの知見共有", isActive: true },
+];
+
+/* 委員会の任命と追加所属(兼務)。所属からチャットルームが自動で決まる */
+const COMMITTEE_MEMBERS = {
+  "cm-tech": ["s01", "s03", "s05", "s07", "s08", "s02"],
+  "cm-marketing": ["s10", "s02", "s04", "s17"],
+  "cm-recruit": ["s09", "s05", "s12", "s13"],
+  "cm-env": ["s04", "s06", "s18", "s19"],
+  "cm-traffic": ["s05", "s07", "s01"],
+};
+const EXTRA_STORES = { s15: ["st-omiya"], s10: ["st-biyou"], s16: ["st-urawa", "st-biyou"] };
+for (const s of staff) {
+  s.committeeIds = Object.entries(COMMITTEE_MEMBERS).filter(([, ids]) => ids.includes(s.id)).map(([id]) => id);
+  s.storeIds = EXTRA_STORES[s.id] || [];
+}
+
 const menus = [
   { id: "m1", name: "整体スタンダード(60分)", minutes: 60, price: 6600, kind: "treatment" },
   { id: "m2", name: "骨盤矯正(45分)", minutes: 45, price: 5500, kind: "treatment" },
@@ -987,16 +1013,24 @@ const staffingRules = stores.map((st) => ({
 // チャット(グループ・DM・メンション)
 // ============================================================
 
-/** チャットルーム。kind: group(グループ) / dm(個別) / store(店舗) */
+/** 所属(主所属+追加所属)からその店舗のルームに入る人 */
+const storeRoomMembers = (storeId) => staff
+  .filter((s) => s.storeId === storeId || (s.storeIds || []).includes(storeId))
+  .map((s) => s.id);
+
+/**
+ * チャットルーム。kind: group(グループ) / dm(個別) / store(店舗) / committee(委員会)
+ * autoKey があるルームは所属から参加者が自動で決まる(js/rooms.js が同期する)。
+ */
 const chatRooms = [
-  { id: "cr-all", kind: "group", name: "全社アナウンス", icon: "📢", desc: "全社員向けの連絡", memberIds: staff.map((s) => s.id), announceOnly: false, pinnedMessageId: null },
-  { id: "cr-narimasu", kind: "store", name: "成増店", icon: "🏠", desc: "成増店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-narimasu").map((s) => s.id), pinnedMessageId: null },
-  { id: "cr-omiya", kind: "store", name: "大宮店", icon: "🏠", desc: "大宮店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-omiya").map((s) => s.id), pinnedMessageId: null },
-  { id: "cr-kawagoe", kind: "store", name: "川越店", icon: "🏠", desc: "川越店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-kawagoe").map((s) => s.id), pinnedMessageId: null },
-  { id: "cr-urawa", kind: "store", name: "浦和店", icon: "🏠", desc: "浦和店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-urawa").map((s) => s.id), pinnedMessageId: null },
-  { id: "cr-biyou", kind: "store", name: "ビューティー大宮店", icon: "💆", desc: "美容・エステ店舗のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-biyou").map((s) => s.id), pinnedMessageId: null },
+  { id: "cr-all", autoKey: "all", kind: "group", name: "全社アナウンス", icon: "📢", desc: "全社員向けの連絡(全員が参加)", memberIds: staff.map((s) => s.id), announceOnly: false, pinnedMessageId: null },
+  { id: "cr-narimasu", autoKey: "store:st-narimasu", kind: "store", name: "成増店", icon: "🏠", desc: "成増店のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-narimasu"), pinnedMessageId: null },
+  { id: "cr-omiya", autoKey: "store:st-omiya", kind: "store", name: "大宮店", icon: "🏠", desc: "大宮店のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-omiya"), pinnedMessageId: null },
+  { id: "cr-kawagoe", autoKey: "store:st-kawagoe", kind: "store", name: "川越店", icon: "🏠", desc: "川越店のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-kawagoe"), pinnedMessageId: null },
+  { id: "cr-urawa", autoKey: "store:st-urawa", kind: "store", name: "浦和店", icon: "🏠", desc: "浦和店のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-urawa"), pinnedMessageId: null },
+  { id: "cr-biyou", autoKey: "store:st-biyou", kind: "store", name: "ビューティー大宮店", icon: "💆", desc: "美容・エステ店舗のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-biyou"), pinnedMessageId: null },
   { id: "cr-managers", kind: "group", name: "院長・マネージャー", icon: "🧭", desc: "責任者間の連携", memberIds: ["s01", "s05", "s07", "s12", "s09", "s10"], pinnedMessageId: null },
-  { id: "cr-tech", kind: "group", name: "技術委員会", icon: "✋", desc: "手技・症例の相談", memberIds: ["s01", "s03", "s05", "s07", "s08", "s02"], pinnedMessageId: null },
+  { id: "cr-tech", autoKey: "committee:cm-tech", kind: "committee", name: "技術委員会", icon: "✋", desc: "手技・症例の相談(委員会の任命から自動で更新)", memberIds: COMMITTEE_MEMBERS["cm-tech"], pinnedMessageId: null },
   { id: "cr-mentor-s02", kind: "group", name: "メンター:鈴木班", icon: "🌱", desc: "鈴木メンターとメンティー", memberIds: ["s02", "s11", "s06"], pinnedMessageId: null },
   { id: "cr-dm-s01-s02", kind: "dm", name: null, memberIds: ["s01", "s02"], pinnedMessageId: null },
   { id: "cr-dm-s01-s09", kind: "dm", name: null, memberIds: ["s01", "s09"], pinnedMessageId: null },
@@ -1321,7 +1355,7 @@ function makeIncidentReports() {
   ];
 }
 
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 /* ------------------------------------------------------------
    「記録」と「設定」を分ける
@@ -1373,7 +1407,8 @@ export function createSeed({ demo = true } = {}) {
       // チャットルームはデモの店舗名とスタッフIDで作られているので本番では持たない。
       // 実店舗が入ったあとに作る。
       menus, philosophy, channels, faq, talkScripts,
-      staffingRules: [], chatRooms: [],
+      // 委員会はサーバーのマスタ(マネージャー以上・本部人事が画面から足す)
+      staffingRules: [], chatRooms: [], committees: [],
       // 在庫の品目も持たない。実際に使う品目は店舗ごとに違ううえ、
       // 数量ゼロの品目を残すと「発注点割れ」の自動タスクが初日から並んでしまう。
       // 画面から追加していってもらう。
@@ -1392,7 +1427,7 @@ export function createSeed({ demo = true } = {}) {
     seedMode: "demo",
     currentUserId: "s01",
     settings,
-    stores, staff, menus, philosophy, channels, staffingRules,
+    stores, staff, menus, philosophy, channels, committees, staffingRules,
     patients,
     karte: makeKarte(patients),
     reservations: makeReservations(patients),
