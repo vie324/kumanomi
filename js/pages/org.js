@@ -53,7 +53,7 @@ export default {
   icon: "org",
 
   // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
-  needs: ["orgChangeLog", "staff", "stores"],
+  needs: ["committees", "orgChangeLog", "staff", "stores"],
   render(root) {
     const me = store.me();
     const editable = can("org.edit");

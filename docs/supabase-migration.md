@@ -478,7 +478,7 @@ select count(*) from public.members where employee_no is null;
 | 対象 | 読める | 書ける |
 |---|---|---|
 | メンバー `members` / `v_app_members` | 全社員 | 追加・異動・退職・委員会は **マネージャー以上と本部人事**(`app.can_manage_members()`)。本人はプロフィールのみ |
-| 委員会 `committees` | 全社員 | マネージャー以上と本部人事 |
+| 委員会 `committees` | 全社員 | 固定の 6 つ(`0011_committee_master.sql` で登録)。名前・アイコンを変えるときは SQL で |
 | 自動ルーム(`chat_rooms.auto_key`) | 参加者 | 参加者の変更・削除は不可(所属から自動)。アイコン・説明は参加者が直せる |
 
 - 画面からの追加・編集は `v_app_members` ビュー越し。社員番号・店舗コード・上司の社員番号のまま送ると、

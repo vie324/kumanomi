@@ -9,7 +9,7 @@
 import { el, clear, icon, avatar, badge, modal, confirmDialog, toast } from "./ui.js";
 import { store, todayStr } from "./store.js";
 import { RANKS, rankOf, rankLevel, can, subtreeIds } from "./auth.js";
-import { syncAutoRooms } from "./rooms.js";
+import { syncAutoRooms, committeeList, committeeLabel } from "./rooms.js";
 
 const RANK_ORDER = ["staff", "mentor", "manager", "chief", "area", "exec", "hr", "clerk", "ceo"];
 const ROLE_SUGGEST = ["スタッフ", "柔道整復師", "鍼灸師", "整体師", "エステティシャン", "受付", "院長", "店長", "統括院長", "マネージャー", "統括マネージャー", "本部人事", "事務職員", "社長"];
@@ -82,19 +82,33 @@ export function openMemberForm({ existing = null, onSaved } = {}) {
   storeSel.addEventListener("change", () => { extraStores.delete(storeSel.value); paintExtra(); });
   paintExtra();
 
+  /* ---- 委員会:固定の6つからプルダウンで選んで任命(複数可) ---- */
   const committeeIds = new Set(existing?.committeeIds || []);
-  const cmWrap = el("div", { class: "mf-chips" });
+  const cmSel = el("select", { class: "select mf-cmsel", "aria-label": "委員会を選ぶ" });
+  const cmAdd = el("button", { class: "btn soft sm", type: "button" }, icon("plus", 13), "任命する");
+  const cmTags = el("div", { class: "mf-chips mf-cmtags" });
   const paintCommittees = () => {
-    clear(cmWrap);
-    const list = (store.get("committees") || []).filter((c) => c.isActive !== false);
-    for (const c of list) {
-      cmWrap.appendChild(el("button", {
-        class: `chip ${committeeIds.has(c.id) ? "on" : ""}`, type: "button",
-        onclick: () => { committeeIds.has(c.id) ? committeeIds.delete(c.id) : committeeIds.add(c.id); paintCommittees(); },
-      }, `${c.icon || "🗂"} ${c.name}`));
+    const list = committeeList();
+    clear(cmSel).append(
+      el("option", { value: "" }, "委員会を選ぶ…"),
+      ...list.filter((c) => !committeeIds.has(c.id)).map((c) => el("option", { value: c.id }, `${c.icon || "🗂"} ${c.name}`)));
+    cmSel.disabled = list.every((c) => committeeIds.has(c.id));
+    cmAdd.disabled = cmSel.disabled;
+    clear(cmTags);
+    if (!committeeIds.size) cmTags.appendChild(el("span", { class: "small muted" }, "任命なし"));
+    for (const id of committeeIds) {
+      cmTags.appendChild(el("span", { class: "chip on mf-tag" },
+        committeeLabel(id),
+        el("button", { class: "mf-tag-x", type: "button", "aria-label": "外す", onclick: () => { committeeIds.delete(id); paintCommittees(); } }, "×")));
     }
-    cmWrap.appendChild(el("button", { class: "chip mf-chip-add", type: "button", onclick: openNewCommittee }, icon("plus", 12), "委員会を追加"));
   };
+  cmAdd.addEventListener("click", () => {
+    const id = cmSel.value;
+    if (!id) { toast("委員会を選んでください", "info"); return; }
+    committeeIds.add(id);
+    paintCommittees();
+  });
+  cmSel.addEventListener("change", () => { if (cmSel.value) cmAdd.click(); });
   paintCommittees();
 
   // 上司:自分の配下(や本人)を上司にはできない
@@ -112,37 +126,6 @@ export function openMemberForm({ existing = null, onSaved } = {}) {
   emailIn.value = existing?.email || "";
 
   const activeCb = el("input", { type: "checkbox", checked: existing ? existing.isActive !== false : true });
-
-  /* ---- 委員会をその場で足す ---- */
-  function openNewCommittee() {
-    const nIn = el("input", { class: "input", placeholder: "例)衛生委員会" });
-    const iIn = el("input", { class: "input", placeholder: "例)🧼", maxlength: 4, style: { maxWidth: "90px" } });
-    const dIn = el("input", { class: "input", placeholder: "何をする委員会か(任意)" });
-    const ok = el("button", { class: "btn primary" }, icon("check", 14), "追加する");
-    const cancel = el("button", { class: "btn ghost" }, "キャンセル");
-    const m2 = modal({
-      title: "委員会を追加",
-      body: el("div", { class: "mf-form" },
-        el("div", { class: "form-row" },
-          el("div", { class: "field", style: { flex: "1" } }, el("label", {}, "委員会名"), nIn),
-          el("div", { class: "field" }, el("label", {}, "アイコン"), iIn)),
-        el("div", { class: "field" }, el("label", {}, "説明"), dIn),
-        el("p", { class: "small muted" }, "追加すると、委員会のチャットルームが自動で作られます。任命した人が自動で参加します。")),
-      actions: [cancel, ok],
-    });
-    cancel.addEventListener("click", () => m2.close());
-    ok.addEventListener("click", () => {
-      const name = nIn.value.trim();
-      if (!name) { toast("委員会名を入力してください", "error"); return; }
-      const id = `cm-${Date.now().toString(36)}`;
-      store.add("committees", { id, name, icon: iIn.value.trim() || "🗂", desc: dIn.value.trim(), isActive: true });
-      committeeIds.add(id);
-      syncAutoRooms();
-      m2.close();
-      paintCommittees();
-      toast(`委員会「${name}」を追加しました`);
-    });
-  }
 
   /* ---- 保存 ---- */
   const collect = () => ({
@@ -213,7 +196,7 @@ export function openMemberForm({ existing = null, onSaved } = {}) {
     });
     syncAutoRooms();
     m.close();
-    const rooms = [store.storeName(d.storeId), ...d.committeeIds.map((c) => store.byId("committees", c)?.name)].filter((x) => x && x !== "—");
+    const rooms = [store.storeName(d.storeId), ...d.committeeIds.map((c) => committeeLabel(c))].filter((x) => x && x !== "—");
     toast(`${d.name}さんを追加しました${rooms.length ? `(チャット:全社・${rooms.join("・")}に自動参加)` : ""}`);
     onSaved?.(member);
   };
@@ -239,7 +222,9 @@ export function openMemberForm({ existing = null, onSaved } = {}) {
         el("div", { class: "field" }, el("label", {}, "主な所属店舗"), storeSel),
         el("div", { class: "field" }, el("label", {}, "上司(組織図の傘)"), bossSel)),
       el("div", { class: "field" }, el("label", {}, "追加所属(兼務する店舗。複数可)"), extraWrap),
-      el("div", { class: "field" }, el("label", {}, "委員会(複数可)"), cmWrap),
+      el("div", { class: "field" }, el("label", {}, "委員会(プルダウンから選んで任命。複数可)"),
+        el("div", { class: "mf-cmrow" }, cmSel, cmAdd),
+        cmTags),
       el("div", { class: "form-row" },
         el("div", { class: "field" }, el("label", {}, "入社日"), joinedIn),
         el("div", { class: "field" }, el("label", {}, "メールアドレス(ログイン用)"), emailIn)),

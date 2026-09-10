@@ -13,6 +13,27 @@
    ============================================================ */
 
 import { store } from "./store.js";
+import { DEFAULT_COMMITTEES } from "./data.js";
+
+/**
+ * 委員会の一覧(固定の6つ)。
+ * 本番ではサーバーのマスタを使うが、まだ取り込めていない・空のときは既定の6つを出す。
+ */
+export function committeeList() {
+  const list = (store.get("committees") || []).filter((c) => c.isActive !== false);
+  return list.length ? list : DEFAULT_COMMITTEES;
+}
+
+/** 委員会 id → 名前とアイコン(無ければ null) */
+export function committeeById(id) {
+  return committeeList().find((c) => c.id === id) || DEFAULT_COMMITTEES.find((c) => c.id === id) || null;
+}
+
+/** 委員会の表示名(🧭 理念浸透委員会 のように) */
+export function committeeLabel(id) {
+  const c = committeeById(id);
+  return c ? `${c.icon || "🗂"} ${c.name}` : id;
+}
 
 const ROOM_ID = {
   all: () => "cr-all",
@@ -67,7 +88,7 @@ export function syncAutoRooms() {
     ensure({ autoKey: `store:${st.id}`, id: ROOM_ID.store(st.id), kind: "store", name: st.name, icon: "🏠",
       desc: `${st.name}のスタッフルーム(所属から自動で更新)`, storeId: st.id });
   }
-  for (const c of (store.get("committees") || []).filter((x) => x.isActive !== false)) {
+  for (const c of committeeList()) {
     ensure({ autoKey: `committee:${c.id}`, id: ROOM_ID.committee(c.id), kind: "committee", name: c.name,
       icon: c.icon || "🗂", desc: c.desc || `${c.name}のルーム` });
   }
