@@ -106,23 +106,27 @@ const staff = [
 const practitioners = staff.filter((s) => ["院長", "店長", "柔道整復師", "鍼灸師", "エステティシャン"].includes(s.role));
 
 /**
- * 委員会マスタ。メンバーは committeeIds で任命され、委員会ごとのチャットルームに自動で入る。
- * (社内SNSのチャンネルとは別。チャンネルは投稿の宛先、委員会は人の所属)
+ * 委員会マスタ。会社の委員会はこの 6 つで固定(画面のプルダウンはここから選ぶ)。
+ * メンバーは committeeIds で任命され、委員会ごとのチャットルームに自動で入る。
+ * 本番も同じ 6 つを 0011 で登録している(社内SNSのチャンネルと同じ並び)。
  */
-const committees = [
-  { id: "cm-tech", name: "技術委員会", icon: "✋", desc: "手技研鑽・症例共有・技術研修運営", isActive: true },
+export const DEFAULT_COMMITTEES = [
+  { id: "cm-recruit", name: "採用委員会", icon: "🤝", desc: "採用活動・面接調整・母集団づくり", isActive: true },
   { id: "cm-marketing", name: "マーケ委員会", icon: "📈", desc: "集客・LINE配信・キャンペーン企画", isActive: true },
-  { id: "cm-recruit", name: "採用委員会", icon: "🤝", desc: "採用活動・面接調整", isActive: true },
-  { id: "cm-env", name: "衛生委員会", icon: "🌿", desc: "院内環境・衛生・備品", isActive: true },
+  { id: "cm-philosophy", name: "理念浸透委員会", icon: "🧭", desc: "理念の言語化と浸透施策", isActive: true },
+  { id: "cm-env", name: "環境委員会", icon: "🌿", desc: "院内環境・衛生・備品", isActive: true },
+  { id: "cm-tech", name: "技術委員会", icon: "✋", desc: "手技研鑽・症例共有・技術研修運営", isActive: true },
   { id: "cm-traffic", name: "交通事故委員会", icon: "🚗", desc: "交通事故対応・保険手続きの知見共有", isActive: true },
 ];
+const committees = DEFAULT_COMMITTEES.map((c) => ({ ...c }));
 
 /* 委員会の任命と追加所属(兼務)。所属からチャットルームが自動で決まる */
 const COMMITTEE_MEMBERS = {
-  "cm-tech": ["s01", "s03", "s05", "s07", "s08", "s02"],
-  "cm-marketing": ["s10", "s02", "s04", "s17"],
   "cm-recruit": ["s09", "s05", "s12", "s13"],
+  "cm-marketing": ["s10", "s02", "s04", "s17"],
+  "cm-philosophy": ["s14", "s09", "s01", "s15"],
   "cm-env": ["s04", "s06", "s18", "s19"],
+  "cm-tech": ["s01", "s03", "s05", "s07", "s08", "s02"],
   "cm-traffic": ["s05", "s07", "s01"],
 };
 const EXTRA_STORES = { s15: ["st-omiya"], s10: ["st-biyou"], s16: ["st-urawa", "st-biyou"] };
@@ -1355,7 +1359,7 @@ function makeIncidentReports() {
   ];
 }
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 /* ------------------------------------------------------------
    「記録」と「設定」を分ける

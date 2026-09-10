@@ -15,6 +15,7 @@ import { makeTest, testTopics, summarizeInterview, sampleInterviewVoice } from "
 import { can, canSeeStaff, rankLevel } from "../auth.js";
 import { pointsOf } from "./sns.js";
 import { openMemberForm } from "../memberform.js";
+import { committeeLabel } from "../rooms.js";
 
 /* ---------------- 共通ヘルパー ---------------- */
 
@@ -117,7 +118,7 @@ function membersView(body, rerender) {
         badge(store.storeName(s.storeId), "brand"),
         badge(s.role),
         s.isActive === false ? badge("退職", "critical") : null,
-        (s.committeeIds || []).length ? el("span", { class: "small muted", title: (s.committeeIds || []).map((c) => store.byId("committees", c)?.name).filter(Boolean).join("・") }, `委員会 ${s.committeeIds.length}`) : null,
+        (s.committeeIds || []).length ? el("span", { class: "small muted", title: (s.committeeIds || []).map(committeeLabel).join("・") }, `委員会 ${s.committeeIds.length}`) : null,
         el("span", { class: "st-pts", title: "サンクスポイント" }, icon("gift", 13), `${pointsOf(s.id)}pt`)),
       el("div", { class: "st-mradar" },
         canViewScore(s.id) ? skillsRadar(s, 150) : scoreLockNote())));
@@ -164,7 +165,7 @@ function openMemberModal(s, rerender) {
           kv("入社", s.joined ? fmtDate(s.joined, { withYear: true, withDow: false }) : "—"),
           kv("上司", s.reportsTo ? store.staffName(s.reportsTo) : "—"),
           kv("追加所属", (s.storeIds || []).length ? s.storeIds.map((id) => store.storeName(id)).join("・") : "—"),
-          kv("委員会", (s.committeeIds || []).length ? s.committeeIds.map((c) => store.byId("committees", c)?.name).filter(Boolean).join("・") : "—"),
+          kv("委員会", (s.committeeIds || []).length ? s.committeeIds.map(committeeLabel).join("・") : "—"),
           kv("保有資格", s.licenses?.length ? s.licenses.join("・") : "—"),
           kv("サンクスポイント", `${pointsOf(s.id)} pt`),
           showScore && Object.keys(s.skills || {}).length
@@ -969,7 +970,7 @@ export default {
   icon: "grad",
 
   // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
-  needs: ["evaluations", "interviews", "staff", "stores", "tests", "trainingReports", "trainings"],
+  needs: ["committees", "evaluations", "interviews", "staff", "stores", "tests", "trainingReports", "trainings"],
   render(root, params) {
     const tab = VIEWS[params?.[0]] ? params[0] : "members";
     renderPage(root, tab);

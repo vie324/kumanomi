@@ -934,3 +934,13 @@
 .mf-check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .mf-check input { width: 16px; height: 16px; accent-color: var(--brand); }
 .mf-note { line-height: 1.7; }
+.mf-cmrow { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.mf-cmrow .mf-cmsel { flex: 1; min-width: 0; }
+.mf-tag { padding-right: 6px; }
+.mf-tag .mf-tag-x {
+  margin-left: 4px; width: 18px; height: 18px; border-radius: 50%;
+  display: inline-grid; place-items: center;
+  background: color-mix(in srgb, #fff 25%, transparent); color: inherit;
+  font-size: 12px; line-height: 1;
+}
+.mf-tag .mf-tag-x:hover { background: color-mix(in srgb, #fff 45%, transparent); }
