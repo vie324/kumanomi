@@ -13,9 +13,11 @@ import { store, todayStr, addDays } from "../store.js";
 import { canSeeStaff, rankLevel } from "../auth.js";
 import { router } from "../router.js";
 import { AUTO_SOURCE_LINK } from "../autotasks.js";
+import { notifyTaskAssigned, notifyTaskDone, notifyTaskProgress, sendTaskAlert } from "../taskalerts.js";
 
 const STATUS_NEXT = { todo: "doing", doing: "done", done: "todo" };
 const STATUS_LABEL = { todo: "未着手", doing: "進行中", done: "完了" };
+const PROGRESS_STEPS = [25, 50, 75, 100];
 const SOURCE_META = {
   chat: { emoji: "💬", label: "チャット" },
   meeting: { emoji: "📋", label: "議事録" },
@@ -27,9 +29,12 @@ const SOURCE_META = {
   kintai: { emoji: "⏰", label: "勤怠の承認" },
   shift: { emoji: "🗓", label: "希望休の提出" },
   order: { emoji: "🚚", label: "発注の追跡" },
+  survey: { emoji: "📝", label: "毎月のお願い" },
+  transport: { emoji: "🚃", label: "毎月のお願い" },
 };
 
 const isOverdue = (t) => !!t.due && t.due < todayStr() && t.status !== "done";
+const isDueToday = (t) => !!t.due && t.due === todayStr() && t.status !== "done";
 
 export default {
   id: "tasks",
@@ -37,10 +42,18 @@ export default {
   icon: "check",
 
   // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
-  needs: ["staff", "stores", "tasks"],
-  render(root) {
+  needs: ["chatMessages", "chatRooms", "staff", "stores", "tasks"],
+  render(root, params = []) {
     const me = store.me();
-    const state = { tab: "mine", filter: "open" };
+    const state = { tab: "mine", filter: "open", focusId: params[0] || null };
+    // チャットのタスクカードから飛んできたときは、そのタスクが見えるタブに切り替える
+    if (state.focusId) {
+      const t = store.byId("tasks", state.focusId);
+      if (t) {
+        if (t.ownerId !== me.id) state.tab = "team";
+        if (t.status === "done") state.filter = "all";
+      }
+    }
 
     /* ---------------- データアクセス ---------------- */
     const all = () => store.get("tasks") || [];
@@ -63,10 +76,38 @@ export default {
         : arr;
 
     /* ---------------- 操作 ---------------- */
+    function setStatus(t, next, { progress = null } = {}) {
+      const patch = { status: next };
+      if (next === "done") patch.progress = 100;
+      else if (next === "todo") patch.progress = 0;
+      else if (progress != null) patch.progress = progress;
+      else if (!t.progress) patch.progress = 25;
+      const updated = store.update("tasks", t.id, patch);
+      if (next === "done") {
+        toast(`「${t.title}」を完了にしました 🎉`);
+        // 振られたタスクなら、振った人にチャットで完了を知らせる
+        if (updated && notifyTaskDone(updated, { by: me.id })) toast(`${store.staffName(t.createdBy)}さんに完了を知らせました`, "info");
+      }
+      draw();
+    }
+
     function cycleStatus(t) {
-      const next = STATUS_NEXT[t.status] || "todo";
-      store.update("tasks", t.id, { status: next });
-      if (next === "done") toast(`「${t.title}」を完了にしました 🎉`);
+      setStatus(t, STATUS_NEXT[t.status] || "todo");
+    }
+
+    function setProgress(t, pct) {
+      if (pct >= 100) { setStatus(t, "done"); return; }
+      const updated = store.update("tasks", t.id, { progress: pct, status: "doing" });
+      if (updated && updated.createdBy && updated.createdBy !== me.id && updated.ownerId === me.id) {
+        notifyTaskProgress(updated, { by: me.id });
+      }
+      draw();
+    }
+
+    function remind(t) {
+      const msg = sendTaskAlert(t, { by: me.id, force: true });
+      if (msg) toast(`${store.staffName(t.ownerId)}さんにチャットでリマインドを送りました`);
+      else toast("リマインドを送れませんでした(相手と同じルームがありません)", "error");
       draw();
     }
 
@@ -81,7 +122,10 @@ export default {
       if (!kind) return;
       if (kind === "chat") router.navigate(`chat/${t.source.refId}`);
       else if (kind === "meeting") router.navigate(`meetings/${t.source.refId}`);
-      else if (AUTO_SOURCE_LINK[kind]) router.navigate(AUTO_SOURCE_LINK[kind](t));
+      else if (AUTO_SOURCE_LINK[kind]) {
+        const to = AUTO_SOURCE_LINK[kind](t);
+        if (to) router.navigate(to);
+      }
     }
 
     /* ---------------- タスクの振り分け ---------------- */
@@ -135,16 +179,20 @@ export default {
       okBtn.addEventListener("click", () => {
         const toId = ownerSel.value;
         if (!toId) { toast("担当者を選んでください", "error"); return; }
-        store.update("tasks", t.id, {
+        const note = noteIn.value.trim();
+        const updated = store.update("tasks", t.id, {
           ownerId: toId,
           reassigned: true,
+          alertedAt: null,
           assignLog: [...(t.assignLog || []), {
             from: t.ownerId, to: toId, by: me.id,
-            at: new Date().toISOString(), note: noteIn.value.trim(),
+            at: new Date().toISOString(), note,
           }],
         });
         m.close();
-        toast(`「${t.title}」を ${store.staffName(toId)} さんに振り分けました`);
+        // 新しい担当者にチャットでタスクカードを届ける
+        const sent = updated ? notifyTaskAssigned(updated, { by: me.id, note }) : null;
+        toast(`「${t.title}」を ${store.staffName(toId)} さんに振り分けました${sent ? "(チャットで知らせました)" : ""}`);
         draw();
       });
     }
@@ -185,17 +233,19 @@ export default {
           });
           toast("タスクを更新しました");
         } else {
-          store.add("tasks", {
+          const task = store.add("tasks", {
             title,
             note: noteIn.value.trim(),
             ownerId: ownerSel.value,
             createdBy: me.id,
             due: dueIn.value || null,
             status: "todo",
+            progress: 0,
             source: { kind: "manual", refId: null, label: "手動追加" },
             createdAt: todayStr(),
           });
-          toast(`タスクを追加しました(担当:${store.staffName(ownerSel.value)})`);
+          const sent = task.ownerId !== me.id ? notifyTaskAssigned(task, { by: me.id, note: noteIn.value.trim() }) : null;
+          toast(`タスクを追加しました(担当:${store.staffName(ownerSel.value)})${sent ? "。チャットで知らせました" : ""}`);
         }
         m.close();
         draw();
@@ -224,11 +274,30 @@ export default {
       }, `${meta.emoji} ${t.source?.label || meta.label}`);
     }
 
+    /** 進捗(進行中のときだけ出す。25%刻みで更新、100%で完了) */
+    function progressNode(t) {
+      if (t.status === "done") return null;
+      const pct = Math.max(0, Math.min(100, Number(t.progress) || 0));
+      const mayEdit = t.ownerId === me.id || t.createdBy === me.id || rankLevel(me) >= 3;
+      return el("div", { class: "tk-progress" },
+        el("div", { class: "tk-prog-track" }, el("div", { class: "tk-prog-fill", style: { width: `${pct}%` } })),
+        el("span", { class: "tk-prog-pct" }, `${pct}%`),
+        mayEdit ? el("div", { class: "tk-prog-steps" },
+          PROGRESS_STEPS.map((p) => el("button", {
+            class: `tk-prog-step ${pct >= p ? "on" : ""}`,
+            title: p === 100 ? "完了にする" : `進捗を${p}%にする`,
+            onclick: (e) => { e.stopPropagation(); setProgress(t, p); },
+          }, p === 100 ? "✓" : String(p)))) : null);
+    }
+
     function taskRow(t) {
       // 自動タスクは条件が解消すると自動で消えるため、手で削除させない
       const mayDelete = !t.auto && (t.createdBy === me.id || t.ownerId === me.id || rankLevel(me) >= 3);
+      // リマインド:振った人か責任者が、担当者(自分以外)へチャットで送る
+      const mayRemind = t.status !== "done" && t.ownerId !== me.id && (t.createdBy === me.id || rankLevel(me) >= 3);
       const lastAssign = (t.assignLog || []).slice(-1)[0];
-      return el("div", { class: `tk-row ${t.status === "done" ? "done" : ""} ${t.auto ? "auto" : ""}` },
+      const alertedToday = (t.alertedAt || "").startsWith(todayStr());
+      return el("div", { class: `tk-row ${t.status === "done" ? "done" : ""} ${t.auto ? "auto" : ""} ${isOverdue(t) ? "overdue" : ""}`, dataset: { id: t.id } },
         statusBtn(t),
         el("div", { class: "tk-main" },
           el("div", { class: "tk-title" },
@@ -239,10 +308,16 @@ export default {
             sourceChip(t),
             staffChip(t.ownerId, { size: 20, withRole: false }),
             t.due ? el("span", { class: "tk-due" }, icon("calendar", 12), `期限 ${fmtDate(t.due)}`) : null,
-            isOverdue(t) ? badge("期限超過", "critical") : null,
+            isOverdue(t) ? badge("期限超過", "critical") : isDueToday(t) ? badge("今日まで", "warn") : null,
             lastAssign ? el("span", { class: "tk-reassigned", title: `${store.staffName(lastAssign.from)} から振り分け${lastAssign.note ? `:${lastAssign.note}` : ""}` },
-              icon("refresh", 11), `${store.staffName(lastAssign.from)}から`) : null)),
+              icon("refresh", 11), `${store.staffName(lastAssign.from)}から`) : null,
+            alertedToday ? el("span", { class: "tk-alerted", title: `チャットでリマインド済み(${relTime(t.alertedAt)})` }, icon("bell", 11), "リマインド済") : null),
+          progressNode(t)),
         el("div", { class: "tk-ops" },
+          mayRemind ? el("button", {
+            class: "icon-btn sm", title: "チャットでリマインドを送る", "aria-label": "リマインドを送る",
+            onclick: () => remind(t),
+          }, icon("bell", 14)) : null,
           el("button", {
             class: "icon-btn sm", title: "担当を振り分ける", "aria-label": "タスクを振り分ける",
             onclick: () => openAssignModal(t),
@@ -315,12 +390,22 @@ export default {
         el("span", { class: "tk-hint-ic" }, icon("sparkle", 16)),
         el("span", {},
           el("strong", {}, "タスクの入口は4つ:"),
-          "①チャットのメッセージにマウスを乗せて📋「タスクリストに追加」 ②議事録のアクションアイテムの「タスクへ」 ③この画面の「タスクを追加」 ④",
+          "①チャットの📋ボタン(メッセージから、または入力欄の横から「タスクを振る」) ②議事録のアクションアイテムの「タスクへ」 ③この画面の「タスクを追加」 ④",
           el("strong", {}, "業務からの自動追加"),
-          "(在庫の発注点割れ・経費や勤怠の承認待ち・日報や売上報告の未提出・希望休の締切・入荷待ちの追跡)。自動タスクは対応が終わると自動で消えます。",
+          "(在庫の発注点割れ・経費や勤怠の承認待ち・日報や売上報告の未提出・希望休の締切・入荷待ちの追跡・毎月のお願い)。自動タスクは対応が終わると自動で消えます。",
           el("br"),
-          el("strong", {}, "振り分け:"),
-          "各タスクの👥ボタンから別のスタッフへ担当を変更できます(引き継ぎメモと履歴が残ります)。")));
+          el("strong", {}, "振り分けとアラート:"),
+          "各タスクの👥ボタンから別のスタッフへ担当を変更できます(引き継ぎメモと履歴が残り、相手のチャットにタスクカードが届きます)。期限の当日と超過時には、振った人から担当者へチャットでリマインドが自動で送られます。🔔ボタンで手動でも送れます。進捗は25%刻みで更新でき、完了にすると振った人に知らせが届きます。")));
+
+      // チャットのタスクカードから来たときは、そのタスクまでスクロールして目立たせる
+      if (state.focusId) {
+        const node = root.querySelector(`.tk-row[data-id="${state.focusId}"]`);
+        if (node) {
+          node.classList.add("focus");
+          setTimeout(() => node.scrollIntoView({ block: "center", behavior: "smooth" }), 60);
+        }
+        state.focusId = null;
+      }
     }
 
     draw();

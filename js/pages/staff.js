@@ -6,13 +6,15 @@
    ============================================================ */
 import {
   el, clear, icon, badge, avatar, card, sectionHeader, tabs, table, emptyState,
-  staffChip, kv, fmtDate, toast, aiButton, aiPanel, meter, modal, chip, segmented, celebrate,
-  micButton,
+  staffChip, kv, fmtDate, relTime, toast, aiButton, aiPanel, meter, modal, confirmDialog,
+  chip, segmented, celebrate, micButton,
 } from "../ui.js";
 import { radar } from "../charts.js";
 import { store, todayStr } from "../store.js";
 import { makeTest, testTopics, summarizeInterview, sampleInterviewVoice } from "../ai.js";
 import { can, canSeeStaff, rankLevel } from "../auth.js";
+import { pointsOf } from "./sns.js";
+import { openMemberForm } from "../memberform.js";
 
 /* ---------------- 共通ヘルパー ---------------- */
 
@@ -75,14 +77,32 @@ const h4 = (text) => el("h4", { class: "st-h4" }, text);
    タブ 1:メンバー
    ============================================================ */
 
-function membersView(body) {
+let showRetired = false;
+
+function membersView(body, rerender) {
   if (rankLevel(store.me()) < 3) {
     body.appendChild(el("div", { class: "st-note st-note-block" }, icon("eye", 15),
       el("span", {}, "スキルスコアやテストの点数は、", el("strong", {}, "本人と責任者(院長以上)のみ"), "が閲覧できます。")));
   }
+  const all = store.get("staff");
+  const retired = all.filter((s) => s.isActive === false);
+  const manage = can("members.manage");
+  body.appendChild(el("div", { class: "st-toolrow" },
+    el("div", { class: "st-note" }, icon(manage ? "edit" : "info", 15),
+      el("span", {}, manage
+        ? "メンバーの追加・異動・退職・委員会の任命はここから。所属を変えるとチャットのルームも自動で入れ替わります。"
+        : "メンバーの追加・異動はマネージャー以上と本部人事が行います。")),
+    el("div", { class: "flex", style: { gap: "8px", flexWrap: "wrap" } },
+      retired.length ? el("button", {
+        class: "btn ghost sm", onclick: () => { showRetired = !showRetired; rerender(); },
+      }, showRetired ? "退職者を隠す" : `退職者を表示(${retired.length})`) : null,
+      manage ? el("button", { class: "btn primary sm", onclick: () => openMemberForm({ onSaved: rerender }) },
+        icon("plus", 14), "メンバーを追加") : null)));
+
   const grid = el("div", { class: "st-mgrid" });
-  for (const s of store.get("staff")) {
-    const open = () => openMemberModal(s);
+  for (const s of all) {
+    if (s.isActive === false && !showRetired) continue;
+    const open = () => openMemberModal(s, rerender);
     grid.appendChild(el("div", {
       class: "st-mcard", role: "button", tabindex: "0",
       onclick: open,
@@ -96,14 +116,16 @@ function membersView(body) {
       el("div", { class: "st-mbadges" },
         badge(store.storeName(s.storeId), "brand"),
         badge(s.role),
-        el("span", { class: "st-pts", title: "サンクスポイント" }, icon("gift", 13), `${s.points}pt`)),
+        s.isActive === false ? badge("退職", "critical") : null,
+        (s.committeeIds || []).length ? el("span", { class: "small muted", title: (s.committeeIds || []).map((c) => store.byId("committees", c)?.name).filter(Boolean).join("・") }, `委員会 ${s.committeeIds.length}`) : null,
+        el("span", { class: "st-pts", title: "サンクスポイント" }, icon("gift", 13), `${pointsOf(s.id)}pt`)),
       el("div", { class: "st-mradar" },
         canViewScore(s.id) ? skillsRadar(s, 150) : scoreLockNote())));
   }
   body.appendChild(grid);
 }
 
-function openMemberModal(s) {
+function openMemberModal(s, rerender) {
   const showScore = canViewScore(s.id);
   const history = store.get("tests")
     .flatMap((t) => t.results.filter((r) => r.staffId === s.id).map((r) => ({ test: t, r })))
@@ -139,13 +161,20 @@ function openMemberModal(s) {
           showScore ? skillsRadar(s, 250) : scoreLockNote("lg")),
         el("div", { class: "st-detail-right" },
           h4("基本情報"),
-          kv("入社", fmtDate(s.joined, { withYear: true, withDow: false })),
+          kv("入社", s.joined ? fmtDate(s.joined, { withYear: true, withDow: false }) : "—"),
+          kv("上司", s.reportsTo ? store.staffName(s.reportsTo) : "—"),
+          kv("追加所属", (s.storeIds || []).length ? s.storeIds.map((id) => store.storeName(id)).join("・") : "—"),
+          kv("委員会", (s.committeeIds || []).length ? s.committeeIds.map((c) => store.byId("committees", c)?.name).filter(Boolean).join("・") : "—"),
           kv("保有資格", s.licenses?.length ? s.licenses.join("・") : "—"),
-          kv("サンクスポイント", `${s.points} pt`),
-          showScore ? kv("スキル平均", (Object.values(s.skills).reduce((a, v) => a + v, 0) / Object.keys(s.skills).length).toFixed(1) + " / 5.0") : null,
+          kv("サンクスポイント", `${pointsOf(s.id)} pt`),
+          showScore && Object.keys(s.skills || {}).length
+            ? kv("スキル平均", (Object.values(s.skills).reduce((a, v) => a + v, 0) / Object.keys(s.skills).length).toFixed(1) + " / 5.0")
+            : null,
           h4("テスト受験履歴"),
           historyBody))),
-    actions: [closeBtn],
+    actions: [closeBtn, can("members.manage")
+      ? el("button", { class: "btn primary", onclick: () => { m.close(); openMemberForm({ existing: s, onSaved: rerender }); } }, icon("edit", 14), "編集・異動")
+      : null].filter(Boolean),
   });
   closeBtn.addEventListener("click", m.close);
 }
@@ -397,29 +426,84 @@ function openTakeTestModal(t, rerender) {
    ============================================================ */
 
 const TRAINING_KIND = { 技術研修: "brand", 鍼研修: "accent", 座学: "" };
+const TRAINING_TYPES = ["技術研修", "鍼研修", "座学"];
+
+/** 研修ごとのレポート(提出済みは全員が読める) */
+const reportsOf = (trainingId) => (store.get("trainingReports") || []).filter((r) => r.trainingId === trainingId);
+const submittedReportsOf = (trainingId) => reportsOf(trainingId).filter((r) => r.status === "submitted")
+  .sort((a, b) => ((a.submittedAt || "") < (b.submittedAt || "") ? 1 : -1));
+const myReportOf = (trainingId) => reportsOf(trainingId).find((r) => r.authorId === store.me().id) || null;
+/** 研修の予定を作る・直せる人(院長以上。本部人事は対象外) */
+const canManageTrainings = () => rankLevel(store.me()) >= 3 && store.me().rank !== "hr";
+
+function nowIsoLocal() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${todayStr()}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
 
 function trainingsView(body, rerender) {
   const today = todayStr();
   const trainings = store.get("trainings");
   const future = trainings.filter((t) => t.date >= today).sort((a, b) => (a.date > b.date ? 1 : -1));
   const past = trainings.filter((t) => t.date < today).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const me = store.me();
 
   body.appendChild(el("div", { class: "st-note st-note-block" }, icon("info", 15),
     el("span", {},
       el("strong", {}, "研修は月3回。"),
-      "うち技術研修1回・鍼研修1回(該当職種)は必須参加です。出欠の回答はシフト自動作成の条件に反映されます。")));
+      "うち技術研修1回・鍼研修1回(該当職種)は必須参加です。出欠の回答はシフト自動作成の条件に反映されます。",
+      el("br"),
+      el("strong", {}, "レポートは研修ごとに提出します。"),
+      "提出したレポートは全員が読めるので、参加できなかった人の学びにもなります。")));
+
+  // 自分の未提出レポート(出席した実施済み研修のうち、レポートが提出されていないもの)
+  const pendingMine = past.filter((t) => {
+    const a = (t.attendees || []).find((x) => x.staffId === me.id);
+    const attended = a && (a.status === "出席" || a.status === "参加");
+    return attended && myReportOf(t.id)?.status !== "submitted";
+  });
+  if (pendingMine.length) {
+    body.appendChild(el("div", { class: "st-note st-note-block st-note-warn" }, icon("alert", 15),
+      el("span", {},
+        el("strong", {}, `レポート未提出の研修が ${pendingMine.length} 件あります。`),
+        `「${pendingMine[0].title}」${pendingMine.length > 1 ? " など" : ""}。実施済みの研修の「レポートを書く」から提出してください。`)));
+  }
 
   body.appendChild(card({
     title: "今後の研修", sub: `${future.length}件・出欠を回答してください`,
+    actions: canManageTrainings()
+      ? el("button", { class: "btn primary sm", onclick: () => openTrainingModal(null, rerender) }, icon("plus", 14), "研修を追加")
+      : null,
     body: future.length
       ? el("div", {}, future.map((t) => trainingRow(t, true, rerender)))
-      : emptyState({ icon: "📅", title: "予定されている研修はありません" }),
+      : emptyState({ icon: "📅", title: "予定されている研修はありません", hint: canManageTrainings() ? "「研修を追加」から予定を登録できます" : "" }),
   }));
   body.appendChild(card({
-    title: "実施済みの研修", sub: `${past.length}件`, class: "mt-16",
+    title: "実施済みの研修", sub: `${past.length}件・研修ごとにレポートを提出できます`, class: "mt-16",
     body: past.length
       ? el("div", {}, past.map((t) => trainingRow(t, false, rerender)))
       : emptyState({ icon: "🗂", title: "実施済みの研修はありません" }),
+  }));
+
+  // みんなのレポート(最近の提出)
+  const recent = (store.get("trainingReports") || [])
+    .filter((r) => r.status === "submitted" && store.byId("trainings", r.trainingId))
+    .sort((a, b) => ((a.submittedAt || "") < (b.submittedAt || "") ? 1 : -1))
+    .slice(0, 6);
+  body.appendChild(card({
+    title: "みんなの研修レポート", sub: "最近提出されたもの。研修ごとにまとめて読めます", class: "mt-16",
+    body: recent.length
+      ? el("div", { class: "row-list" }, recent.map((r) => {
+          const t = store.byId("trainings", r.trainingId);
+          return el("div", { class: "row-item clickable", onclick: () => openReportsModal(t, rerender) },
+            avatar(store.byId("staff", r.authorId), 32),
+            el("span", { class: "row-main" },
+              el("span", { class: "row-title" }, `${store.staffName(r.authorId)}・${t.title}`),
+              el("span", { class: "row-sub" }, r.learned || r.body)),
+            el("span", { class: "small muted" }, relTime(r.submittedAt)));
+        }))
+      : emptyState({ icon: "📝", title: "まだ提出されたレポートはありません", hint: "実施済みの研修の「レポートを書く」から提出できます" }),
   }));
 }
 
@@ -428,16 +512,20 @@ function trainingRow(t, isFuture, rerender) {
   const attendees = t.attendees || [];
   const yes = attendees.filter((a) => a.status === "参加" || a.status === "出席");
   const mine = attendees.find((a) => a.staffId === me.id);
+  const reports = submittedReportsOf(t.id);
+  const myReport = myReportOf(t.id);
 
   const respond = (status) => {
     store.update("trainings", t.id, (tr) => {
-      const a = (tr.attendees || []).find((x) => x.staffId === me.id);
-      if (a) a.status = status;
-      return { attendees: tr.attendees };
+      const list = (tr.attendees || []).map((x) => (x.staffId === me.id ? { ...x, status } : x));
+      return { attendees: list };
     });
     toast(`「${t.title}」の出欠を「${status}」で回答しました`);
     rerender();
   };
+
+  const reportLabel = !myReport ? "レポートを書く"
+    : myReport.status === "submitted" ? "自分のレポート(提出済)" : "下書きを続ける";
 
   return el("div", { class: `st-trrow ${isFuture ? "" : "past"}` },
     el("div", { class: "st-trdate" },
@@ -449,11 +537,22 @@ function trainingRow(t, isFuture, rerender) {
         badge(t.type, TRAINING_KIND[t.type] ?? ""),
         t.required ? badge("必須参加", "critical") : null,
         el("span", { class: "st-trfact" }, icon("clock", 12), `${t.start}〜${endTime(t.start, t.durationMin)}`),
-        el("span", { class: "st-trfact" }, icon("pin", 12), t.place)),
+        el("span", { class: "st-trfact" }, icon("pin", 12), t.place || "未定")),
       el("div", { class: "st-trpeople" },
         avatarStack(yes.map((a) => a.staffId), 24),
         el("span", { class: "small muted" },
-          `${isFuture ? "参加" : "出席"} ${yes.length}/${attendees.length}名`))),
+          `${isFuture ? "参加" : "出席"} ${yes.length}/${attendees.length}名`)),
+      // レポート(実施済みの研修。予定でも下書きは書ける)
+      el("div", { class: "st-trreports" },
+        el("button", {
+          class: `btn sm ${myReport?.status === "submitted" ? "ghost" : "soft"}`,
+          onclick: () => openReportModal(t, rerender),
+        }, icon("edit", 13), reportLabel),
+        el("button", {
+          class: "btn ghost sm", disabled: !reports.length,
+          onclick: () => openReportsModal(t, rerender),
+        }, icon("book", 13), `レポートを読む(${reports.length})`),
+        reports.length ? avatarStack(reports.map((r) => r.authorId), 20, 5) : null)),
     el("div", { class: "st-trside" },
       isFuture && mine
         ? el("div", { class: "st-rsvp" },
@@ -468,7 +567,160 @@ function trainingRow(t, isFuture, rerender) {
         : null,
       isFuture && mine && mine.status === "未回答" ? badge("未回答", "warn") : null,
       isFuture && !mine ? el("span", { class: "small muted" }, "対象外") : null,
-      !isFuture && mine ? badge(mine.status, mine.status === "出席" ? "good" : "critical") : null));
+      !isFuture && mine ? badge(mine.status, mine.status === "出席" || mine.status === "参加" ? "good" : "critical") : null,
+      canManageTrainings()
+        ? el("div", { class: "st-trops" },
+            el("button", { class: "icon-btn sm", title: "研修を編集", "aria-label": "研修を編集", onclick: () => openTrainingModal(t, rerender) }, icon("edit", 14)),
+            el("button", { class: "icon-btn sm", title: "研修を削除", "aria-label": "研修を削除", onclick: async () => {
+              const ok = await confirmDialog({ title: "研修を削除", message: `「${t.title}」を削除します。提出済みのレポートは残ります。`, okLabel: "削除する", danger: true });
+              if (!ok) return;
+              store.remove("trainings", t.id); toast("研修を削除しました", "info"); rerender();
+            } }, icon("trash", 14)))
+        : null));
+}
+
+/* ---- 研修の予定を作る・直す(院長以上) ---- */
+function openTrainingModal(existing, rerender) {
+  const titleIn = el("input", { class: "input", placeholder: "例)技術研修:胸椎モビライゼーション" });
+  titleIn.value = existing?.title || "";
+  const typeSel = el("select", { class: "select" },
+    TRAINING_TYPES.map((ty) => el("option", { value: ty, selected: ty === (existing?.type || "技術研修") }, ty)));
+  const dateIn = el("input", { class: "input", type: "date", value: existing?.date || todayStr() });
+  const startIn = el("input", { class: "input", type: "time", value: existing?.start || "10:00" });
+  const durIn = el("input", { class: "input", type: "number", min: "30", step: "30", value: String(existing?.durationMin || 120) });
+  const placeIn = el("input", { class: "input", placeholder: "例)大宮店 研修室 / オンライン" });
+  placeIn.value = existing?.place || "";
+  const reqCb = el("input", { type: "checkbox", checked: !!existing?.required });
+
+  // 対象者:新規のときは種類に応じた初期値、編集のときは今の対象者
+  const picked = new Set((existing?.attendees || []).map((a) => a.staffId));
+  const defaultFor = (ty) => store.get("staff").filter((s) =>
+    ty === "鍼研修" ? (s.licenses || []).some((l) => /はり|鍼/.test(l)) || s.role === "鍼灸師"
+      : ty === "座学" ? true
+        : PRACT_ROLES.includes(s.role)).map((s) => s.id);
+  if (!existing) defaultFor(typeSel.value).forEach((id) => picked.add(id));
+  const memberBox = el("div", { class: "st-pick" });
+  const paintMembers = () => {
+    clear(memberBox);
+    for (const s of store.get("staff")) {
+      const cb = el("input", { type: "checkbox", checked: picked.has(s.id) });
+      cb.addEventListener("change", () => { if (cb.checked) picked.add(s.id); else picked.delete(s.id); });
+      memberBox.appendChild(el("label", { class: "st-pick-row" }, cb, avatar(s, 24),
+        el("span", {}, s.name, el("span", { class: "small muted" }, ` ${store.storeName(s.storeId)}・${s.role}`))));
+    }
+  };
+  paintMembers();
+  typeSel.addEventListener("change", () => {
+    if (existing) return;
+    picked.clear(); defaultFor(typeSel.value).forEach((id) => picked.add(id)); paintMembers();
+  });
+
+  const okBtn = el("button", { class: "btn primary" }, icon("check", 15), existing ? "保存する" : "研修を登録");
+  const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
+  const m = modal({
+    title: existing ? "研修を編集" : "研修を追加",
+    wide: true,
+    body: el("div", { class: "page-staff st-form" },
+      el("div", { class: "field" }, el("label", {}, "研修名"), titleIn),
+      el("div", { class: "form-row" },
+        el("div", { class: "field" }, el("label", {}, "種類"), typeSel),
+        el("div", { class: "field" }, el("label", {}, "日付"), dateIn)),
+      el("div", { class: "form-row" },
+        el("div", { class: "field" }, el("label", {}, "開始"), startIn),
+        el("div", { class: "field" }, el("label", {}, "時間(分)"), durIn)),
+      el("div", { class: "field" }, el("label", {}, "場所"), placeIn),
+      el("label", { class: "st-check" }, reqCb, "必須参加にする"),
+      el("div", { class: "field" }, el("label", {}, `対象者(${picked.size}名)`), memberBox)),
+    actions: [cancelBtn, okBtn],
+  });
+  cancelBtn.addEventListener("click", () => m.close());
+  okBtn.addEventListener("click", () => {
+    const title = titleIn.value.trim();
+    if (!title) { toast("研修名を入力してください", "error"); return; }
+    if (!dateIn.value) { toast("日付を入力してください", "error"); return; }
+    const prev = new Map((existing?.attendees || []).map((a) => [a.staffId, a.status]));
+    const attendees = [...picked].map((id) => ({ staffId: id, status: prev.get(id) || "未回答" }));
+    const data = {
+      title, type: typeSel.value, date: dateIn.value, start: startIn.value || "10:00",
+      durationMin: Number(durIn.value) || 120, required: reqCb.checked, place: placeIn.value.trim(), attendees,
+    };
+    if (existing) store.update("trainings", existing.id, data);
+    else store.add("trainings", data);
+    m.close();
+    toast(existing ? "研修を更新しました" : `研修「${title}」を登録しました(${attendees.length}名に出欠を依頼)`);
+    rerender();
+  });
+}
+
+/* ---- 自分のレポートを書く(研修ごとに1通。提出後も直せる) ---- */
+function openReportModal(t, rerender) {
+  const me = store.me();
+  const existing = myReportOf(t.id);
+  const bodyIn = el("textarea", { class: "textarea", rows: 5, placeholder: "研修の内容と、実際にやったこと・教わったこと" });
+  bodyIn.value = existing?.body || "";
+  const learnedIn = el("textarea", { class: "textarea", rows: 3, placeholder: "いちばん大きな学び・気づき(一言でも)" });
+  learnedIn.value = existing?.learned || "";
+  const applyIn = el("textarea", { class: "textarea", rows: 3, placeholder: "明日からの施術・接客でどう活かすか" });
+  applyIn.value = existing?.applyPlan || "";
+
+  const collect = () => ({ body: bodyIn.value.trim(), learned: learnedIn.value.trim(), applyPlan: applyIn.value.trim() });
+  const save = (status) => {
+    const data = collect();
+    if (status === "submitted" && !data.body) { toast("研修の内容を記入してください", "error"); return; }
+    const patch = { ...data, status, submittedAt: status === "submitted" ? (existing?.submittedAt || nowIsoLocal()) : null };
+    if (existing) store.update("trainingReports", existing.id, patch);
+    else store.add("trainingReports", { ...patch, trainingId: t.id, authorId: me.id });
+    m.close();
+    toast(status === "submitted" ? `「${t.title}」のレポートを提出しました` : "下書きを保存しました");
+    rerender();
+  };
+
+  const draftBtn = el("button", { class: "btn ghost", onclick: () => save("draft") }, "下書き保存");
+  const submitBtn = el("button", { class: "btn primary", onclick: () => save("submitted") }, icon("send", 15), existing?.status === "submitted" ? "更新して提出" : "提出する");
+  const m = modal({
+    title: `研修レポート:${t.title}`,
+    wide: true,
+    body: el("div", { class: "page-staff st-form" },
+      el("div", { class: "st-report-meta" },
+        badge(t.type, TRAINING_KIND[t.type] ?? ""),
+        el("span", { class: "small muted" }, `${fmtDate(t.date, { withYear: true })}・${t.place || ""}`),
+        existing?.status === "submitted" ? badge("提出済", "good") : existing ? badge("下書き", "warn") : null),
+      el("div", { class: "field" }, el("label", {}, "研修の内容・教わったこと"), bodyIn),
+      el("div", { class: "field" }, el("label", {}, "学んだこと・気づき"), learnedIn),
+      el("div", { class: "field" }, el("label", {}, "現場でどう活かすか"), applyIn),
+      el("p", { class: "small muted" }, "提出したレポートは全員が読めます。下書きは自分だけに見えます。")),
+    actions: [draftBtn, submitBtn],
+  });
+}
+
+/* ---- みんなのレポートを読む(研修ごと) ---- */
+function openReportsModal(t, rerender) {
+  const reports = submittedReportsOf(t.id);
+  const me = store.me();
+  const list = reports.length
+    ? el("div", { class: "st-reports" }, reports.map((r) => el("article", { class: `st-report ${r.authorId === me.id ? "mine" : ""}` },
+        el("header", { class: "st-report-head" },
+          staffChip(r.authorId, { size: 30 }),
+          el("span", { class: "small muted" }, `提出 ${relTime(r.submittedAt)}`),
+          r.authorId === me.id ? el("button", { class: "btn ghost sm", onclick: () => { m.close(); openReportModal(t, rerender); } }, icon("edit", 12), "編集") : null),
+        el("div", { class: "st-report-sec" }, el("b", {}, "研修の内容"), el("p", {}, r.body)),
+        r.learned ? el("div", { class: "st-report-sec" }, el("b", {}, "学んだこと"), el("p", {}, r.learned)) : null,
+        r.applyPlan ? el("div", { class: "st-report-sec" }, el("b", {}, "現場でどう活かすか"), el("p", {}, r.applyPlan)) : null)))
+    : emptyState({ icon: "📝", title: "まだレポートがありません" });
+  const closeBtn = el("button", { class: "btn ghost" }, "閉じる");
+  const writeBtn = el("button", { class: "btn primary" }, icon("edit", 14), myReportOf(t.id)?.status === "submitted" ? "自分のレポートを直す" : "自分のレポートを書く");
+  const m = modal({
+    title: `研修レポート:${t.title}`,
+    wide: true,
+    body: el("div", { class: "page-staff" },
+      el("div", { class: "st-report-meta" },
+        badge(t.type, TRAINING_KIND[t.type] ?? ""),
+        el("span", { class: "small muted" }, `${fmtDate(t.date, { withYear: true })}・提出 ${reports.length}件`)),
+      list),
+    actions: [closeBtn, writeBtn],
+  });
+  closeBtn.addEventListener("click", () => m.close());
+  writeBtn.addEventListener("click", () => { m.close(); openReportModal(t, rerender); });
 }
 
 /* ============================================================
@@ -717,7 +969,7 @@ export default {
   icon: "grad",
 
   // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
-  needs: ["evaluations", "interviews", "staff", "stores", "tests", "trainings"],
+  needs: ["evaluations", "interviews", "staff", "stores", "tests", "trainingReports", "trainings"],
   render(root, params) {
     const tab = VIEWS[params?.[0]] ? params[0] : "members";
     renderPage(root, tab);

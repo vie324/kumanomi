@@ -139,6 +139,8 @@ select full_name, store_name, role_title, license, gender
 # 空のDBに setup.sql を流してから
 psql "$TEST_DATABASE_URL" -f supabase/tests/roster_import_test.sql
 psql "$TEST_DATABASE_URL" -f supabase/tests/daily_operations_test.sql
+psql "$TEST_DATABASE_URL" -f supabase/tests/collaboration_test.sql   # 投稿・タスク・チャット・研修・始末書・予算・写真
+psql "$TEST_DATABASE_URL" -f supabase/tests/members_rooms_test.sql   # メンバーの手入力・自動チャットルーム
 ```
 
 `すべて成功しました` が出れば OK です。テストは最後に `rollback` するのでデータは残りません。
@@ -449,6 +451,46 @@ select count(*) from public.members where employee_no is null;
 > これが無いとビュー越しに RLS がまるごと素通りします
 > (= 全社員の勤怠が誰にでも見えてしまう)。
 
+### 投稿・タスク・チャット・研修・始末書・予算(0009)
+
+| 対象 | 読める | 書ける |
+|---|---|---|
+| 投稿 `posts` | 全社員 | 本人(本文)/ 誰でも(いいね・コメント)/ 院長以上(ピン留め・削除) |
+| タスク `tasks` | 担当・作成者・担当の傘の上の人 | 同左。作成者は必ず自分 |
+| チャット `chat_rooms` / `chat_messages` | 参加者(役員以上は全ルーム) | 参加者。他人の発言は既読・リアクション・タスク紐付けだけ |
+| 研修 `trainings` | 全社員 | 予定は院長以上。出欠は本人 |
+| 研修レポート `training_reports` | 提出済みは全社員。下書きは本人 | 本人だけ(研修ごとに 1 人 1 通) |
+| 始末書・業務改善書 `incident_reports` | 本人・組織図で上の人・本部人事・社長 | 本文は本人(提出後は変更不可)。上の人は「確認」と一言だけ |
+| 予算 `budgets` | 全社員 | 役員以上・本部人事 |
+| プロフィール写真 `members.photo_url` | 全社員 | 本人。Storage `avatars/<社員番号>/` に置く |
+
+- 「本人は本文、他人はいいねだけ」のような列単位の制限は、ポリシーではなく **BEFORE UPDATE トリガ**で
+  他人の変更を元に戻す形で実装しています(`app.guard_post_update()` など)。
+- 人の配列(いいね・既読・参加者)は社員番号の `text[]` のまま持ちます。読み替えの手間が無く、
+  `app.current_employee_no()` と突き合わせるだけで RLS が書けます。
+- 自動タスクは `auto_key` に部分ユニーク制約があり、別の端末が同時に積んでも 1 行にまとまります。
+  アプリ側も本番では「自分のタスクは自分の端末が積む」ので、他人の名前で書き込むことはありません。
+- Storage の `avatars` バケットは公開読み取りです。氏名の頭文字の代わりに出す写真なので、
+  カルテ写真のような要配慮情報は **絶対にここへ置かないでください**(そちらは非公開バケット+署名URLで別途設計します)。
+
+### メンバーの手入力と自動チャットルーム(0010)
+
+| 対象 | 読める | 書ける |
+|---|---|---|
+| メンバー `members` / `v_app_members` | 全社員 | 追加・異動・退職・委員会は **マネージャー以上と本部人事**(`app.can_manage_members()`)。本人はプロフィールのみ |
+| 委員会 `committees` | 全社員 | マネージャー以上と本部人事 |
+| 自動ルーム(`chat_rooms.auto_key`) | 参加者 | 参加者の変更・削除は不可(所属から自動)。アイコン・説明は参加者が直せる |
+
+- 画面からの追加・編集は `v_app_members` ビュー越し。社員番号・店舗コード・上司の社員番号のまま送ると、
+  INSTEAD OF トリガが uuid に読み替えます。取込キー `name_key` は氏名から作り、同姓同名は `氏名@社員番号` で区別します。
+- 追加所属は `members.store_codes`、委員会は `members.committee_codes`(どちらもコードの配列)。
+  組織図シートの取込が作る `member_store_assignments` はそのまま残し、管轄の判定(`app.managed_store_ids`)は両方を見ます。
+- 自動ルームは `app.sync_auto_rooms()` が用意します。`members` / `stores` / `committees` の変更で
+  トリガが走り、参加者を所属に合わせます(全社=在籍者全員 / 店舗=主所属+追加所属 / 委員会=任命者)。
+  ルームの id は `cr-all` / `cr-store-<店舗コード>` / `cr-committee-<委員会コード>` で固定です。
+- `members_update_self`(0004)はどの列でも直せてしまっていたため、本人の更新ではランク・所属・上司・
+  社員番号・在籍などを元に戻すトリガ(`app.guard_member_self_update()`)を足しました。
+
 ---
 
 ## 9. 画面から Supabase につなぐ
@@ -524,9 +566,13 @@ update public.members set license = 'unknown', gender = 'unknown';
 テーブルを作って `js/remote.js` の `REMOTE` に 1 行足せば、その画面はサーバー化されます。
 
 1. 患者・カルテ — 出勤打刻との連動、店舗単位の分離。**要配慮個人情報**のため取扱方針を別途定める
-5. 画像(経費レシート・姿勢分析写真)を Supabase Storage へ
-6. LINE Messaging API 連携、mPOP レジ連携
+2. 予約・キャンセル待ち — ダッシュボードの「今日の予約人数」は今は端末内の予約から数えています
+3. 経費・発注・在庫・レジ — 交通費の自動タスク(毎月のお願い)は経費申請がサーバー化されると全端末で揃います
+4. 画像(経費レシート・姿勢分析写真)を Supabase Storage へ(非公開バケット+署名URL)
+5. LINE Messaging API 連携、mPOP レジ連携
 
-現在の進捗は 6 / 35 コレクション
-(`stores` / `staff` / `attendance` / `shifts` / `shiftRequests` / `dailyReports`)。
+現在の進捗は 15 / 39 コレクション
+(`stores` / `staff` / `committees` / `attendance` / `shifts` / `shiftRequests` / `dailyReports` /
+`posts` / `tasks` / `chatRooms` / `chatMessages` / `trainings` / `trainingReports` /
+`incidentReports` / `budgets`)。
 アプリの「接続とデータ」画面でも確認できます。

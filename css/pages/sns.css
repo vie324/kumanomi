@@ -330,6 +330,22 @@
 .page-sns .mc-main { flex: 1; min-width: 0; line-height: 1.4; }
 .page-sns .mc-title { display: block; font-size: var(--fs-sm); font-weight: 700; }
 .page-sns .mc-sub { display: block; font-size: var(--fs-xs); color: var(--ink-3); }
+.page-sns .mc-note { margin: -2px 0 6px; line-height: 1.6; }
+.page-sns .mc-item.done { opacity: 0.62; }
+.page-sns .mc-item.done .mc-title { text-decoration: line-through; }
+
+/* 連絡事項のピン留めチェック / 投稿カードの操作ボタン */
+.page-sns .composer-pin {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink-2);
+  cursor: pointer; user-select: none;
+}
+.page-sns .composer-pin input { width: 15px; height: 15px; accent-color: var(--brand); }
+.page-sns .post-tags .post-op { width: 28px; height: 28px; color: var(--ink-3); }
+.page-sns .post-tags .post-op:hover { color: var(--brand-ink); }
+
+/* サンクスギフトの案内バー */
+.page-sns .thanks-bar { border-color: color-mix(in srgb, var(--accent) 35%, var(--hairline)); background: var(--accent-soft); }
 
 /* ============================================================
    タイムライン4分割(連絡事項/チャンネル/売上報告/社内SNS)

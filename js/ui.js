@@ -223,8 +223,9 @@ export function celebrate(message) {
 /** 人物アバター(イニシャル+個人カラー) */
 export function avatar(person, size = 36) {
   const initial = (person?.name || "?").trim().charAt(0);
-  return el("span", {
-    class: "avatar",
+  const photo = person?.photoUrl || null;
+  const node = el("span", {
+    class: `avatar ${photo ? "has-photo" : ""}`,
     style: {
       width: size + "px", height: size + "px",
       fontSize: Math.round(size * 0.42) + "px",
@@ -232,6 +233,13 @@ export function avatar(person, size = 36) {
     },
     title: person?.name || "",
   }, initial);
+  if (photo) {
+    // 写真が読めなかったら頭文字に戻す(リンク切れ・オフライン対策)
+    const img = el("img", { src: photo, alt: "", loading: "lazy", draggable: false });
+    img.addEventListener("error", () => { img.remove(); node.classList.remove("has-photo"); });
+    node.appendChild(img);
+  }
+  return node;
 }
 
 export function badge(text, kind = "", withDot = false) {
@@ -428,8 +436,10 @@ export function confirmDialog({ title = "確認", message, okLabel = "実行す�
     const ok = el("button", { class: `btn ${danger ? "danger" : "primary"}` }, okLabel);
     const cancel = el("button", { class: "btn ghost" }, "キャンセル");
     const m = modal({ title, body: el("p", { style: { fontSize: "var(--fs-sm)", lineHeight: "1.7" } }, message), actions: [cancel, ok], onClose: () => resolve(false) });
-    ok.addEventListener("click", () => { m.close(); resolve(true); });
-    cancel.addEventListener("click", () => { m.close(); resolve(false); });
+    // close() が onClose → resolve(false) を先に呼ぶので、「実行する」は先に true で確定させる
+    // (順番が逆だと、どのボタンを押しても false になってしまう)
+    ok.addEventListener("click", () => { resolve(true); m.close(); });
+    cancel.addEventListener("click", () => { resolve(false); m.close(); });
   });
 }
 

@@ -83,11 +83,6 @@ export function renderLogin(host, onSignedIn) {
     msg.dataset.tone = "bad";
     clear(msg).append(icon("alert", 15), el("span", {}, text));
   };
-  const showInfo = (text) => {
-    msg.hidden = false;
-    msg.dataset.tone = "info";
-    clear(msg).append(icon("info", 15), el("span", {}, text));
-  };
 
   const form = el("form", {
     class: "lg-form", novalidate: true,

@@ -128,6 +128,13 @@
   user-select: none;
   letter-spacing: 0.02em;
 }
+.avatar { position: relative; overflow: hidden; }
+.avatar img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
 .avatar.ring { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand); }
 .avatar-stack { display: flex; }
 .avatar-stack .avatar { box-shadow: 0 0 0 2px var(--surface); }
@@ -890,3 +897,40 @@
   background: var(--surface-2);
 }
 .chart-empty-msg { font-size: var(--fs-sm); color: var(--ink-3); }
+
+/* ---- アカウント:プロフィール写真 ---- */
+.sync-panel .sp-photo {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 14px; margin-bottom: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.sync-panel .sp-photo-preview { flex: none; }
+.sync-panel .sp-photo-preview .avatar { font-size: 34px; }
+.sync-panel .sp-photo-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sync-panel .sp-photo-title { font-size: var(--fs-sm); font-weight: 800; }
+.user-switch .us-self {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-bottom: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.user-switch .us-self .us-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ---- メンバーの手入力フォーム ---- */
+.mf-form { display: flex; flex-direction: column; gap: 10px; }
+.mf-form .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.mf-form .form-row .field { flex: 1 1 180px; min-width: 0; }
+.mf-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-bottom: 2px;
+  background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--r-md);
+}
+.mf-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.mf-chips .chip { height: 30px; }
+.mf-chips .mf-chip-add { border-style: dashed; gap: 4px; }
+.mf-check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+.mf-check input { width: 16px; height: 16px; accent-color: var(--brand); }
+.mf-note { line-height: 1.7; }

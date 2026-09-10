@@ -17,7 +17,7 @@
 
 import {
   el, clear, icon, badge, card, statTile, tabs, toast, modal,
-  emptyState, confirmDialog, avatar,
+  emptyState, confirmDialog,
 } from "../ui.js";
 import { store } from "../store.js";
 import { can, rankLabel } from "../auth.js";

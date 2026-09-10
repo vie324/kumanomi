@@ -23,6 +23,9 @@ import { store, todayStr, addDays, monthOf } from "./store.js";
 const pad2 = (n) => String(n).padStart(2, "0");
 const fmtMD = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
+/** 毎月のお願い:1minuteアンケート(Googleフォーム) */
+export const SURVEY_URL = "https://forms.gle/xjRUN51dF7Rj8vqs9";
+
 /** その店舗の責任者(院長・店長)。いなければ社長にフォールバック */
 function directorOf(storeId) {
   const list = store.get("staff") || [];
@@ -179,6 +182,38 @@ function desiredTasks() {
     });
   }
 
+  /* ---- 8. 毎月のお願い(1minuteアンケート・交通費申請) ----
+     以前は社内SNSの脇に置いていたが、月ごとのタスクとして全員に積む。
+     期限は月末。済んだかどうかは本人がタスクを完了にして記録する(自動では閉じない)。 */
+  const month = monthOf(today);
+  const monthEnd = addDays(nextMonth(month) + "-01", -1);
+  const mLabel = `${Number(month.slice(5))}月分`;
+  for (const s of store.get("staff") || []) {
+    add({
+      autoKey: `survey:${s.id}:${month}`,
+      resolve: "keep",
+      title: `1minuteアンケートに回答する(${mLabel})`,
+      note: `所要1分・月1回。Googleフォームで回答したら、このタスクを完了にしてください。\n${SURVEY_URL}`,
+      ownerId: s.id,
+      due: monthEnd,
+      source: { kind: "survey", refId: SURVEY_URL, label: "毎月のお願い" },
+    });
+    // 交通費は現場スタッフだけ(本部人事・事務は申請の確認側)
+    if (!isFieldStaff(s)) continue;
+    const applied = (store.get("expenses") || [])
+      .some((e) => e.staffId === s.id && e.category === "交通費" && monthOf(e.date) === month);
+    if (applied) continue;
+    add({
+      autoKey: `transport:${s.id}:${month}`,
+      resolve: "done",
+      title: `交通費を申請する(${mLabel})`,
+      note: "月1回。領収書画像+金額+区間(どこからどこまで)+距離を、在庫・経費ページの「経費申請」から申請してください。申請すると自動で完了になります。",
+      ownerId: s.id,
+      due: monthEnd,
+      source: { kind: "transport", refId: null, label: "毎月のお願い" },
+    });
+  }
+
   return out.filter((t) => t.ownerId);
 }
 
@@ -191,11 +226,21 @@ function desiredTasks() {
  * @returns {{added:number, closed:number}} 追加・クローズした件数
  */
 export function syncAutoTasks() {
+  const me = store.me();
+  if (!me) return { added: 0, closed: 0 };
   const today = todayStr();
-  const desired = desiredTasks();
+
+  // 本番(サーバー同期あり)では「自分のタスクは自分の端末が積む」。
+  // 他人のぶんまで積むと、その人の名前では書けない(RLS)うえ、
+  // 端末ごとに同じタスクが二重に積まれてしまう。
+  // デモでは全員分を積んで、権限切替で見え方を体験できるようにする。
+  const live = (store.state.seedMode || "demo") === "live";
+  const mineOnly = (t) => !live || t.ownerId === me.id;
+
+  const desired = desiredTasks().filter(mineOnly);
   const desiredByKey = new Map(desired.map((d) => [d.autoKey, d]));
   const existingByKey = new Map();
-  for (const t of store.get("tasks") || []) if (t.autoKey) existingByKey.set(t.autoKey, t);
+  for (const t of store.get("tasks") || []) if (t.autoKey && mineOnly(t)) existingByKey.set(t.autoKey, t);
 
   let added = 0;
   let closed = 0;
@@ -208,9 +253,10 @@ export function syncAutoTasks() {
         title: d.title,
         note: d.note,
         ownerId: d.ownerId,
-        createdBy: d.ownerId,
+        createdBy: live ? me.id : d.ownerId,
         due: d.due || null,
         status: "todo",
+        progress: 0,
         source: d.source,
         createdAt: today,
         auto: true,
@@ -232,9 +278,10 @@ export function syncAutoTasks() {
   // --- 条件が解消したタスクを片付ける ---
   for (const [key, t] of existingByKey) {
     if (desiredByKey.has(key)) continue;
+    if (t.autoResolve === "keep") continue;           // 月が変わっても残す(未対応なら期限超過のまま)
     if (t.autoResolve === "done") {
       if (t.status !== "done") {
-        store.update("tasks", t.id, { status: "done", autoClosedAt: today });
+        store.update("tasks", t.id, { status: "done", progress: 100 });
         closed++;
       }
     } else {
@@ -255,4 +302,7 @@ export const AUTO_SOURCE_LINK = {
   nippo: () => "nippo",
   shift: () => "shift",
   order: () => "backoffice",
+  transport: () => "backoffice/expense",
+  // アンケートは外部(Googleフォーム)なので、ページ遷移ではなく別タブで開く
+  survey: () => { window.open(SURVEY_URL, "_blank", "noopener"); return null; },
 };

@@ -5,9 +5,11 @@
    ・@メンション(入力補助つき)/ リアクション / 返信 / 既読 / 添付
    ============================================================ */
 import {
-  el, clear, icon, avatar, badge, emptyState, modal, toast, relTime, staffChip,
+  el, clear, icon, avatar, badge, emptyState, modal, toast, relTime, staffChip, fmtDate,
 } from "../ui.js";
 import { store, todayStr, addDays } from "../store.js";
+import { notifyTaskAssigned } from "../taskalerts.js";
+import { isAutoRoom, autoRoomHint } from "../rooms.js";
 
 const DOW_JA = ["日", "月", "火", "水", "木", "金", "土"];
 const REACTIONS = ["👍", "🙏", "🎉", "💡", "😊", "❤️"];
@@ -60,7 +62,7 @@ export default {
   icon: "chat",
 
   // このページが必要とするデータ。ルーターがそろえてから render() を呼ぶ
-  needs: ["chatMessages", "chatRooms", "staff", "stores"],
+  needs: ["chatMessages", "chatRooms", "staff", "stores", "tasks"],
   render(root, params = []) {
     const meId = store.state.currentUserId;
     const me = store.me();
@@ -166,6 +168,7 @@ export default {
       const sections = [
         { kind: "group", label: "グループ" },
         { kind: "store", label: "店舗" },
+        { kind: "committee", label: "委員会" },
         { kind: "dm", label: "ダイレクト" },
       ];
       let hit = 0;
@@ -242,7 +245,8 @@ export default {
         roomIconNode(room, 38),
         el("div", { class: "cv-title" },
           el("div", { class: "cv-name" }, roomTitle(room),
-            room.kind === "dm" ? badge("ダイレクト", "accent") : null),
+            room.kind === "dm" ? badge("ダイレクト", "accent") : null,
+            isAutoRoom(room) ? el("span", { class: "badge brand", title: autoRoomHint(room) }, "所属で自動") : null),
           el("div", { class: "cv-sub" },
             `メンバー ${members.length}名`,
             room.kind === "dm"
@@ -420,10 +424,41 @@ export default {
     }
 
     function attachNode(a) {
+      if (a.kind === "task") return taskCardNode(a);
       return el("div", { class: "msg-attach" },
         el("span", { class: "at-ic" }, a.kind === "image" ? "🖼" : "📎"),
         el("span", { class: "at-name" }, a.name),
         el("span", { class: "at-hint" }, a.kind === "image" ? "画像" : "ファイル"));
+    }
+
+    /* ---- タスクカード(振り分け・リマインド・完了の知らせに付く)。
+            表示するたびにタスクの今の状態を映すので、完了すればカードも完了になる ---- */
+    const TASK_STATUS = { todo: ["未着手", ""], doing: ["進行中", "brand"], done: ["完了", "good"] };
+    function taskCardNode(a) {
+      const t = store.byId("tasks", a.taskId);
+      if (!t) {
+        return el("div", { class: "msg-task gone" },
+          el("span", { class: "mt-ic" }, "📋"),
+          el("span", { class: "mt-title" }, "このタスクは削除されました"));
+      }
+      const overdue = t.due && t.due < todayStr() && t.status !== "done";
+      const [label, kind] = TASK_STATUS[t.status] || TASK_STATUS.todo;
+      const mineTask = t.ownerId === meId;
+      return el("button", {
+        class: `msg-task ${t.status}`, title: "タスクを開く",
+        onclick: (e) => { e.stopPropagation(); location.hash = `#/tasks/${t.id}`; },
+      },
+        el("span", { class: "mt-head" },
+          el("span", { class: "mt-ic" }, t.status === "done" ? "✅" : "📋"),
+          el("span", { class: "mt-title" }, t.title),
+          badge(label, kind)),
+        el("span", { class: "mt-meta" },
+          el("span", {}, `担当 ${store.staffName(t.ownerId)}${mineTask ? "(自分)" : ""}`),
+          el("span", { class: overdue ? "mt-overdue" : "" }, t.due ? `期限 ${fmtDate(t.due, { withDow: false })}${overdue ? "・超過" : ""}` : "期限なし"),
+          t.status === "doing" ? el("span", {}, `進捗 ${t.progress ?? 0}%`) : null),
+        t.status === "doing"
+          ? el("span", { class: "mt-track" }, el("span", { class: "mt-fill", style: { width: `${t.progress ?? 0}%` } }))
+          : null);
     }
 
     function reactionsNode(m) {
@@ -472,44 +507,72 @@ export default {
       return tools;
     }
 
-    /* ---- チャット発言 → タスク化 ---- */
+    /* ---- チャット発言 → タスク化 / チャットからタスクを振る ----
+       どちらも同じモーダル。担当を選んで作ると、ルームにタスクカードが流れて
+       担当者にメンションが届く。 */
     function openTaskFromMessage(m, room) {
-      const titleIn = el("input", { class: "input", placeholder: "タスクの内容" });
-      titleIn.value = excerpt(m.text || m.attachment?.name || "", 60);
-      const ownerSel = el("select", { class: "select" },
-        room.memberIds.map((id) => el("option", { value: id, selected: id === meId }, store.staffName(id))));
-      const dueIn = el("input", { class: "input", type: "date", value: addDays(todayStr(), 3) });
-      const noteIn = el("textarea", { class: "textarea", rows: 2 });
-      noteIn.value = `${store.staffName(m.authorId)}さんの発言(${roomTitle(room)})から作成`;
+      openAssignTaskModal(room, {
+        title: excerpt(m.text || m.attachment?.name || "", 60),
+        note: `${store.staffName(m.authorId)}さんの発言(${roomTitle(room)})から作成`,
+        ownerId: (m.mentions || []).find((id) => id !== meId) || meId,
+        heading: "このメッセージをタスク化",
+      });
+    }
 
-      const okBtn = el("button", { class: "btn primary" }, icon("check", 15), "タスクを作成");
+    function openAssignTaskModal(room, { title = "", note = "", ownerId = null, heading = "タスクを振る" } = {}) {
+      const titleIn = el("input", { class: "input", placeholder: "例)LINE配信文面のレビュー" });
+      titleIn.value = title;
+      const members = room.memberIds.filter((id) => store.byId("staff", id));
+      const ownerSel = el("select", { class: "select" },
+        members.map((id) => el("option", { value: id, selected: id === (ownerId || meId) },
+          `${store.staffName(id)}${id === meId ? "(自分)" : ""}`)));
+      const dueIn = el("input", { class: "input", type: "date", value: addDays(todayStr(), 3) });
+      const noteIn = el("textarea", { class: "textarea", rows: 2, placeholder: "補足やお願いのひとこと(任意)" });
+      noteIn.value = note;
+
+      const okBtn = el("button", { class: "btn primary" }, icon("send", 15), "タスクを振る");
       const cancelBtn = el("button", { class: "btn ghost" }, "キャンセル");
       const md = modal({
-        title: "このメッセージをタスク化",
+        title: heading,
         body: el("div", { class: "page-chat chat-modal new-room" },
           el("div", { class: "field" }, el("label", {}, "タスクの内容"), titleIn),
-          el("div", { class: "field" }, el("label", {}, "担当者"), ownerSel),
+          el("div", { class: "field" }, el("label", {}, "担当者(このルームのメンバー)"), ownerSel),
           el("div", { class: "field" }, el("label", {}, "期限"), dueIn),
-          el("div", { class: "field" }, el("label", {}, "メモ"), noteIn)),
+          el("div", { class: "field" }, el("label", {}, "メモ"), noteIn),
+          el("div", { class: "hint" }, "作成すると、このルームにタスクカードが流れて担当者にメンションが届きます。期限の当日と超過時には自動でリマインドが送られます。")),
         actions: [cancelBtn, okBtn],
       });
       cancelBtn.addEventListener("click", () => md.close());
       okBtn.addEventListener("click", () => {
         const t = titleIn.value.trim();
         if (!t) { toast("タスクの内容を入力してください", "error"); return; }
-        store.add("tasks", {
+        const task = store.add("tasks", {
           title: t,
           note: noteIn.value.trim(),
           ownerId: ownerSel.value,
           createdBy: meId,
           due: dueIn.value || null,
           status: "todo",
+          progress: 0,
           source: { kind: "chat", refId: room.id, label: roomTitle(room) },
           createdAt: todayStr(),
         });
         md.close();
-        toast(`タスクを作成しました(担当:${store.staffName(ownerSel.value)})。「タスク」ページで確認できます`);
+        if (task.ownerId !== meId) {
+          notifyTaskAssigned(task, { by: meId, room, note: noteIn.value.trim() });
+          drawMessages(); scrollToBottom(); drawRoomList();
+          toast(`${store.staffName(task.ownerId)}さんにタスクを振りました。ルームにタスクカードを送りました`);
+        } else {
+          toast("自分のタスクに追加しました。「タスク」ページで確認できます");
+        }
+        refreshTasksBadge();
       });
+    }
+
+    function refreshTasksBadge() {
+      const n = (store.get("tasks") || []).filter((t) => t.ownerId === meId && t.status !== "done").length;
+      const b = document.querySelector('.nav-badge[data-role="tasks-badge"]');
+      if (b) { if (n > 0) b.textContent = String(n); else b.remove(); }
     }
 
     /* ---------------- 操作 ---------------- */
@@ -609,7 +672,11 @@ export default {
         el("div", { class: "cv-tools" },
           el("button", { class: "icon-btn cv-tool", title: "ファイルを添付", "aria-label": "ファイルを添付", onclick: openAttachPop }, "📎"),
           el("button", { class: "icon-btn cv-tool", title: "絵文字を挿入", "aria-label": "絵文字を挿入", onclick: openEmojiPop }, "😊"),
-          el("button", { class: "icon-btn cv-tool", title: "メンバーをメンション", "aria-label": "メンション", onclick: () => insertAtCaret("@") }, "@")),
+          el("button", { class: "icon-btn cv-tool", title: "メンバーをメンション", "aria-label": "メンション", onclick: () => insertAtCaret("@") }, "@"),
+          el("button", {
+            class: "icon-btn cv-tool cv-tool-task", title: "このルームのメンバーにタスクを振る", "aria-label": "タスクを振る",
+            onclick: () => { const room = roomById(activeRoomId); if (room) openAssignTaskModal(room); },
+          }, icon("clipboard", 16))),
         el("div", { class: "cv-inputwrap" }, ta, mentionPop),
         sendBtn),
       popLayer);
@@ -827,7 +894,10 @@ export default {
       clear(convSearch);
       if (!room) {
         clear(convHead); clear(convPin); clear(convBody);
-        convBody.appendChild(emptyState({ title: "参加中のルームがありません", hint: "「新しいルーム」から作成できます" }));
+        convBody.appendChild(emptyState({
+          title: "参加中のルームがありません",
+          hint: "店舗・委員会・全社のルームは所属から自動で作られます。名簿に所属が登録されると表示されます。個別のルームは「新しいルーム」から作れます",
+        }));
         convFoot.style.display = "none";
         return;
       }
@@ -908,14 +978,19 @@ export default {
         const kind = ids.length === 1 ? "dm" : "group";
         const name = nameInput.value.trim();
         if (kind === "group" && !name) { toast("ルーム名を入力してください", "error"); return; }
-        const room = store.add("chatRooms", {
-          id: store.uid("cr"),
+        // ダイレクトは2人の id から部屋名を決める(同じ相手と2部屋できない)
+        const dmId = kind === "dm" ? `cr-dm-${[meId, ids[0]].sort().join("-")}` : store.uid("cr");
+        const existing = kind === "dm" ? store.byId("chatRooms", dmId) : null;
+        const room = existing || store.add("chatRooms", {
+          id: dmId,
           kind,
           name: kind === "dm" ? null : name,
           icon: kind === "dm" ? null : emoji,
           desc: kind === "dm" ? "" : "新しく作成されたルーム",
           memberIds: [meId, ...ids],
+          announceOnly: false,
           pinnedMessageId: null,
+          createdBy: meId,
         });
         m.close();
         openRoom(room.id);

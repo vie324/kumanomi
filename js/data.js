@@ -105,6 +105,32 @@ const staff = [
 /** 現場の担当者(受付・本部職を除く=日報/予約/評価の対象) */
 const practitioners = staff.filter((s) => ["院長", "店長", "柔道整復師", "鍼灸師", "エステティシャン"].includes(s.role));
 
+/**
+ * 委員会マスタ。メンバーは committeeIds で任命され、委員会ごとのチャットルームに自動で入る。
+ * (社内SNSのチャンネルとは別。チャンネルは投稿の宛先、委員会は人の所属)
+ */
+const committees = [
+  { id: "cm-tech", name: "技術委員会", icon: "✋", desc: "手技研鑽・症例共有・技術研修運営", isActive: true },
+  { id: "cm-marketing", name: "マーケ委員会", icon: "📈", desc: "集客・LINE配信・キャンペーン企画", isActive: true },
+  { id: "cm-recruit", name: "採用委員会", icon: "🤝", desc: "採用活動・面接調整", isActive: true },
+  { id: "cm-env", name: "衛生委員会", icon: "🌿", desc: "院内環境・衛生・備品", isActive: true },
+  { id: "cm-traffic", name: "交通事故委員会", icon: "🚗", desc: "交通事故対応・保険手続きの知見共有", isActive: true },
+];
+
+/* 委員会の任命と追加所属(兼務)。所属からチャットルームが自動で決まる */
+const COMMITTEE_MEMBERS = {
+  "cm-tech": ["s01", "s03", "s05", "s07", "s08", "s02"],
+  "cm-marketing": ["s10", "s02", "s04", "s17"],
+  "cm-recruit": ["s09", "s05", "s12", "s13"],
+  "cm-env": ["s04", "s06", "s18", "s19"],
+  "cm-traffic": ["s05", "s07", "s01"],
+};
+const EXTRA_STORES = { s15: ["st-omiya"], s10: ["st-biyou"], s16: ["st-urawa", "st-biyou"] };
+for (const s of staff) {
+  s.committeeIds = Object.entries(COMMITTEE_MEMBERS).filter(([, ids]) => ids.includes(s.id)).map(([id]) => id);
+  s.storeIds = EXTRA_STORES[s.id] || [];
+}
+
 const menus = [
   { id: "m1", name: "整体スタンダード(60分)", minutes: 60, price: 6600, kind: "treatment" },
   { id: "m2", name: "骨盤矯正(45分)", minutes: 45, price: 5500, kind: "treatment" },
@@ -987,16 +1013,24 @@ const staffingRules = stores.map((st) => ({
 // チャット(グループ・DM・メンション)
 // ============================================================
 
-/** チャットルーム。kind: group(グループ) / dm(個別) / store(店舗) */
+/** 所属(主所属+追加所属)からその店舗のルームに入る人 */
+const storeRoomMembers = (storeId) => staff
+  .filter((s) => s.storeId === storeId || (s.storeIds || []).includes(storeId))
+  .map((s) => s.id);
+
+/**
+ * チャットルーム。kind: group(グループ) / dm(個別) / store(店舗) / committee(委員会)
+ * autoKey があるルームは所属から参加者が自動で決まる(js/rooms.js が同期する)。
+ */
 const chatRooms = [
-  { id: "cr-all", kind: "group", name: "全社アナウンス", icon: "📢", desc: "全社員向けの連絡", memberIds: staff.map((s) => s.id), announceOnly: false, pinnedMessageId: null },
-  { id: "cr-narimasu", kind: "store", name: "成増店", icon: "🏠", desc: "成増店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-narimasu").map((s) => s.id), pinnedMessageId: null },
-  { id: "cr-omiya", kind: "store", name: "大宮店", icon: "🏠", desc: "大宮店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-omiya").map((s) => s.id), pinnedMessageId: null },
-  { id: "cr-kawagoe", kind: "store", name: "川越店", icon: "🏠", desc: "川越店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-kawagoe").map((s) => s.id), pinnedMessageId: null },
-  { id: "cr-urawa", kind: "store", name: "浦和店", icon: "🏠", desc: "浦和店のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-urawa").map((s) => s.id), pinnedMessageId: null },
-  { id: "cr-biyou", kind: "store", name: "ビューティー大宮店", icon: "💆", desc: "美容・エステ店舗のスタッフルーム", memberIds: staff.filter((s) => s.storeId === "st-biyou").map((s) => s.id), pinnedMessageId: null },
+  { id: "cr-all", autoKey: "all", kind: "group", name: "全社アナウンス", icon: "📢", desc: "全社員向けの連絡(全員が参加)", memberIds: staff.map((s) => s.id), announceOnly: false, pinnedMessageId: null },
+  { id: "cr-narimasu", autoKey: "store:st-narimasu", kind: "store", name: "成増店", icon: "🏠", desc: "成増店のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-narimasu"), pinnedMessageId: null },
+  { id: "cr-omiya", autoKey: "store:st-omiya", kind: "store", name: "大宮店", icon: "🏠", desc: "大宮店のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-omiya"), pinnedMessageId: null },
+  { id: "cr-kawagoe", autoKey: "store:st-kawagoe", kind: "store", name: "川越店", icon: "🏠", desc: "川越店のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-kawagoe"), pinnedMessageId: null },
+  { id: "cr-urawa", autoKey: "store:st-urawa", kind: "store", name: "浦和店", icon: "🏠", desc: "浦和店のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-urawa"), pinnedMessageId: null },
+  { id: "cr-biyou", autoKey: "store:st-biyou", kind: "store", name: "ビューティー大宮店", icon: "💆", desc: "美容・エステ店舗のスタッフルーム(所属から自動で更新)", memberIds: storeRoomMembers("st-biyou"), pinnedMessageId: null },
   { id: "cr-managers", kind: "group", name: "院長・マネージャー", icon: "🧭", desc: "責任者間の連携", memberIds: ["s01", "s05", "s07", "s12", "s09", "s10"], pinnedMessageId: null },
-  { id: "cr-tech", kind: "group", name: "技術委員会", icon: "✋", desc: "手技・症例の相談", memberIds: ["s01", "s03", "s05", "s07", "s08", "s02"], pinnedMessageId: null },
+  { id: "cr-tech", autoKey: "committee:cm-tech", kind: "committee", name: "技術委員会", icon: "✋", desc: "手技・症例の相談(委員会の任命から自動で更新)", memberIds: COMMITTEE_MEMBERS["cm-tech"], pinnedMessageId: null },
   { id: "cr-mentor-s02", kind: "group", name: "メンター:鈴木班", icon: "🌱", desc: "鈴木メンターとメンティー", memberIds: ["s02", "s11", "s06"], pinnedMessageId: null },
   { id: "cr-dm-s01-s02", kind: "dm", name: null, memberIds: ["s01", "s02"], pinnedMessageId: null },
   { id: "cr-dm-s01-s09", kind: "dm", name: null, memberIds: ["s01", "s09"], pinnedMessageId: null },
@@ -1262,7 +1296,66 @@ const orgChangeLog = [
   { id: "og02", date: addDays(TODAY, -32), staffId: "s12", fromId: "s15", toId: "s16", by: "s09", note: "浦和店をエリアBへ移管" },
 ];
 
-export const SCHEMA_VERSION = 8;
+// ============================================================
+// 予算・研修レポート・始末書(0009 でサーバー化した新しい記録)
+// ============================================================
+
+/** 店舗 × 月の売上予算。デモでは月次KPIの目標値をそのまま予算にする */
+function makeBudgets(kpiMonthly) {
+  return kpiMonthly.map((k) => ({
+    id: `bg-${k.storeId}-${k.month}`,
+    storeId: k.storeId,
+    month: k.month,
+    amount: k.target,
+    note: "",
+  }));
+}
+
+/** 研修ごとのレポート(実施済み研修に対する提出例) */
+function makeTrainingReports() {
+  return [
+    {
+      id: "trp01", trainingId: "tr04", authorId: "s02", status: "submitted",
+      submittedAt: iso(addDays(TODAY, -11), "21:10"),
+      body: "骨盤帯の評価では、ASIS・PSISの高さの左右差を立位と座位の両方で確認する流れを練習しました。矯正は仙腸関節のモビライゼーションを中心に、患者様の呼吸に合わせて圧を入れるタイミングを重点的に指導いただきました。",
+      learned: "評価→仮説→施術→再評価の順番を崩さないこと。矯正前後で必ず同じ検査を行う。",
+      applyPlan: "初診の姿勢分析で骨盤の左右差を必ず記録し、3回目の来院で再評価して患者様に変化を見せる。",
+    },
+    {
+      id: "trp02", trainingId: "tr04", authorId: "s06", status: "submitted",
+      submittedAt: iso(addDays(TODAY, -10), "19:40"),
+      body: "腸骨の前傾・後傾の見分け方を実技で確認しました。自分は触診の圧が強すぎる癖があると指摘を受け、指腹で面で触れる練習をしました。",
+      learned: "触診は「探す」ではなく「感じる」。圧を弱くしたほうが左右差がわかる。",
+      applyPlan: "毎日の施術で最初の触診を10秒長く取り、左右差を言葉にしてカルテに残す。",
+    },
+    {
+      id: "trp03", trainingId: "tr04", authorId: "s11", status: "draft",
+      submittedAt: null,
+      body: "骨盤の評価の流れを学びました。",
+      learned: "",
+      applyPlan: "",
+    },
+  ];
+}
+
+/** 業務改善書・始末書(組織図で上の人だけが読める) */
+function makeIncidentReports() {
+  return [
+    {
+      id: "ir01", authorId: "s06", kind: "kaizen", occurredOn: addDays(TODAY, -4),
+      conclusion: "回数券の残回数を誤って案内し、患者様に会計時に訂正をお願いすることになった。",
+      cause: "前回の消化入力が反映される前に残回数を口頭で伝えてしまった。",
+      processDetail: "施術後、患者様から「あと何回?」と聞かれ、画面を確認せずに記憶で「3回」と答えた。会計時に受付が確認すると残り2回だった。",
+      worstCase: "残回数の認識違いから追加購入のタイミングがずれ、通院が途切れて信頼を失っていた可能性がある。",
+      prevention: "残回数は必ず画面を見て答える。施術後の声かけの前に消化入力を済ませる手順に変える。",
+      status: "acknowledged", submittedAt: iso(addDays(TODAY, -3), "20:15"),
+      acknowledgedBy: "s05", acknowledgedAt: iso(addDays(TODAY, -2), "09:05"),
+      ackComment: "共有ありがとう。朝礼で「残回数は画面で確認」を店舗ルールとして周知します。",
+    },
+  ];
+}
+
+export const SCHEMA_VERSION = 10;
 
 /* ------------------------------------------------------------
    「記録」と「設定」を分ける
@@ -1286,6 +1379,7 @@ export const RECORD_COLLECTIONS = [
   "inventory", "cashbook", "expenses", "orders", "registerSales",
   "sharoushiSubmissions", "payrollAdjustments",
   "notifications", "tasks", "chatMessages", "orgChangeLog",
+  "budgets", "trainingReports", "incidentReports",
 ];
 
 /**
@@ -1313,7 +1407,8 @@ export function createSeed({ demo = true } = {}) {
       // チャットルームはデモの店舗名とスタッフIDで作られているので本番では持たない。
       // 実店舗が入ったあとに作る。
       menus, philosophy, channels, faq, talkScripts,
-      staffingRules: [], chatRooms: [],
+      // 委員会はサーバーのマスタ(マネージャー以上・本部人事が画面から足す)
+      staffingRules: [], chatRooms: [], committees: [],
       // 在庫の品目も持たない。実際に使う品目は店舗ごとに違ううえ、
       // 数量ゼロの品目を残すと「発注点割れ」の自動タスクが初日から並んでしまう。
       // 画面から追加していってもらう。
@@ -1325,13 +1420,14 @@ export function createSeed({ demo = true } = {}) {
   const patients = makePatients();
   const shifts = makeShifts();
   const dailyReports = makeDailyReports();
+  const kpiMonthly = makeKpiMonthly();
   return {
     schemaVersion: SCHEMA_VERSION,
     generatedAt: TODAY,
     seedMode: "demo",
     currentUserId: "s01",
     settings,
-    stores, staff, menus, philosophy, channels, staffingRules,
+    stores, staff, menus, philosophy, channels, committees, staffingRules,
     patients,
     karte: makeKarte(patients),
     reservations: makeReservations(patients),
@@ -1339,7 +1435,10 @@ export function createSeed({ demo = true } = {}) {
     attendance: makeAttendance(shifts),
     shiftRequests: makeShiftRequests(),
     dailyReports,
-    kpiMonthly: makeKpiMonthly(),
+    kpiMonthly,
+    budgets: makeBudgets(kpiMonthly),
+    trainingReports: makeTrainingReports(),
+    incidentReports: makeIncidentReports(),
     posts: [...makeUriagePosts(), ...makePosts()],
     meetings: makeMeetings(),
     trainings: makeTrainings(),
