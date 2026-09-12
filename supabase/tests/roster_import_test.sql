@@ -148,8 +148,17 @@ select pg_temp.check('店舗が5件登録された',
   ((select r from t_result) ->> 'stores_created')::int, 5);
 select pg_temp.check('メンバーが16名登録された',
   ((select r from t_result) ->> 'members_created')::int, 16);
+-- 戻り値の orphans は名簿ぜんたいを数えるので、組織図に載っていない人
+-- (スタッフ名簿だけで入った人など)がいると 0 にならない。
+-- ここで見たいのは「この取込が上司を付け忘れなかったか」なので、
+-- 今回のバッチに出てきた人だけを数える。
 select pg_temp.check('上司なしの取りこぼしはない',
-  jsonb_array_length((select r from t_result) -> 'orphans'), 0);
+  (select count(*)::int
+     from public.members m
+     join public.roster_import_people p on p.name_key = m.name_key
+    where p.batch_id = (((select r from t_result) ->> 'batch_id')::uuid)
+      and m.is_active and m.reports_to_id is null
+      and m.rank not in ('ceo', 'exec', 'hr')), 0);
 select pg_temp.check('同姓同名の誤検出はない',
   jsonb_array_length((select r from t_result) -> 'duplicate_names'), 0);
 -- 資格の注記があるのは整体部門の6名だけ。残る10名は「未確認」として報告される
