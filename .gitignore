@@ -11,3 +11,6 @@ Thumbs.db
 # ローカル作業用
 node_modules/
 *.log
+
+# スタッフ名簿など、個人情報を含むローカル専用シード
+supabase/seed/*.local.sql

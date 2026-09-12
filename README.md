@@ -121,7 +121,7 @@ vercel.json         … Vercel の設定(ビルドコマンド・キャッシュ
 supabase/
   setup.sql         … これ1つを流せばスキーマが揃う(migrations から自動生成)
   migrations/*.sql  … 分割版(既存DBに差分を当てる用)
-  seed/             … 組織図シート(TSV)と、それを流し込む実行用SQL
+  seed/             … 組織図シート・スタッフ名簿シート(TSV)と、それを流し込む実行用SQL
   tests/            … 取込と権限(RLS)の回帰テスト
 docs/
   supabase-migration.md … 本番移行の手順書
@@ -155,7 +155,12 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/setup.sql
 # 2) 組織図を登録する(全店舗・全メンバー・傘が一度に入る)
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed/0001_roster.sql
 
-# 3) 確認
+# 3) スタッフ名簿を登録する(社員番号・性別・メール・兼務が一度に入る)
+#    ひな形をコピーして、$sheet$ … $sheet$ に名簿シートを貼ってから流す
+cp supabase/seed/0002_staff.sql supabase/seed/0002_staff.local.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed/0002_staff.local.sql
+
+# 4) 確認
 psql "$DATABASE_URL" -c "select repeat('  ', depth) || full_name || ' 【' || role_title || '】'
                            from public.v_org_tree order by sort_path, name_path;"
 ```
@@ -165,6 +170,14 @@ psql "$DATABASE_URL" -c "select repeat('  ', depth) || full_name || ' 【' || ro
 - **氏名をキーに UPSERT する**ので、毎月の組織変更は更新したシートを貼り直して再実行するだけです。
 - 画面(`組織運営 → メンバー・組織図の一括登録`)からは、
   **スプレッドシートのセルの色から資格・性別を自動判定**して取り込めます。
+- 人事のスタッフ名簿シート(状態 / 社員番号 / 姓 / 名 / 性別 / 役職 / 店舗… / メール)も
+  **そのまま貼り付けるだけ**で取り込めます。店舗の列が複数あれば 1 列目が主たる所属、
+  2 列目以降が兼務になります。流す前に `public.preview_staff_sheet(…)` で中身を確認できます。
+- シートの略称(`越谷院`)と名簿の正式名称(`越谷駅前院`)の対応は `public.store_aliases` に、
+  `渡邉`/`渡邊` のような異体字は `app.name_fold` が吸収します。
+- **実際の名簿(氏名+メールアドレス)はリポジトリに置きません。**
+  `supabase/seed/0002_staff.sql` はひな形で、貼り付けた実データは
+  `supabase/seed/*.local.sql`(`.gitignore` 済み)に置くか、SQL Editor に直接貼ります。
 - 権限(RLS)は `js/auth.js` と同じ形を SQL 側にも実装しています。
 
 ### 接続先の設定(Vercel)

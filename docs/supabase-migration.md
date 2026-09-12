@@ -116,7 +116,93 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed/0001_roster.sql
 | `orphans` | 上司が付かなかった人 | 空 |
 | `duplicate_names` | 同姓同名の疑い | 空(あれば `@2` で区別する) |
 
-### 2-3. 確認する
+### 2-3. スタッフ名簿を登録する
+
+組織図シートには氏名しか載っていません。**社員番号・性別・メールアドレス**は
+人事のスタッフ名簿シート(状態 / 社員番号 / 姓 / 名 / 性別 / 役職 / 店舗… / メール)から入れます。
+
+実際の名簿は全社員の氏名とメールアドレスを含むので、リポジトリには入れていません。
+`supabase/seed/0002_staff.sql` はひな形です。コピーして名簿を貼ってから流します
+(`supabase/seed/*.local.sql` は `.gitignore` 済み)。
+
+```bash
+cp supabase/seed/0002_staff.sql supabase/seed/0002_staff.local.sql
+# $sheet$ … $sheet$ の中身を、スプレッドシートからコピーして貼り替える
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed/0002_staff.local.sql
+```
+
+Supabase の SQL Editor に直接貼って実行してもかまいません。
+
+貼り付けた内容は、流す前に確認できます。
+
+```sql
+select * from public.preview_staff_sheet($sheet$ …シートをそのまま貼る… $sheet$);
+```
+
+| 列 | 見かた |
+|---|---|
+| `matched_to` | 重なる既存メンバー。空なら新しく作られる |
+| `unknown_store` | 名簿に無い店舗名。別名が要るか、新しい院か |
+| `primary_store` / `extra_stores` | 1 列目が主たる所属、2 列目以降が兼務 |
+
+取込の結果も JSON で返ります。
+
+```json
+{
+  "rows": 122,
+  "members_new": 21,
+  "members_updated": 101,
+  "stores_new": 2,
+  "assignments": 137,
+  "managers_linked": 4,
+  "created_stores": ["…名簿に無かった院…"],
+  "unknown_stores": [],
+  "without_store": ["…店舗が空欄だった人…"],
+  "without_manager": ["…上司が決まらなかった人…"],
+  "not_in_sheet": ["…名簿に載っていない在籍者…"]
+}
+```
+
+見るべきは次の 4 つです。
+
+| 項目 | 意味 | やること |
+|---|---|---|
+| `unknown_stores` | どの店舗にも結び付かなかった名前 | `public.store_aliases` に別名を足す |
+| `created_stores` | 新しく作られた店舗 | 略称のずれで二重に作っていないか確かめる |
+| `not_in_sheet` | 名簿に載っていない在籍者 | 退職なら `deactivate_missing` を true にして流し直す |
+| `without_manager` | 上司が空欄のまま残った人 | 組織図の画面でつなぐ |
+
+**店舗名の読み替え。** シートの略称(`越谷院`)と名簿の正式名称(`越谷駅前院`)は
+`public.store_aliases` で対応させています。店舗名が変わったらここを直します。
+
+```sql
+select * from public.store_aliases order by alias;
+insert into public.store_aliases (alias, store_name) values ('越谷院', '越谷駅前院')
+on conflict (alias) do update set store_name = excluded.store_name;
+```
+
+**氏名の揺れ。** `渡邉` と `渡邊`、`髙` と `高`、`﨑` と `崎` のような異体字は
+`app.name_fold` が自動で吸収するので、同じ人として重なります。
+字そのものが違う場合だけ `public.member_name_aliases` に書きます。
+
+**社員番号がいちばん強いキーです。** シートの社員番号と一致する人がいれば、
+氏名が違っていてもその人が更新されます(氏名はシートの表記に直ります)。
+番号の振り間違いはそのまま別人の上書きになるので、`preview_staff_sheet` の
+`matched_to` を必ず確認してください。
+
+**オプション。** `0002_staff.sql` の `jsonb_build_object(...)` で切り替えます。
+
+| キー | 既定 | 意味 |
+|---|---|---|
+| `create_missing_stores` | `true` | 名簿に無い店舗をその名前で作る |
+| `deactivate_missing` | `false` | シートに載っていない在籍者を退職扱いにする |
+| `link_managers` | `true` | 上司が**空欄の人だけ**、主所属の院長 → 統括院長 → MG の順でつなぐ |
+| `set_store_leaders` | `false` | 店舗の院長・統括院長・MG 列も名簿から書き換える(組織図取込と食い違うので既定は切) |
+
+このシートは資格(柔整/鍼灸/整体)と部門(整体/受付/美容)を持たないので、
+そこは触りません。組織図シートの取込で入った値がそのまま残ります。
+
+### 2-4. 確認する
 
 ```sql
 -- 組織ツリー(インデント付き)
@@ -133,7 +219,7 @@ select full_name, store_name, role_title, license, gender
  order by store_name, full_name;
 ```
 
-### 2-4. テスト
+### 2-5. テスト
 
 ```bash
 # 空のDBに setup.sql を流してから
@@ -141,6 +227,7 @@ psql "$TEST_DATABASE_URL" -f supabase/tests/roster_import_test.sql
 psql "$TEST_DATABASE_URL" -f supabase/tests/daily_operations_test.sql
 psql "$TEST_DATABASE_URL" -f supabase/tests/collaboration_test.sql   # 投稿・タスク・チャット・研修・始末書・予算・写真
 psql "$TEST_DATABASE_URL" -f supabase/tests/members_rooms_test.sql   # メンバーの手入力・自動チャットルーム
+psql "$TEST_DATABASE_URL" -f supabase/tests/staff_import_test.sql    # スタッフ名簿の一括登録
 ```
 
 `すべて成功しました` が出れば OK です。テストは最後に `rollback` するのでデータは残りません。
@@ -375,7 +462,8 @@ select status, count(*) from public.v_account_status group by status;
 ### 社員番号を振る(アプリ側の安定キー)
 
 アプリは uuid ではなく **社員番号** で人を識別します(`js/remote.js` の `key: "employee_no"`)。
-シートに番号が無い場合は、取込のあとに一度だけ採番してください。
+人事のスタッフ名簿シート(2-3)を取り込めば実際の社員番号が入ります。
+番号を持たないシートしか無い場合だけ、取込のあとに一度だけ採番してください。
 
 ```sql
 select public.fill_employee_numbers();        -- 'K0001' 形式
